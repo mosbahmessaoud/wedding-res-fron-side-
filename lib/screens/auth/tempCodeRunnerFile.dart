@@ -1,0 +1,910 @@
+// lib/screens/auth/multi_step_signup_screen.dart
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import '../../utils/colors.dart';
+import '../../utils/constants.dart';
+import '../../services/api_service.dart';
+import '../../models/county.dart';
+import '../../models/clan.dart';
+import '../../widgets/common/custom_text_field.dart' hide AppColors;
+import 'otp_verification_screen.dart';
+
+class MultiStepSignupScreen extends StatefulWidget {
+  const MultiStepSignupScreen({super.key});
+
+  @override
+  _MultiStepSignupScreenState createState() => _MultiStepSignupScreenState();
+}
+
+class _MultiStepSignupScreenState extends State<MultiStepSignupScreen>
+    with TickerProviderStateMixin {
+  final PageController _pageController = PageController();
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
+  
+  int _currentStep = 0;
+  final int _totalSteps = 4;
+  
+  // Form keys for each step
+  final List<GlobalKey<FormState>> _formKeys = [
+    GlobalKey<FormState>(),
+    GlobalKey<FormState>(),
+    GlobalKey<FormState>(),
+    GlobalKey<FormState>(),
+  ];
+  
+  // Controllers for personal info
+  final _phoneController = TextEditingController();
+  final _firstNameController = TextEditingController();
+  final _lastNameController = TextEditingController();
+  final _fatherNameController = TextEditingController();
+  final _grandfatherNameController = TextEditingController();
+  final _birthAddressController = TextEditingController();
+  final _homeAddressController = TextEditingController();
+  
+  // Controllers for guardian info
+  final _guardianNameController = TextEditingController();
+  final _guardianPhoneController = TextEditingController();
+  final _guardianBirthAddressController = TextEditingController();
+  final _guardianHomeAddressController = TextEditingController();
+  
+  // Controllers for security
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+  
+  // Form data
+  DateTime? _birthDate;
+  DateTime? _guardianBirthDate;
+  County? _selectedCounty;
+  Clan? _selectedClan;
+  String? _selectedGuardianRelation;
+  
+  // State
+  bool _isLoading = false;
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
+  List<County> _counties = [];
+  List<Clan> _clans = [];
+  List<Clan> _filteredClans = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      duration: Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
+    _animationController.forward();
+    _loadCounties();
+    _loadClans();
+  }
+
+  Future<void> _loadCounties() async {
+    try {
+      final counties = await ApiService.getCounties();
+      setState(() {
+        _counties = counties;
+      });
+    } catch (e) {
+      _showErrorSnackBar('فشل في تحميل البلديات: $e');
+    }
+  }
+
+  Future<void> _loadClans() async {
+    if (_clans.isNotEmpty) return;
+    
+    try {
+      final clans = await ApiService.getAllClans();
+      setState(() {
+        _clans = clans;
+      });
+    } catch (e) {
+      _showErrorSnackBar('فشل في تحميل العشائر: $e');
+    }
+  }
+
+  void _filterClansByCounty() {
+    if (_selectedCounty != null) {
+      _filteredClans = _clans.where((clan) => 
+        clan.countyId == _selectedCounty!.id
+      ).toList();
+      _selectedClan = null;
+    } else {
+      _filteredClans = [];
+    }
+  }
+
+  void _onCountyChanged(County? county) {
+    setState(() {
+      _selectedCounty = county;
+      _filterClansByCounty();
+    });
+  }
+
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: AppColors.error,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+
+  Future<void> _selectDate({required bool isGuardian}) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now().subtract(Duration(days: isGuardian ? 40 * 365 : 18 * 365)),
+      firstDate: DateTime.now().subtract(Duration(days: 80 * 365)),
+      lastDate: DateTime.now().subtract(Duration(days: isGuardian ? 18 * 365 : 16 * 365)),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: AppColors.primary,
+              onPrimary: Colors.white,
+              surface: Colors.white,
+              onSurface: AppColors.textPrimary,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      setState(() {
+        if (isGuardian) {
+          _guardianBirthDate = picked;
+        } else {
+          _birthDate = picked;
+        }
+      });
+    }
+  }
+
+  String? _validatePhone(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'رقم الهاتف مطلوب';
+    }
+    if (!RegExp(r'^[0-9]{10}$').hasMatch(value)) {
+      return 'رقم الهاتف يجب أن يكون 10 أرقام';
+    }
+    return null;
+  }
+
+  String? _validateRequired(String? value, String fieldName) {
+    if (value == null || value.isEmpty) {
+      return '$fieldName مطلوب';
+    }
+    return null;
+  }
+
+  String? _validatePassword(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'كلمة المرور مطلوبة';
+    }
+    if (value.length < 6) {
+      return 'كلمة المرور يجب أن تكون 6 أحرف على الأقل';
+    }
+    return null;
+  }
+
+  String? _validateConfirmPassword(String? value) {
+    if (value != _passwordController.text) {
+      return 'كلمتا المرور غير متطابقتان';
+    }
+    return null;
+  }
+
+  bool _validateCurrentStep() {
+    switch (_currentStep) {
+      case 0:
+        return _formKeys[0].currentState!.validate() && _birthDate != null;
+      case 1:
+        return _selectedCounty != null && _selectedClan != null;
+      case 2:
+        return _formKeys[2].currentState!.validate() && 
+               _guardianBirthDate != null && 
+               _selectedGuardianRelation != null;
+      case 3:
+        return _formKeys[3].currentState!.validate();
+      default:
+        return false;
+    }
+  }
+
+  void _nextStep() {
+    if (_validateCurrentStep()) {
+      if (_currentStep < _totalSteps - 1) {
+        setState(() {
+          _currentStep++;
+        });
+        _pageController.animateToPage(
+          _currentStep,
+          duration: Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
+      } else {
+        _signup();
+      }
+    } else {
+      if (_currentStep == 0 && _birthDate == null) {
+        _showErrorSnackBar('يرجى اختيار تاريخ الميلاد');
+      } else if (_currentStep == 1 && (_selectedCounty == null || _selectedClan == null)) {
+        _showErrorSnackBar('يرجى اختيار القصر والعشيرة');
+      } else if (_currentStep == 2) {
+        if (_guardianBirthDate == null) {
+          _showErrorSnackBar('يرجى اختيار تاريخ ميلاد ولي العريس');
+        } else if (_selectedGuardianRelation == null) {
+          _showErrorSnackBar('يرجى اختيار صلة القرابة');
+        }
+      }
+    }
+  }
+
+  void _previousStep() {
+    if (_currentStep > 0) {
+      setState(() {
+        _currentStep--;
+      });
+      _pageController.animateToPage(
+        _currentStep,
+        duration: Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
+  Future<void> _signup() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final userData = {
+        'phone_number': _phoneController.text.trim(),
+        'first_name': _firstNameController.text.trim(),
+        'last_name': _lastNameController.text.trim(),
+        'father_name': _fatherNameController.text.trim(),
+        'grandfather_name': _grandfatherNameController.text.trim(),
+        'birth_date': DateFormat('yyyy-MM-dd').format(_birthDate!),
+        'birth_address': _birthAddressController.text.trim(),
+        'home_address': _homeAddressController.text.trim(),
+        'clan_id': _selectedClan!.id,
+        'county_id': _selectedCounty!.id,
+        'password': _passwordController.text,
+        'role': 'groom',
+        'guardian_name': _guardianNameController.text.trim(),
+        'guardian_phone': _guardianPhoneController.text.trim(),
+        'guardian_birth_date': DateFormat('yyyy-MM-dd').format(_guardianBirthDate!),
+        'guardian_birth_address': _guardianBirthAddressController.text.trim(),
+        'guardian_home_address': _guardianHomeAddressController.text.trim(),
+        'guardian_relation': _selectedGuardianRelation,
+      };
+
+      final response = await ApiService.registerGroom(userData);
+      
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => OTPVerificationScreen(
+            phoneNumber: _phoneController.text.trim(),
+          ),
+        ),
+      );
+
+    } catch (e) {
+      _showErrorSnackBar('فشل في التسجيل: $e');
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  Widget _buildProgressIndicator() {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+      child: Column(
+        children: [
+          Row(
+            children: List.generate(_totalSteps, (index) {
+              return Expanded(
+                child: Container(
+                  height: 4,
+                  margin: EdgeInsets.symmetric(horizontal: 2),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(2),
+                    color: index <= _currentStep 
+                        ? AppColors.primary 
+                        : AppColors.primary.withOpacity(0.2),
+                  ),
+                ),
+              );
+            }),
+          ),
+          SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'الخطوة ${_currentStep + 1} من $_totalSteps',
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              Text(
+                '${((_currentStep + 1) / _totalSteps * 100).round()}% مكتمل',
+                style: TextStyle(
+                  color: AppColors.primary,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDateSelector({
+    required String label,
+    required DateTime? selectedDate,
+    required VoidCallback onTap,
+    required IconData icon,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+        decoration: BoxDecoration(
+          border: Border.all(color: AppColors.border),
+          borderRadius: BorderRadius.circular(16),
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.02),
+              blurRadius: 8,
+              offset: Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, color: AppColors.primary, size: 20),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    selectedDate != null
+                        ? DateFormat('dd/MM/yyyy').format(selectedDate)
+                        : 'اختر التاريخ',
+                    style: TextStyle(
+                      color: selectedDate != null 
+                          ? AppColors.textPrimary 
+                          : AppColors.textSecondary,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.keyboard_arrow_down,
+              color: AppColors.textSecondary,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStepTitle(String title, String subtitle) {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              color: AppColors.primary,
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          SizedBox(height: 8),
+          Text(
+            subtitle,
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 16,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.grey[50],
+      appBar: AppBar(
+        title: Text(
+          'إنشاء حساب جديد',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        foregroundColor: AppColors.primary,
+        centerTitle: true,
+      ),
+      body: FadeTransition(
+        opacity: _fadeAnimation,
+        child: Column(
+          children: [
+            _buildProgressIndicator(),
+            Expanded(
+              child: PageView(
+                controller: _pageController,
+                physics: NeverScrollableScrollPhysics(),
+                children: [
+                  _buildPersonalInfoStep(),
+                  _buildLocationStep(),
+                  _buildGuardianInfoStep(),
+                  _buildSecurityStep(),
+                ],
+              ),
+            ),
+            _buildNavigationButtons(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPersonalInfoStep() {
+    return SingleChildScrollView(
+      padding: EdgeInsets.all(24),
+      child: Form(
+        key: _formKeys[0],
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildStepTitle('معلومات العريس', 'أدخل بياناتك الأساسية'),
+            SizedBox(height: 32),
+
+            CustomTextField(
+              controller: _phoneController,
+              label: 'رقم الهاتف',
+              keyboardType: TextInputType.phone,
+              validator: _validatePhone,
+              prefixIcon: Icons.phone,
+              hint: '0xxxxxxxxx',
+            ),
+            SizedBox(height: 20),
+
+            Row(
+              children: [
+                Expanded(
+                  child: CustomTextField(
+                    controller: _firstNameController,
+                    label: 'الاسم ',
+                    validator: (value) => _validateRequired(value, 'الاسم '),
+                    prefixIcon: Icons.person,
+                  ),
+                ),
+                SizedBox(width: 16),
+                Expanded(
+                  child: CustomTextField(
+                    controller: _lastNameController,
+                    label: 'اللقب',
+                    validator: (value) => _validateRequired(value, 'اللقب'),
+                    prefixIcon: Icons.person_outline,
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 20),
+
+            CustomTextField(
+              controller: _fatherNameController,
+              label: 'اسم الأب',
+              validator: (value) => _validateRequired(value, 'اسم الأب'),
+              prefixIcon: Icons.family_restroom,
+            ),
+            SizedBox(height: 20),
+
+            CustomTextField(
+              controller: _grandfatherNameController,
+              label: 'اسم الجد',
+              validator: (value) => _validateRequired(value, 'اسم الجد'),
+              prefixIcon: Icons.elderly,
+            ),
+            SizedBox(height: 20),
+
+            _buildDateSelector(
+              label: 'تاريخ الميلاد',
+              selectedDate: _birthDate,
+              onTap: () => _selectDate(isGuardian: false),
+              icon: Icons.calendar_today,
+            ),
+            SizedBox(height: 20),
+
+            CustomTextField(
+              controller: _birthAddressController,
+              label: 'مكان الميلاد',
+              validator: (value) => _validateRequired(value, 'مكان الميلاد'),
+              prefixIcon: Icons.location_on,
+            ),
+            SizedBox(height: 20),
+
+            CustomTextField(
+              controller: _homeAddressController,
+              label: 'عنوان السكن',
+              validator: (value) => _validateRequired(value, 'عنوان السكن'),
+              prefixIcon: Icons.home,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLocationStep() {
+    return SingleChildScrollView(
+      padding: EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildStepTitle('معلومات الموقع', ' اختر القصر والعشيرة  '),
+          SizedBox(height: 32),
+
+          CustomDropdown<County>(
+            label: 'القصر',
+            value: _selectedCounty,
+            hint: ' اختر القصر الذي تنتمي اليه ',
+            items: _counties.map((county) => DropdownMenuItem<County>(
+              value: county,
+              child: Text(county.name),
+            )).toList(),
+            onChanged: _onCountyChanged,
+            prefixIcon: Icons.location_city,
+          ),
+          SizedBox(height: 20),
+
+          CustomDropdown<Clan>(
+            label: 'العشيرة',
+            value: _selectedClan,
+            hint: ' اختر العشيرة التي تنتمي اليها ' ,
+            items: _filteredClans.map((clan) => DropdownMenuItem<Clan>(
+              value: clan,
+              child: Text(clan.name),
+            )).toList(),
+            onChanged: (clan) {
+              setState(() {
+                _selectedClan = clan;
+              });
+            },
+            prefixIcon: Icons.groups,
+            enabled: _filteredClans.isNotEmpty,
+          ),
+
+          if (_selectedCounty != null && _filteredClans.isEmpty) ...[
+            SizedBox(height: 20),
+            Container(
+              padding: EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.orange.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: Colors.orange),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'لا توجد عشائر مسجلة في هذه القصر حالياً',
+                      style: TextStyle(color: Colors.orange.shade700),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGuardianInfoStep() {
+    return SingleChildScrollView(
+      padding: EdgeInsets.all(24),
+      child: Form(
+        key: _formKeys[2],
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildStepTitle('معلومات ولي العريس', ' المعلومات الشخصية لولي العريس'),
+            SizedBox(height: 32),
+
+            CustomTextField(
+              controller: _guardianNameController,
+              label: 'الاسم الكامل',
+              hint: "الاسم و اللقب , اسم الاب , اسم الجد",
+              validator: (value) => _validateRequired(value, 'الاسم الكامل'),
+              prefixIcon: Icons.person_4,
+            ),
+            SizedBox(height: 20),
+
+            CustomTextField(
+              controller: _guardianPhoneController,
+              label: 'رقم هاتف ',
+              keyboardType: TextInputType.phone,
+              validator: _validatePhone,
+              prefixIcon: Icons.phone,
+              hint: '0xxxxxxxxx',
+            ),
+            SizedBox(height: 20),
+
+            CustomDropdown<String>(
+              label: 'صلة القرابة بالعريس',
+              value: _selectedGuardianRelation,
+              hint: ' صلة القرابة بالعريس ',
+              items: AppConstants.guardianRelations.map((relation) => 
+                DropdownMenuItem<String>(
+                  value: relation,
+                  child: Text(relation),
+                )
+              ).toList(),
+              onChanged: (relation) {
+                setState(() {
+                  _selectedGuardianRelation = relation;
+                });
+              },
+              prefixIcon: Icons.family_restroom,
+            ),
+            SizedBox(height: 20),
+
+            _buildDateSelector(
+              label: 'تاريخ ميلاد ',
+              selectedDate: _guardianBirthDate,
+              onTap: () => _selectDate(isGuardian: true),
+              icon: Icons.calendar_today,
+            ),
+            SizedBox(height: 20),
+
+            CustomTextField(
+              controller: _guardianBirthAddressController,
+              label: 'مكان الميلاد ',
+              validator: (value) => _validateRequired(value, 'مكان الميلاد '),
+              prefixIcon: Icons.location_on,
+            ),
+            SizedBox(height: 20),
+
+            CustomTextField(
+              controller: _guardianHomeAddressController,
+              label: 'عنوان سكن ',
+              validator: (value) => _validateRequired(value, 'عنوان سكن '),
+              prefixIcon: Icons.home,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSecurityStep() {
+    return SingleChildScrollView(
+      padding: EdgeInsets.all(24),
+      child: Form(
+        key: _formKeys[3],
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildStepTitle('معلومات الأمان', 'أنشئ كلمة مرور قوية'),
+            SizedBox(height: 32),
+
+            CustomTextField(
+              controller: _passwordController,
+              label: 'كلمة المرور',
+              obscureText: _obscurePassword,
+              validator: _validatePassword,
+              prefixIcon: Icons.lock,
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                ),
+                onPressed: () {
+                  setState(() {
+                    _obscurePassword = !_obscurePassword;
+                  });
+                },
+              ),
+            ),
+            SizedBox(height: 20),
+
+            CustomTextField(
+              controller: _confirmPasswordController,
+              label: 'تأكيد كلمة المرور',
+              obscureText: _obscureConfirmPassword,
+              validator: _validateConfirmPassword,
+              prefixIcon: Icons.lock_outline,
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _obscureConfirmPassword ? Icons.visibility : Icons.visibility_off,
+                ),
+                onPressed: () {
+                  setState(() {
+                    _obscureConfirmPassword = !_obscureConfirmPassword;
+                  });
+                },
+              ),
+            ),
+            SizedBox(height: 24),
+
+            Container(
+              padding: EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.primary.withOpacity(0.1)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.security, color: AppColors.primary),
+                      SizedBox(width: 8),
+                      Text(
+                        'متطلبات كلمة المرور',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 12),
+                  _buildPasswordRequirement('على الأقل 6 أحرف', _passwordController.text.length >= 6),
+                  _buildPasswordRequirement('تحتوي على أرقام', RegExp(r'[0-9]').hasMatch(_passwordController.text)),
+                  _buildPasswordRequirement('تحتوي على أحرف', RegExp(r'[a-zA-Z]').hasMatch(_passwordController.text)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPasswordRequirement(String requirement, bool isMet) {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          Icon(
+            isMet ? Icons.check_circle : Icons.radio_button_unchecked,
+            size: 16,
+            color: isMet ? Colors.green : AppColors.textSecondary,
+          ),
+          SizedBox(width: 8),
+          Text(
+            requirement,
+            style: TextStyle(
+              fontSize: 14,
+              color: isMet ? Colors.green : AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNavigationButtons() {
+    return Container(
+      padding: EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: Offset(0, -2),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        child: Row(
+          children: [
+            if (_currentStep > 0) ...[
+              Expanded(
+                flex: 1,
+                child: OutlinedButton(
+                  onPressed: _previousStep,
+                  style: OutlinedButton.styleFrom(
+                    padding: EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    side: BorderSide(color: AppColors.primary),
+                  ),
+                  child: Text(
+                    'السابق',
+                    style: TextStyle(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(width: 12),
+            ],
+            Expanded(
+              flex: 2,
+              child: LoadingButton(
+                onPressed: _nextStep,
+                isLoading: _isLoading,
+                text: _currentStep == _totalSteps - 1 ? 'إنشاء الحساب' : 'التالي',
+                icon: Icons.arrow_forward,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    _pageController.dispose();
+    
+    // Dispose all controllers
+    _phoneController.dispose();
+    _firstNameController.dispose();
+    _lastNameController.dispose();
+    _fatherNameController.dispose();
+    _grandfatherNameController.dispose();
+    _birthAddressController.dispose();
+    _homeAddressController.dispose();
+    _guardianNameController.dispose();
+    _guardianPhoneController.dispose();
+    _guardianBirthAddressController.dispose();
+    _guardianHomeAddressController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    
+    super.dispose();
+  }
+}

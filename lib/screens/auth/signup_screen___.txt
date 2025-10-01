@@ -1,0 +1,561 @@
+// /lib/screens/auth/signup_screen.dart
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import '../../utils/colors.dart';
+import '../../utils/constants.dart';
+import '../../services/api_service.dart';
+import '../../models/county.dart';
+import '../../models/clan.dart';
+import '../../widgets/common/custom_text_field.dart';
+import '../../widgets/common/custom_dropdown.dart';
+import '../../widgets/common/loading_button.dart';
+import 'otp_verification_screen.dart';
+
+class SignupScreen extends StatefulWidget {
+  @override
+  _SignupScreenState createState() => _SignupScreenState();
+}
+
+class _SignupScreenState extends State<SignupScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _scrollController = ScrollController();
+  
+  // Controllers
+  final _phoneController = TextEditingController();
+  final _firstNameController = TextEditingController();
+  final _lastNameController = TextEditingController();
+  final _fatherNameController = TextEditingController();
+  final _grandfatherNameController = TextEditingController();
+  final _birthAddressController = TextEditingController();
+  final _homeAddressController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+  final _guardianNameController = TextEditingController();
+  final _guardianPhoneController = TextEditingController();
+  
+  // Form data
+  DateTime? _birthDate;
+  County? _selectedCounty;
+  Clan? _selectedClan;
+  String? _selectedGuardianRelation;
+  
+  // State
+  bool _isLoading = false;
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
+  List<County> _counties = [];
+  List<Clan> _clans = [];
+  List<Clan> _filteredClans = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCounties();
+    _loadClans(); // Load clans once at startup
+  }
+
+  Future<void> _loadCounties() async {
+    try {
+      final counties = await ApiService.getCounties();
+      setState(() {
+        _counties = counties;
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('فشل في تحميل البلديات: $e')),
+      );
+    }
+  }
+
+  // Load clans only once when screen initializes
+  Future<void> _loadClans() async {
+    try {
+      final clans = await ApiService.getClans();
+      setState(() {
+        _clans = clans;
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('فشل في تحميل العشائر: $e')),
+      );
+    }
+  }
+
+  // Filter clans when county changes (no API call needed)
+  void _filterClansByCounty() {
+    setState(() {
+      if (_selectedCounty != null) {
+        _filteredClans = _clans.where((clan) => 
+          clan.countyId == _selectedCounty!.id
+        ).toList();
+        _selectedClan = null; // Reset clan selection when county changes
+      } else {
+        _filteredClans = [];
+        _selectedClan = null;
+      }
+    });
+  }
+
+  // Call this when county dropdown changes
+  void _onCountyChanged(County? county) {
+    _selectedCounty = county;
+    _filterClansByCounty(); // This will call setState internally
+  }
+
+  Future<void> _selectBirthDate() async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now().subtract(Duration(days: 18 * 365)),
+      firstDate: DateTime.now().subtract(Duration(days: 80 * 365)),
+      lastDate: DateTime.now().subtract(Duration(days: 16 * 365)),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: AppColors.primary,
+              onPrimary: Colors.white,
+              surface: Colors.white,
+              onSurface: AppColors.textPrimary,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null && picked != _birthDate) {
+      setState(() {
+        _birthDate = picked;
+      });
+    }
+  }
+
+  String? _validatePhone(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'رقم الهاتف مطلوب';
+    }
+    return null;
+  }
+
+  String? _validateRequired(String? value, String fieldName) {
+    if (value == null || value.isEmpty) {
+      return '$fieldName مطلوب';
+    }
+    return null;
+  }
+
+  String? _validatePassword(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'كلمة المرور مطلوبة';
+    }
+    if (value.length < 6) {
+      return 'كلمة المرور يجب أن تكون 6 أحرف على الأقل';
+    }
+    return null;
+  }
+
+  String? _validateConfirmPassword(String? value) {
+    if (value != _passwordController.text) {
+      return 'كلمتا المرور غير متطابقتان';
+    }
+    return null;
+  }
+
+  Future<void> _signup() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    if (_birthDate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('يرجى اختيار تاريخ الميلاد')),
+      );
+      return;
+    }
+
+    if (_selectedCounty == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('يرجى اختيار البلدية')),
+      );
+      return;
+    }
+
+    if (_selectedClan == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('يرجى اختيار العشيرة')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final userData = {
+        'phone_number': _phoneController.text.trim(),
+        'first_name': _firstNameController.text.trim(),
+        'last_name': _lastNameController.text.trim(),
+        'father_name': _fatherNameController.text.trim(),
+        'grandfather_name': _grandfatherNameController.text.trim(),
+        'birth_date': DateFormat('yyyy-MM-dd').format(_birthDate!),
+        'birth_address': _birthAddressController.text.trim(),
+        'home_address': _homeAddressController.text.trim(),
+        'clan_id': _selectedClan!.id,
+        'county_id': _selectedCounty!.id,
+        'password': _passwordController.text,
+        'role': 'groom',
+        'guardian_name': _guardianNameController.text.trim(),
+        'guardian_phone': _guardianPhoneController.text.trim(),
+        'guardian_relation': _selectedGuardianRelation,
+      };
+
+      final response = await ApiService.registerGroom(userData);
+      
+      // Navigate to OTP verification
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => OTPVerificationScreen(
+            phoneNumber: _phoneController.text.trim(),
+          ),
+        ),
+      );
+
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('فشل في التسجيل: $e'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('إنشاء حساب جديد'),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        foregroundColor: AppColors.primary,
+      ),
+      body: SingleChildScrollView(
+        controller: _scrollController,
+        padding: EdgeInsets.all(24),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header
+              Text(
+                'معلومات شخصية',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: AppColors.primary,
+                  fontSize: 20,
+                ),
+              ),
+              SizedBox(height: 20),
+
+              // Phone Number
+              CustomTextField(
+                controller: _phoneController,
+                label: 'رقم الهاتف',
+                keyboardType: TextInputType.phone,
+                validator: _validatePhone,
+                prefixIcon: Icons.phone,
+                hint: '0xxxxxxxxx',
+              ),
+              SizedBox(height: 16),
+
+              // First Name
+              CustomTextField(
+                controller: _firstNameController,
+                label: 'الاسم الأول',
+                validator: (value) => _validateRequired(value, 'الاسم الأول'),
+                prefixIcon: Icons.person,
+              ),
+              SizedBox(height: 16),
+
+              // Last Name
+              CustomTextField(
+                controller: _lastNameController,
+                label: 'الاسم الأخير',
+                validator: (value) => _validateRequired(value, 'الاسم الأخير'),
+                prefixIcon: Icons.person_outline,
+              ),
+              SizedBox(height: 16),
+
+              // Father Name
+              CustomTextField(
+                controller: _fatherNameController,
+                label: 'اسم الأب',
+                validator: (value) => _validateRequired(value, 'اسم الأب'),
+                prefixIcon: Icons.family_restroom,
+              ),
+              SizedBox(height: 16),
+
+              // Grandfather Name
+              CustomTextField(
+                controller: _grandfatherNameController,
+                label: 'اسم الجد',
+                validator: (value) => _validateRequired(value, 'اسم الجد'),
+                prefixIcon: Icons.elderly,
+              ),
+              SizedBox(height: 16),
+
+              // Birth Date
+              GestureDetector(
+                onTap: _selectBirthDate,
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: AppColors.border),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.calendar_today, color: AppColors.primary),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          _birthDate != null
+                              ? DateFormat('yyyy/MM/dd').format(_birthDate!)
+                              : 'تاريخ الميلاد',
+                          style: TextStyle(
+                            color: _birthDate != null 
+                                ? AppColors.textPrimary 
+                                : AppColors.textSecondary,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              SizedBox(height: 16),
+
+              // Birth Address
+              CustomTextField(
+                controller: _birthAddressController,
+                label: 'مكان الولادة',
+                validator: (value) => _validateRequired(value, 'مكان الولادة'),
+                prefixIcon: Icons.location_on,
+              ),
+              SizedBox(height: 16),
+
+              // Home Address
+              CustomTextField(
+                controller: _homeAddressController,
+                label: 'عنوان السكن',
+                validator: (value) => _validateRequired(value, 'عنوان السكن'),
+                prefixIcon: Icons.home,
+              ),
+              SizedBox(height: 24),
+
+              // Location Section
+              Text(
+                'معلومات الموقع',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: AppColors.primary,
+                  fontSize: 20,
+                ),
+              ),
+              SizedBox(height: 20),
+
+              // County Dropdown
+              CustomDropdown<County>(
+                value: _selectedCounty,
+                hint: 'اختر البلدية',
+                items: _counties.map((county) => DropdownMenuItem<County>(
+                  value: county,
+                  child: Text(county.name),
+                )).toList(),
+                onChanged: _onCountyChanged,
+                prefixIcon: Icons.location_city,
+              ),
+              SizedBox(height: 16),
+
+              // Clan Dropdown
+              CustomDropdown<Clan>(
+                value: _selectedClan,
+                hint: _filteredClans.isEmpty && _selectedCounty != null
+                    ? 'لا توجد عشائر متاحة'
+                    : 'اختر العشيرة',
+                items: _filteredClans.map((clan) => DropdownMenuItem<Clan>(
+                  value: clan,
+                  child: Text(clan.name),
+                )).toList(),
+                onChanged: _filteredClans.isNotEmpty ? (clan) {
+                  setState(() {
+                    _selectedClan = clan;
+                  });
+                } : null,
+                prefixIcon: Icons.groups,
+                enabled: _filteredClans.isNotEmpty,
+              ),
+              SizedBox(height: 24),
+
+              // Guardian Section
+              Text(
+                'معلومات ولي الأمر',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: AppColors.primary,
+                  fontSize: 20,
+                ),
+              ),
+              SizedBox(height: 20),
+
+              // Guardian Name
+              CustomTextField(
+                controller: _guardianNameController,
+                label: 'اسم ولي الأمر',
+                validator: (value) => _validateRequired(value, 'اسم ولي الأمر'),
+                prefixIcon: Icons.person_4,
+              ),
+              SizedBox(height: 16),
+
+              // Guardian Phone
+              CustomTextField(
+                controller: _guardianPhoneController,
+                label: 'رقم هاتف ولي الأمر',
+                keyboardType: TextInputType.phone,
+                validator: _validatePhone,
+                prefixIcon: Icons.phone,
+                hint: '0xxxxxxxxx',
+              ),
+              SizedBox(height: 16),
+
+              // Guardian Relation
+              CustomDropdown<String>(
+                value: _selectedGuardianRelation,
+                hint: 'صلة القرابة',
+                items: AppConstants.guardianRelations.map((relation) => 
+                  DropdownMenuItem<String>(
+                    value: relation,
+                    child: Text(relation),
+                  )
+                ).toList(),
+                onChanged: (relation) {
+                  setState(() {
+                    _selectedGuardianRelation = relation;
+                  });
+                },
+                prefixIcon: Icons.family_restroom,
+              ),
+              SizedBox(height: 24),
+
+              // Security Section
+              Text(
+                'معلومات الأمان',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: AppColors.primary,
+                  fontSize: 20,
+                ),
+              ),
+              SizedBox(height: 20),
+
+              // Password
+              CustomTextField(
+                controller: _passwordController,
+                label: 'كلمة المرور',
+                obscureText: _obscurePassword,
+                validator: _validatePassword,
+                prefixIcon: Icons.lock,
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _obscurePassword = !_obscurePassword;
+                    });
+                  },
+                ),
+              ),
+              SizedBox(height: 16),
+
+              // Confirm Password
+              CustomTextField(
+                controller: _confirmPasswordController,
+                label: 'تأكيد كلمة المرور',
+                obscureText: _obscureConfirmPassword,
+                validator: _validateConfirmPassword,
+                prefixIcon: Icons.lock_outline,
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _obscureConfirmPassword ? Icons.visibility : Icons.visibility_off,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _obscureConfirmPassword = !_obscureConfirmPassword;
+                    });
+                  },
+                ),
+              ),
+              SizedBox(height: 32),
+
+              // Signup Button
+              LoadingButton(
+                onPressed: _signup,
+                isLoading: _isLoading,
+                text: 'إنشاء الحساب',
+              ),
+              
+              SizedBox(height: 20),
+
+              // Login Link
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'لديك حساب بالفعل؟ ',
+                    style: TextStyle(color: AppColors.textSecondary),
+                  ),
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.pop(context);
+                    },
+                    child: Text(
+                      'تسجيل الدخول',
+                      style: TextStyle(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              
+              SizedBox(height: 20),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _phoneController.dispose();
+    _firstNameController.dispose();
+    _lastNameController.dispose();
+    _fatherNameController.dispose();
+    _grandfatherNameController.dispose();
+    _birthAddressController.dispose();
+    _homeAddressController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    _guardianNameController.dispose();
+    _guardianPhoneController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+}

@@ -19,10 +19,10 @@ class CreateReservationScreen extends StatefulWidget {
   });
 
   @override
-  State<CreateReservationScreen> createState() => _CreateReservationScreenState();
+  State<CreateReservationScreen> createState() => CreateReservationScreenState();
 }
 
-class _CreateReservationScreenState extends State<CreateReservationScreen> {
+class CreateReservationScreenState extends State<CreateReservationScreen> {
   final _formKey = GlobalKey<FormState>();
   final _pageController = PageController();
   int _currentStep = 0;
@@ -71,6 +71,15 @@ class _CreateReservationScreenState extends State<CreateReservationScreen> {
   void initState() {
     super.initState();
     _loadInitialData();
+  }
+
+
+ void refreshData() {
+
+    _loadInitialData();
+    setState(() {
+      // Trigger rebuild
+    });
   }
 
   @override
@@ -380,46 +389,93 @@ String _formatDayTimeSchedule(String days, String times) {
   return schedules.join(' و ');
 }
 
-String _buildReservationInstructionText() {
-  String baseText = 'للحصول على الموافقة النهائية، يجب طباعة الحجز وختمه وتوقيعه من:\n'
-                   ' \n'
-                   '- الهيئة الدينية\n';
+// String _buildReservationInstructionText() {
+//   String baseText = 'للحصول على الموافقة النهائية، يجب طباعة الحجز وختمه وتوقيعه من:\n';
 
-if (_isCrossClanReservation()) {
-  Map<String, String> selectedClanTime = _getClanAcceptanceTime(false);
-  String selectedClanName = _getSelectedClanName();
+// Map<String, String> originClanTime = _getClanAcceptanceTime(true);
+// String originClanName = _getOriginClanName();
+
+
+// String formattedSchedule = _formatDayTimeSchedule(
+//   originClanTime['day'] ?? '', 
+//   originClanTime['time'] ?? ''
+// );
+// baseText += '\n';
+// baseText += '1)  إدارة عشيرتك $originClanName $formattedSchedule\n\n';
+
+
+// if (_isCrossClanReservation()) {
+//   Map<String, String> selectedClanTime = _getClanAcceptanceTime(false);
+//   String selectedClanName = _getSelectedClanName();
   
-  String formattedSchedule = _formatDayTimeSchedule(
-    selectedClanTime['day'] ?? '', 
-    selectedClanTime['time'] ?? ''
+//   String formattedSchedule = _formatDayTimeSchedule(
+//     selectedClanTime['day'] ?? '', 
+//     selectedClanTime['time'] ?? ''
+//   );
+//   baseText += '\n';
+//   baseText += '2) الدار المضيفة ($selectedClanName) $formattedSchedule\n';
+// }
+
+
+
+// baseText += '\n';
+// if (_isCrossClanReservation()) {baseText +=  '3) الهيئة الدينية\n';}else{baseText +=  '2) الهيئة الدينية\n';}
+
+//   // Safely get validation deadline days with fallback
+//   String daysMax = _getValidationDeadlineDays();
+
+//   baseText += '\n';
+//   baseText += 'يجب استكمال هذه الإجراءات خلال $daysMax أيام كحد أقصى، وإلا يُلغى الحجز تلقائياً.\n\n'
+//               'بعد ختم وتوقيع جميع الجهات، توجّه إلى إدارة عشيرتك $originClanName ليؤكد حجزك في النظام.\n\n';
+
+//   return baseText;
+// }
+Widget _buildReservationInstructionWidget() {
+  final originClanTime = _getClanAcceptanceTime(true);
+  final originClanName = _getOriginClanName();
+  final formattedSchedule = _formatDayTimeSchedule(originClanTime['day'] ?? '', originClanTime['time'] ?? '');
+  final daysMax = _getValidationDeadlineDays();
+
+  return Center(
+    child: SingleChildScrollView(
+      child: Padding(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Text('━━━━━━━━━━━━━━━━━━━━━━', textAlign: TextAlign.center),
+            Text('📝 خطوات إتمام الحجز', textAlign: TextAlign.center, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            Text('━━━━━━━━━━━━━━━━━━━━━━', textAlign: TextAlign.center),
+            SizedBox(height: 20),
+            Text('للحصول على الموافقة النهائية، يجب طباعة الحجز وختمه وتوقيعه من:', textAlign: TextAlign.center),
+            SizedBox(height: 20),
+            Text('⊙ إدارة عشيرتك', textAlign: TextAlign.center, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+            Text(originClanName, textAlign: TextAlign.center),
+            Text('🕐 $formattedSchedule', textAlign: TextAlign.center),
+            SizedBox(height: 20),
+            if (_isCrossClanReservation()) ...[
+              Text('⊙ الدار المضيفة', textAlign: TextAlign.center, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+              Text(_getSelectedClanName(), textAlign: TextAlign.center),
+              Text('🕐 ${_formatDayTimeSchedule(_getClanAcceptanceTime(false)['day'] ?? '', _getClanAcceptanceTime(false)['time'] ?? '')}', textAlign: TextAlign.center),
+              SizedBox(height: 20),
+            ],
+            Text('⊙ الهيئة الدينية', textAlign: TextAlign.center, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+            SizedBox(height: 20),
+            Text('━━━━━━━━━━━━━━━━━━━━━━', textAlign: TextAlign.center),
+            Text('⚠️ تنبيه ', textAlign: TextAlign.center, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.orange)),
+            Text('━━━━━━━━━━━━━━━━━━━━━━', textAlign: TextAlign.center),
+            SizedBox(height: 12),
+            Text('يجب استكمال هذه الإجراءات خلال $daysMax أيام كحد أقصى', textAlign: TextAlign.center),
+            Text('وإلا يُلغى الحجز تلقائياً', textAlign: TextAlign.center, style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600)),
+            SizedBox(height: 12),
+            Text('بعد ختم وتوقيع جميع الجهات، توجّه إلى إدارة عشيرتك', textAlign: TextAlign.center),
+            Text(originClanName, textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.w600)),
+            Text('ليؤكد حجزك في النظام', textAlign: TextAlign.center),
+          ],
+        ),
+      ),
+    ),
   );
-  baseText += '\n';
-  baseText += '- الدار المضيفة ($selectedClanName) $formattedSchedule\n';
 }
-
-
-Map<String, String> originClanTime = _getClanAcceptanceTime(true);
-String originClanName = _getOriginClanName();
-
-
-String formattedSchedule = _formatDayTimeSchedule(
-  originClanTime['day'] ?? '', 
-  originClanTime['time'] ?? ''
-);
-baseText += '\n';
-baseText += '- إدارة عشيرتك $originClanName $formattedSchedule\n\n';
-
-  // Safely get validation deadline days with fallback
-  String daysMax = _getValidationDeadlineDays();
-
-  baseText += '\n';
-  baseText += 'يجب استكمال هذه الإجراءات خلال $daysMax أيام كحد أقصى، وإلا يُلغى الحجز تلقائياً.\n\n'
-              'بعد ختم وتوقيع جميع الجهات، توجّه إلى إدارة عشيرتك $originClanName ليؤكد حجزك في النظام.\n\n';
-
-  return baseText;
-}
-
-
 Future<void> _submitReservation() async {
   setState(() => _isSubmitting = true);
   
@@ -898,7 +954,7 @@ Future<void> _selectDate(TextEditingController controller, String title) async {
     }
   }
 
- @override
+@override
 Widget build(BuildContext context) {
   if (_isLoading) {
     return Scaffold(
@@ -912,52 +968,60 @@ Widget build(BuildContext context) {
   }
 
   return Scaffold(
-    body: Column(
+    body: Stack(
       children: [
-        Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Row(
-            children: [
-              for (int i = 0; i < 3; i++) ...[
-                Expanded(
-                  child: Container(
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: i <= _currentStep 
-                        ? const Color.fromARGB(255, 0, 151, 98)
-                        : const Color.fromARGB(255, 110, 174, 122).withOpacity(0.3),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                if (i < 2) const SizedBox(width: 8),
-              ],
-            ],
-          ),
-        ),
-        Expanded(
-          child: RefreshIndicator(
-            onRefresh: _refreshData,
-            color: AppColors.primary,
-            backgroundColor: Colors.white,
-            child: Form(
-              key: _formKey,
-              child: PageView(
-                controller: _pageController,
-                onPageChanged: (index) => setState(() => _currentStep = index),
+        Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
                 children: [
-                  _buildClanAndHallSelectionStep(),
-                  _buildReservationDetailsStep(),
-                  _buildConfirmationStep(),
+                  for (int i = 0; i < 3; i++) ...[
+                    Expanded(
+                      child: Container(
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: i <= _currentStep 
+                            ? const Color.fromARGB(255, 0, 151, 98)
+                            : const Color.fromARGB(255, 110, 174, 122).withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    if (i < 2) const SizedBox(width: 8),
+                  ],
                 ],
               ),
             ),
-          ),
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: _refreshData,
+                color: AppColors.primary,
+                backgroundColor: Colors.white,
+                child: Form(
+                  key: _formKey,
+                  child: PageView(
+                    controller: _pageController,
+                    onPageChanged: (index) => setState(() => _currentStep = index),
+                    children: [
+                      _buildClanAndHallSelectionStep(),
+                      _buildReservationDetailsStep(),
+                      _buildConfirmationStep(),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
+        // Add side navigation buttons
+        if (_buildSideNavigation() != null) _buildSideNavigation()!,
+
       ],
+      
     ),
-    bottomNavigationBar: _buildBottomNavigation(),
   );
+  
 }
 
 Widget _buildClanAndHallSelectionStep() {
@@ -968,7 +1032,7 @@ Widget _buildClanAndHallSelectionStep() {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'اختيار العشيرة والقاعة',
+          'اختيار دار إقامة العرس',
           style: TextStyle(
             fontSize: 24,
             fontWeight: FontWeight.bold,
@@ -980,7 +1044,7 @@ Widget _buildClanAndHallSelectionStep() {
           children: [
             Expanded(
               child: Text(
-                'اختر العشيرة والقاعة المناسبة لحفلك\nالمحافظة: ${_userProfile?['county_name'] ?? 'غير محدد'}',
+                'اختر العشيرة والقاعة المناسبة لحفلك\nالقصر: ${_userProfile?['county_name'] ?? 'غير محدد'}',
                 style: const TextStyle(
                   fontSize: 16,
                   color: AppColors.textSecondary,
@@ -1006,7 +1070,7 @@ Widget _buildClanAndHallSelectionStep() {
             labelText: 'العشيرة *',
             prefixIcon: const Icon(Icons.group),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-            helperText: 'العشائر المتاحة في محافظتك',
+            helperText: 'العشائر المتاحة في قصرك',
           ),
           items: _clans.map((clan) {
             return DropdownMenuItem<Map<String, dynamic>>(
@@ -1106,10 +1170,8 @@ Widget _buildClanAndHallSelectionStep() {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  _buildInfoRow('الاسم', _selectedClan!['name']?.toString() ?? ''),
-                  _buildInfoRow('المحافظة', _selectedCounty!['name']?.toString() ?? ''),
-                  if (_clanSettings != null)
-                    _buildInfoRow('السماح بيومين', _clanSettings!['allow_two_day_reservations'] == true ? 'نعم' : 'لا'),
+                  _buildInfoRow('اسم العشيرة', _selectedClan!['name']?.toString() ?? ''),
+                  _buildInfoRow('القصر', _selectedCounty!['name']?.toString() ?? ''),
                   if (_selectedClan!['description'] != null)
                     _buildInfoRow('الوصف', _selectedClan!['description'].toString()),
                 ],
@@ -1136,21 +1198,21 @@ Widget _buildReservationDetailsStep() {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'تفاصيل الحجز',
+                    'معلومات الحجز',
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
                       color: AppColors.primary,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'اختر تفاصيل الحجز والتاريخ واللجان',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
+                  // const SizedBox(height: 8),
+                  // const Text(
+                  //   'اختر تفاصيل الحجز والتاريخ واللجان',
+                  //   style: TextStyle(
+                  //     fontSize: 16,
+                  //     color: AppColors.textSecondary,
+                  //   ),
+                  // ),
                 ],
               ),
             ),
@@ -1274,7 +1336,7 @@ Widget _buildReservationDetailsStep() {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'اختر التاريخ أولاً لمعرفة إمكانية الحجز ليومين',
+                    'اختر التاريخ أولاً لمعرفة إمكانية الحجز ليومين متتاليين ',
                     style: TextStyle(color: Colors.grey[600]),
                   ),
                 ),
@@ -1289,10 +1351,10 @@ Widget _buildReservationDetailsStep() {
         DropdownButtonFormField<Map<String, dynamic>>(
           value: _selectedHaiaCommittee,
           decoration: InputDecoration(
-            labelText: 'لجنة الهيئة *',
+            labelText: ' الهيئة *',
             prefixIcon: const Icon(Icons.group),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-            helperText: 'اختر لجنة الهيئة المناسبة',
+            helperText: 'اختر  الهيئة المناسبة',
           ),
           items: _haiaCommittees.map((committee) {
             return DropdownMenuItem<Map<String, dynamic>>(
@@ -1320,7 +1382,7 @@ Widget _buildReservationDetailsStep() {
             );
           }).toList(),
           onChanged: (value) => setState(() => _selectedHaiaCommittee = value),
-          validator: (value) => value == null ? 'لجنة الهيئة مطلوبة' : null,
+          validator: (value) => value == null ? ' الهيئة مطلوبة' : null,
         ),
         const SizedBox(height: 16),
         
@@ -1383,15 +1445,15 @@ Widget _buildReservationDetailsStep() {
                 
                 SwitchListTile(
                   title: const Text('السماح للآخرين بالانضمام'),
-                  subtitle: const Text('هل تسمح لآخرين بالانضمام لحفلك؟'),
+                  subtitle: const Text('هل تسمح لآخرين بالانضمام لعرسك؟'),
                   value: _allowOthers,
                   onChanged: (value) => setState(() => _allowOthers = value),
                   contentPadding: EdgeInsets.zero,
                 ),
                 
                 SwitchListTile(
-                  title: const Text('الانضمام لزفاف جماعي'),
-                  subtitle: const Text('هل تريد الانضمام لحفل زفاف جماعي؟'),
+                  title: const Text('الانضمام لعرس جماعي'),
+                  subtitle: const Text('هل تريد الانضمام لعرس جماعي؟'),
                   value: _joinToMassWedding,
                   onChanged: (value) => setState(() => _joinToMassWedding = value),
                   contentPadding: EdgeInsets.zero,
@@ -1449,11 +1511,19 @@ Widget _buildConfirmationStep() {
         // Rest of your existing confirmation content...
         // (Keep all existing content for this step)
         
+        // gardian Information Summary
+        _buildSummaryCard('معلومات ولي العريس', [
+          _buildSummaryItem(' الاسم الكامل', '${_userProfile?['guardian_name'] ?? 'غير محدد'}'),
+          _buildSummaryItem('رقم الهاتف', _userProfile?['guardian_phone']?.toString() ?? 'غير محدد'),
+          ]),
+        
+        const SizedBox(height: 16),
         // User Information Summary
-        _buildSummaryCard('معلومات المستخدم', [
-          _buildSummaryItem('الاسم', '${_userProfile?['first_name'] ?? ''} ${_userProfile?['last_name'] ?? ''}'),
+        _buildSummaryCard('معلومات العريس', [
+          _buildSummaryItem('الاسم الكامل', '${_userProfile?['first_name'] ?? ''} ${_userProfile?['last_name'] ?? ''}'),
           _buildSummaryItem('رقم الهاتف', _userProfile?['phone_number']?.toString() ?? ''),
-          _buildSummaryItem('المحافظة', _selectedCounty?['name']?.toString() ?? 'غير محدد'),        
+          _buildSummaryItem('العشيرة', _userProfile?['clan_name']?.toString() ?? 'غير محدد'),        
+          _buildSummaryItem('القصر', _userProfile?['county_name']?.toString() ?? 'غير محدد'),        
           ]),
         
         const SizedBox(height: 16),
@@ -1541,36 +1611,45 @@ Widget _buildConfirmationStep() {
                           color: const Color.fromARGB(255, 249, 144, 144),
                           size: 32,
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'ملاحظة مهمة',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: const Color.fromARGB(255, 0, 0, 0),
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
+                        // const SizedBox(height: 8),
+                        // Text(
+                        //   'ملاحظة مهمة',
+                        //   style: TextStyle(
+                        //     fontSize: 16,
+                        //     fontWeight: FontWeight.bold,
+                        //     color: const Color.fromARGB(255, 0, 0, 0),
+                        //   ),
+                        //   textAlign: TextAlign.center,
+                        // ),
                       ],
                     ),
-                    const SizedBox(height: 8),
+                    // const SizedBox(height: 8),
 
                     // Dynamic instruction text
-                    Text(
-                      _buildReservationInstructionText(),
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: const Color.fromARGB(255, 0, 0, 0),
-                        height: 1.5,
-                      ),
-                      textAlign: TextAlign.start,
-                    ),
+                    _buildReservationInstructionWidget(),
+                    
+
+
+                    // Text(
+                    //   _buildReservationInstructionText(),
+                    //   style: TextStyle(
+                    //     fontSize: 14,
+                    //     color: const Color.fromARGB(255, 0, 0, 0),
+                    //     height: 1.5,
+                    //   ),
+                    //   textAlign: TextAlign.start,
+                    // ),
                   ],
                 ),
+                
               ),
+              
             );
+            
           },
+          
         ),
+        const SizedBox(height: 80),
       ],
     ),
   );
@@ -1634,7 +1713,7 @@ Widget _buildConfirmationStep() {
             '$label: ',
             style: const TextStyle(
               fontWeight: FontWeight.w500,
-              color: AppColors.textSecondary,
+              color: Color.fromARGB(0, 255, 255, 255),
             ),
           ),
           Expanded(
@@ -1647,49 +1726,88 @@ Widget _buildConfirmationStep() {
       ),
     );
   }
-
-  Widget _buildBottomNavigation() {
-    return Container(
-      padding: const EdgeInsets.all(5),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 4,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          if (_currentStep > 0) ...[
-            Expanded(
-              child: OutlinedButton(
-                onPressed: _goToPreviousStep,
-                child: const Text('السابق'),
+Widget? _buildSideNavigation() {
+  return Stack(
+    children: [
+      // Previous button on the left
+      if (_currentStep > 0)
+        Positioned(
+          left: 4,
+          top: 0,
+          bottom: 0,
+          child: Center(
+            child: Material(
+              color: const Color.fromARGB(255, 255, 255, 255),
+              elevation: 2,
+              borderRadius: BorderRadius.circular(20),
+              child: InkWell(
+                onTap: _goToPreviousStep,
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  width: 35,
+                  height: 35,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: const Color.fromARGB(255, 8, 136, 15).withOpacity(0.5),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.arrow_forward_ios,
+                    color: const Color.fromARGB(255, 15, 143, 22),
+                    size: 18,
+                  ),
+                ),
               ),
             ),
-            const SizedBox(width: 10),
-          ],
-          Expanded(
-            flex: 2,
-            child: ElevatedButton(
-              onPressed: _isSubmitting ? null : _handleNextStep,
-              child: _isSubmitting
-                  ? const SizedBox(
-                      height: 10,
-                      width: 10,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : Text(_currentStep == 2 ? 'تأكيد الحجز' : 'التالي'),
+          ),
+        ),
+      
+      // Next/Submit button on the right
+      Positioned(
+        right: 4,
+        top: 0,
+        bottom: 0,
+        child: Center(
+          child: Material(
+            color: _isSubmitting 
+                ? Colors.grey.withOpacity(0.9) 
+                : const Color.fromARGB(239, 28, 147, 34),
+            elevation: 2,
+            borderRadius: BorderRadius.circular(20),
+            child: InkWell(
+              onTap: _isSubmitting ? null : _handleNextStep,
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                width: 35,
+                height: 35,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: _isSubmitting
+                    ? const Padding(
+                        padding: EdgeInsets.all(10.0),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : Icon(
+                        _currentStep == 2 
+                            ? Icons.check 
+                            : Icons.arrow_back_ios_new,
+                        color: Colors.white,
+                        size: 18,
+                      ),
+              ),
             ),
           ),
-        ],
+        ),
       ),
-    );
-  }
-
+    ],
+  );
+}
   void _goToPreviousStep() {
     if (_currentStep > 0) {
       _pageController.previousPage(

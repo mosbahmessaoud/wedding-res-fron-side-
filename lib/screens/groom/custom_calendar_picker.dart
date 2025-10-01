@@ -80,6 +80,7 @@ class _BeautifulCustomCalendarPickerState extends State<BeautifulCustomCalendarP
   DateTime? _selectedDate;
   bool _isLocaleInitialized = false;
   bool _isLoading = false;
+  bool _allowsMassWedding=true;
   Map<String, DateAvailability> _dateAvailabilities = {};
   int _maxGroomsPerDate = 3;
   Map<String, List<String>> _groomMultiDayReservations = {};
@@ -296,7 +297,7 @@ class _BeautifulCustomCalendarPickerState extends State<BeautifulCustomCalendarP
             note = 'محجوز بالكامل (${validatedCount}/${_maxGroomsPerDate})';
           } else if (hasAllowOthersValidated) {
             status = DateStatus.massWeddingOpen;
-            note = 'متاح للزفاف الجماعي (${validatedCount}/${_maxGroomsPerDate})';
+            note = 'متاح للعرس الجماعي (${validatedCount}/${_maxGroomsPerDate})';
             allowMassWedding = true;
           } else {
             status = DateStatus.reserved;
@@ -418,6 +419,7 @@ class _BeautifulCustomCalendarPickerState extends State<BeautifulCustomCalendarP
         
         for (String groomDateStr in groomDates) {
           final groomDateAvailability = _dateAvailabilities[groomDateStr];
+           
           if (groomDateAvailability != null) {
             if (groomDateAvailability.validatedCount > 0) hasValidated = true;
             if (groomDateAvailability.pendingCount > 0) hasPending = true;
@@ -425,15 +427,16 @@ class _BeautifulCustomCalendarPickerState extends State<BeautifulCustomCalendarP
             if (groomDateAvailability.currentCount >= groomDateAvailability.maxCapacity) isCapacityFull = true;
           }
         }
+        _allowsMassWedding= allowsMassWedding;
         
         if (hasValidated && hasPending) {
           return allowsMassWedding && !isCapacityFull 
-              ? const Color(0xFFE91E63)
-              : const Color(0xFFFF5722);
+              ? const Color.fromARGB(255, 5, 150, 247)
+              : const Color.fromARGB(255, 249, 15, 15);
         } else if (hasValidated) {
           return allowsMassWedding && !isCapacityFull 
               ? const Color(0xFF00BCD4)
-              : const Color(0xFFFF5722);
+              : const Color.fromARGB(255, 249, 15, 15);
         } else {
           return allowsMassWedding && !isCapacityFull 
               ? const Color(0xFFFFB74D)
@@ -448,11 +451,11 @@ class _BeautifulCustomCalendarPickerState extends State<BeautifulCustomCalendarP
       case DateStatus.pending:
         return const Color(0xFFFFB74D);
       case DateStatus.reserved:
-        return const Color(0xFFFF5722);
+        return const Color.fromARGB(255, 249, 15, 15);
       case DateStatus.massWeddingOpen:
         return const Color(0xFF00BCD4);
       case DateStatus.mixed:
-        return const Color(0xFFE91E63);
+        return const Color.fromARGB(255, 5, 150, 247);
       case DateStatus.disabled:
         return const Color(0xFFBDBDBD);
     }
@@ -532,280 +535,200 @@ class _BeautifulCustomCalendarPickerState extends State<BeautifulCustomCalendarP
     return true;
   }
 
-  Widget _buildCalendarDay(DateTime date) {
-    final availability = _getDateAvailability(date);
-    final isCurrentMonth = date.month == _currentMonth.month && date.year == _currentMonth.year;
-    final isToday = _isSameDay(date, DateTime.now());
-    final isSelected = _selectedDate != null && _isSameDay(date, _selectedDate!);
-    final dateStr = DateFormat('yyyy-MM-dd').format(date);
-    
-    final isSelectable = isCurrentMonth &&
-                        (date.isAfter(widget.firstDate.subtract(const Duration(days: 1))) &&
-                         date.isBefore(widget.lastDate.add(const Duration(days: 1)))) &&
-                        _isDateSelectable(date, availability);
 
-    if (_isLoading && isCurrentMonth) {
-      return Container(
-        margin: const EdgeInsets.all(3),
-        child: _buildLoadingShimmer(),
-      );
-    }
+// Replace _buildCalendarDay method with this modern version:
+Widget _buildCalendarDay(DateTime date) {
+  final availability = _getDateAvailability(date);
+  final isCurrentMonth = date.month == _currentMonth.month && date.year == _currentMonth.year;
+  final isToday = _isSameDay(date, DateTime.now());
+  final isSelected = _selectedDate != null && _isSameDay(date, _selectedDate!);
+  final dateStr = DateFormat('yyyy-MM-dd').format(date);
+  
+  final isSelectable = isCurrentMonth &&
+                      (date.isAfter(widget.firstDate.subtract(const Duration(days: 1))) &&
+                       date.isBefore(widget.lastDate.add(const Duration(days: 1)))) &&
+                      _isDateSelectable(date, availability);
 
-    String? groomId = _dateToGroomMap[dateStr];
-    List<DateTime>? connectedDates = groomId != null ? _connectedDateRanges[groomId] : null;
-    bool isConnectedRange = connectedDates != null && connectedDates.length > 1;
-    
-    int? positionInRange;
-    bool isFirst = false;
-    bool isLast = false;
-    
-    if (isConnectedRange && connectedDates != null) {
-      positionInRange = connectedDates.indexWhere((d) => _isSameDay(d, date));
-      isFirst = positionInRange == 0;
-      isLast = positionInRange == connectedDates.length - 1;
-    }
-
-    return GestureDetector(
-      onTap: isSelectable ? () {
-        setState(() {
-          _selectedDate = date;
-        });
-        _bounceController.forward().then((_) => _bounceController.reverse());
-      } : null,
-      onLongPress: isCurrentMonth && availability.reservations.isNotEmpty ? () {
-        _showReservationDetails(date, availability);
-      } : null,
-      child: AnimatedBuilder(
-        animation: Listenable.merge([_pulseAnimation, _bounceAnimation]),
-        builder: (context, child) {
-          return Transform.scale(
-            scale: isSelected ? _pulseAnimation.value * _bounceAnimation.value : 1.0,
-            child: Container(
-              margin: const EdgeInsets.all(3),
-              decoration: BoxDecoration(
-                color: isCurrentMonth ? _getDateColor(date, availability) : Colors.transparent,
-                borderRadius: isConnectedRange 
-                  ? BorderRadius.horizontal(
-                      right: isFirst ? const Radius.circular(20) : Radius.zero,
-                      left: isLast ? const Radius.circular(20) : Radius.zero,
-                    )
-                  : BorderRadius.circular(20),
-                border: isSelected 
-                    ? Border.all(color: Colors.white, width: 3)
-                    : isToday && isCurrentMonth
-                        ? Border.all(color: const Color(0xFF6C63FF), width: 2.5)
-                        : null,
-                boxShadow: isSelected ? [
-                  BoxShadow(
-                    color: const Color(0xFF6C63FF).withOpacity(0.4),
-                    blurRadius: 12,
-                    spreadRadius: 3,
-                    offset: const Offset(0, 4),
-                  )
-                ] : isCurrentMonth ? [
-                  BoxShadow(
-                    color: _getDateColor(date, availability).withOpacity(0.2),
-                    blurRadius: 6,
-                    spreadRadius: 1,
-                    offset: const Offset(0, 2),
-                  )
-                ] : null,
-                gradient: isSelected ? LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    const Color(0xFF6C63FF),
-                    const Color(0xFF6C63FF).withOpacity(0.8),
-                  ],
-                ) : null,
-              ),
-              child: Stack(
-                children: [
-                  // Main content
-                  Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          date.day.toString(),
-                          style: TextStyle(
-                            color: isCurrentMonth 
-                                ? _getDateTextColor(date, availability)
-                                : const Color(0xFFBDBDBD),
-                            fontWeight: isSelected
-                                ? FontWeight.bold
-                                : isToday ? FontWeight.w600 : FontWeight.w500,
-                            fontSize: 16,
-                          ),
-                        ),
-                        if (isToday && isCurrentMonth && !isSelected)
-                          Container(
-                            width: 5,
-                            height: 5,
-                            margin: const EdgeInsets.only(top: 2),
-                            decoration: BoxDecoration(
-                              color: availability.status == DateStatus.available 
-                                  ? Colors.white 
-                                  : const Color(0xFF6C63FF),
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: (availability.status == DateStatus.available 
-                                      ? Colors.white 
-                                      : const Color(0xFF6C63FF)).withOpacity(0.6),
-                                  blurRadius: 4,
-                                  spreadRadius: 1,
-                                ),
-                              ],
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  
-                  // Enhanced capacity indicator
-                  if (isCurrentMonth && availability.currentCount > 0)
-                    Positioned(
-                      top: 4,
-                      right: 4,
-                      child: Container(
-                        constraints: const BoxConstraints(minWidth: 18),
-                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(10),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
-                              blurRadius: 4,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: Text(
-                          '${availability.currentCount}',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: _getDateColor(date, availability),
-                          ),
-                        ),
-                      ),
-                    ),
-
-                  // Connected range indicator
-                  if (isCurrentMonth && isConnectedRange && isFirst && connectedDates != null)
-                    Positioned(
-                      top: 4,
-                      left: 4,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(10),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
-                              blurRadius: 4,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: Text(
-                          '${connectedDates.length}d',
-                          style: TextStyle(
-                            fontSize: 8,
-                            fontWeight: FontWeight.bold,
-                            color: _getDateColor(date, availability),
-                          ),
-                        ),
-                      ),
-                    ),
-
-                  // Status indicators
-                  if (isCurrentMonth && availability.status == DateStatus.mixed && !isConnectedRange)
-                    Positioned(
-                      bottom: 4,
-                      right: 4,
-                      child: Container(
-                        padding: const EdgeInsets.all(2),
-                        decoration: const BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.merge_type,
-                          size: 10,
-                          color: Color(0xFFE91E63),
-                        ),
-                      ),
-                    ),
-
-                  if (isCurrentMonth && (availability.status == DateStatus.massWeddingOpen || availability.allowMassWedding) && !isConnectedRange)
-                    Positioned(
-                      bottom: 4,
-                      right: 4,
-                      child: Container(
-                        padding: const EdgeInsets.all(2),
-                        decoration: const BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.people_alt,
-                          size: 10,
-                          color: Color(0xFF00BCD4),
-                        ),
-                      ),
-                    ),
-
-                  // Info indicator
-                  if (isCurrentMonth && availability.reservations.isNotEmpty)
-                    Positioned(
-                      bottom: 4,
-                      left: isConnectedRange && !isFirst ? 8 : 4,
-                      child: Container(
-                        padding: const EdgeInsets.all(2),
-                        decoration: const BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.info_outline,
-                          size: 10,
-                          color: Color(0xFF6C63FF),
-                        ),
-                      ),
-                    ),
-
-                  // Lock icon for non-selectable reserved dates
-                  if (isCurrentMonth && !isSelectable && 
-                      (availability.status == DateStatus.reserved || isConnectedRange))
-                    Positioned(
-                      top: 4,
-                      left: 4,
-                      child: Container(
-                        padding: const EdgeInsets.all(2),
-                        decoration: const BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.lock,
-                          size: 10,
-                          color: Color(0xFFFF5722),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
+  if (_isLoading && isCurrentMonth) {
+    return Container(
+      margin: const EdgeInsets.all(2),
+      child: _buildLoadingShimmer(),
     );
   }
+
+  String? groomId = _dateToGroomMap[dateStr];
+  List<DateTime>? connectedDates = groomId != null ? _connectedDateRanges[groomId] : null;
+  bool isConnectedRange = connectedDates != null && connectedDates.length > 1;
+  
+  int? positionInRange;
+  bool isFirst = false;
+  bool isLast = false;
+  
+  if (isConnectedRange && connectedDates != null) {
+    positionInRange = connectedDates.indexWhere((d) => _isSameDay(d, date));
+    isFirst = positionInRange == 0;
+    isLast = positionInRange == connectedDates.length - 1;
+  }
+
+  return GestureDetector(
+    onTap: isSelectable ? () {
+      setState(() {
+        _selectedDate = date;
+      });
+      _bounceController.forward().then((_) => _bounceController.reverse());
+    } : null,
+    onLongPress: isCurrentMonth && availability.reservations.isNotEmpty ? () {
+      _showReservationDetails(date, availability);
+    } : null,
+    child: AnimatedBuilder(
+      animation: Listenable.merge([_pulseAnimation, _bounceAnimation]),
+      builder: (context, child) {
+        return Transform.scale(
+          scale: isSelected ? _pulseAnimation.value * _bounceAnimation.value : 1.0,
+          child: Container(
+            margin: const EdgeInsets.all(2),
+            decoration: BoxDecoration(
+              color: isCurrentMonth ? _getDateColor(date, availability) : Colors.transparent,
+              borderRadius: isConnectedRange 
+                ? BorderRadius.horizontal(
+                    right: isFirst ? const Radius.circular(16) : Radius.zero,
+                    left: isLast ? const Radius.circular(16) : Radius.zero,
+                  )
+                : BorderRadius.circular(16),
+              border: isSelected 
+                  ? Border.all(color: Colors.white, width: 2.5)
+                  : isToday && isCurrentMonth
+                      ? Border.all(color: const Color(0xFF6C63FF), width: 2)
+                      : null,
+              boxShadow: isSelected ? [
+                BoxShadow(
+                  color: const Color(0xFF6C63FF).withOpacity(0.4),
+                  blurRadius: 8,
+                  spreadRadius: 2,
+                  offset: const Offset(0, 3),
+                )
+              ] : null,
+            ),
+            child: Stack(
+              children: [
+                // Main content
+                Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        date.day.toString(),
+                        style: TextStyle(
+                          color: isCurrentMonth 
+                              ? _getDateTextColor(date, availability)
+                              : const Color(0xFFBDBDBD),
+                          fontWeight: isSelected
+                              ? FontWeight.w700
+                              : isToday ? FontWeight.w600 : FontWeight.w500,
+                          fontSize: 15,
+                        ),
+                      ),
+                      if (isToday && isCurrentMonth && !isSelected)
+                        Container(
+                          width: 4,
+                          height: 4,
+                          margin: const EdgeInsets.only(top: 2),
+                          decoration: BoxDecoration(
+                            color: availability.status == DateStatus.available 
+                                ? Colors.white 
+                                : const Color(0xFF6C63FF),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                
+                // Capacity badge
+                if (isCurrentMonth && availability.currentCount > 0)
+                  Positioned(
+                    top: 2,
+                    right: 2,
+                    child: Container(
+                      constraints: const BoxConstraints(minWidth: 16),
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 3,
+                            offset: const Offset(0, 1),
+                          ),
+                        ],
+                      ),
+                      child: Text(
+                        '${availability.currentCount}',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                          color: _getDateColor(date, availability),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                // Multi-day indicator
+                if (isCurrentMonth && isConnectedRange && isFirst && connectedDates != null)
+                  Positioned(
+                    top: 2,
+                    left: 2,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '${connectedDates.length}d',
+                        style: TextStyle(
+                          fontSize: 8,
+                          fontWeight: FontWeight.bold,
+                          color: _getDateColor(date, availability),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                // Status icon
+                if (isCurrentMonth && (availability.status == DateStatus.massWeddingOpen || 
+                    availability.status == DateStatus.mixed))
+                  Positioned(
+                    bottom: 2,
+                    right: 2,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        availability.status == DateStatus.mixed 
+                            ? Icons.group_rounded 
+                            : Icons.people_alt_rounded,
+                        size: 10,
+                        color: availability.status == DateStatus.mixed
+                            ? const Color(0xFF0EA5E9)
+                            : const Color(0xFF00BCD4),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    ),
+  );
+}
+
 
   void _showReservationDetails(DateTime date, DateAvailability availability) {
     showModalBottomSheet(
@@ -911,15 +834,16 @@ class _BeautifulCustomCalendarPickerState extends State<BeautifulCustomCalendarP
                             Icons.schedule,
                           ),
                         ),
+
                         const SizedBox(width: 12),
-                        Expanded(
-                          child: _buildStatCard(
-                            '${availability.currentCount}/${availability.maxCapacity}',
-                            'الإجمالي',
-                            const Color(0xFF9E9E9E),
-                            Icons.people,
+                          Expanded(
+                            child: _buildStatCard(
+                              '${availability.currentCount}/${availability.maxCapacity}',
+                              'الإجمالي',
+                              const Color(0xFF9E9E9E),
+                              Icons.people,
+                            ),
                           ),
-                        ),
                       ],
                     ),
                     
@@ -1148,8 +1072,9 @@ class _BeautifulCustomCalendarPickerState extends State<BeautifulCustomCalendarP
 
   Widget _buildBeautifulReservationTile(Map<String, dynamic> reservation, bool isValidated) {
     final groomId = reservation['groom_id']?.toString() ?? reservation['id']?.toString();
-    final groomName = reservation['groom_name'] ?? 
+    final groomName = reservation['guardian_name'] ?? 
                      '${reservation['first_name'] ?? ''} ${reservation['last_name'] ?? ''}';
+    final phone_number = reservation['guardian_phone'] ??  reservation['phone_number'];
     
     List<DateTime>? connectedDates;
     if (groomId != null && _connectedDateRanges.containsKey(groomId)) {
@@ -1213,6 +1138,15 @@ class _BeautifulCustomCalendarPickerState extends State<BeautifulCustomCalendarP
                   children: [
                     Text(
                       groomName,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF2C2C2C),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      phone_number,
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -1395,7 +1329,7 @@ class _BeautifulCustomCalendarPickerState extends State<BeautifulCustomCalendarP
       case DateStatus.reserved:
         return 'محجوز ومؤكد';
       case DateStatus.massWeddingOpen:
-        return 'متاح للزفاف الجماعي';
+        return 'متاح للعرس الجماعي';
       case DateStatus.mixed:
         return 'مختلط (مؤكد ومعلق)';
       case DateStatus.disabled:
@@ -1446,385 +1380,442 @@ class _BeautifulCustomCalendarPickerState extends State<BeautifulCustomCalendarP
     return days;
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final screenHeight = MediaQuery.of(context).size.height;
-    final screenWidth = MediaQuery.of(context).size.width;
-    
-    return SlideTransition(
-      position: _slideAnimation,
-      child: Dialog(
-        backgroundColor: Colors.transparent,
-        insetPadding: EdgeInsets.symmetric(
-          horizontal: screenWidth * 0.03, // 3% of screen width
-          vertical: screenHeight * 0.02,  // 2% of screen height
+@override
+Widget build(BuildContext context) {
+  final screenHeight = MediaQuery.of(context).size.height;
+  final screenWidth = MediaQuery.of(context).size.width;
+  final safeAreaPadding = MediaQuery.of(context).padding;
+  
+  return SlideTransition(
+    position: _slideAnimation,
+    child: Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: screenWidth * 0.04,
+        vertical: screenHeight * 0.03,
+      ),
+      child: Container(
+        constraints: BoxConstraints(
+          maxHeight: screenHeight - safeAreaPadding.top - safeAreaPadding.bottom - 40,
         ),
-        child: Container(
-          width: double.infinity,
-          height: screenHeight * 0.85, // Fixed height at 85% of screen
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.2),
-                blurRadius: 20,
-                offset: const Offset(0, 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(28),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.15),
+              blurRadius: 30,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Modern Header
+            _buildModernHeader(screenWidth, screenHeight),
+            
+            // Month Navigation
+            _buildMonthNavigation(screenWidth, screenHeight),
+            
+            // Calendar Grid - Flexible
+            Flexible(
+              child: _buildCalendarGrid(screenWidth, screenHeight),
+            ),
+            
+            // Legend and Actions - Scrollable if needed
+            _buildBottomSection(screenWidth, screenHeight),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+// Modern Instagram-inspired header
+Widget _buildModernHeader(double screenWidth, double screenHeight) {
+  return Container(
+    padding: EdgeInsets.fromLTRB(
+      screenWidth * 0.05,
+      screenHeight * 0.02,
+      screenWidth * 0.05,
+      screenHeight * 0.015,
+    ),
+    decoration: BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          const Color(0xFF6C63FF),
+          const Color(0xFF8B5CF6),
+          const Color(0xFFA855F7),
+        ],
+      ),
+      borderRadius: const BorderRadius.only(
+        topLeft: Radius.circular(28),
+        topRight: Radius.circular(28),
+      ),
+    ),
+    child: SafeArea(
+      bottom: false,
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              IconButton(
+                onPressed: widget.onCancel,
+                icon: const Icon(Icons.close, color: Colors.white),
+                iconSize: screenWidth * 0.06,
               ),
+              Expanded(
+                child: Text(
+                  widget.title,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: screenWidth * 0.045,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+              if (_isLoading)
+                SizedBox(
+                  width: screenWidth * 0.06,
+                  height: screenWidth * 0.06,
+                  child: const CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                )
+              else
+                SizedBox(width: screenWidth * 0.06),
             ],
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+
+// Clean month navigation
+Widget _buildMonthNavigation(double screenWidth, double screenHeight) {
+  return Container(
+    padding: EdgeInsets.symmetric(
+      horizontal: screenWidth * 0.04,
+      vertical: screenHeight * 0.015,
+    ),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      border: Border(
+        bottom: BorderSide(
+          color: Colors.grey.shade100,
+          width: 1,
+        ),
+      ),
+    ),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        _buildModernNavButton(
+          Icons.chevron_left_rounded,
+          () {
+            setState(() {
+              _currentMonth = DateTime(_currentMonth.year, _currentMonth.month - 1);
+            });
+            _loadMonthData();
+          },
+          screenWidth,
+        ),
+        Text(
+          _getMonthYearText(_currentMonth),
+          style: TextStyle(
+            fontSize: screenWidth * 0.042,
+            fontWeight: FontWeight.w700,
+            color: const Color(0xFF1C1C1E),
+            letterSpacing: 0.3,
+          ),
+        ),
+        _buildModernNavButton(
+          Icons.chevron_right_rounded,
+          () {
+            setState(() {
+              _currentMonth = DateTime(_currentMonth.year, _currentMonth.month + 1);
+            });
+            _loadMonthData();
+          },
+          screenWidth,
+        ),
+      ],
+    ),
+  );
+}
+
+// Modern navigation button
+Widget _buildModernNavButton(IconData icon, VoidCallback onPressed, double screenWidth) {
+  return Material(
+    color: Colors.transparent,
+    child: InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: onPressed,
+      child: Container(
+        padding: EdgeInsets.all(screenWidth * 0.02),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF5F5F7),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Icon(
+          icon,
+          color: const Color(0xFF6C63FF),
+          size: screenWidth * 0.06,
+        ),
+      ),
+    ),
+  );
+}
+
+
+
+
+// Calendar grid with proper constraints
+Widget _buildCalendarGrid(double screenWidth, double screenHeight) {
+  return LayoutBuilder(
+    builder: (context, constraints) {
+      return SingleChildScrollView(
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: screenWidth * 0.03,
+            vertical: screenHeight * 0.01,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Header with enhanced gradient
+              // Week headers
               Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: screenWidth * 0.06, // 6% of screen width
-                  vertical: screenHeight * 0.02,  // 2% of screen height
-                ),
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Color(0xFF6C63FF),
-                      Color(0xFF5A52FF),
-                      Color(0xFF4C44FF),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(24),
-                    topRight: Radius.circular(24),
-                  ),
-                ),
+                padding: EdgeInsets.symmetric(vertical: screenHeight * 0.01),
                 child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        children: [
-                          Text(
-                            widget.title,
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: screenWidth * 0.05, // Responsive font size
-                              fontWeight: FontWeight.bold,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                          SizedBox(height: screenHeight * 0.005),
-                          Container(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: screenWidth * 0.04,
-                              vertical: screenHeight * 0.005,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Text(
-                              _getMonthYearText(_currentMonth),
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: screenWidth * 0.032,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (_isLoading)
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          shape: BoxShape.circle,
-                        ),
-                        child: SizedBox(
-                          width: screenWidth * 0.045,
-                          height: screenWidth * 0.045,
-                          child: const CircularProgressIndicator(
-                            strokeWidth: 2.5,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                          ),
-                        ),
-                      ),
-                  ],
+                  children: _buildWeekDays(),
                 ),
               ),
-
-              // Month navigation with beautiful styling
-              Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: screenWidth * 0.05,
-                  vertical: screenHeight * 0.015,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFAFAFA),
-                  border: Border(
-                    bottom: BorderSide(color: Colors.grey.shade200),
-                  ),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _buildNavigationButton(
-                      Icons.chevron_left,
-                      () {
-                        setState(() {
-                          _currentMonth = DateTime(_currentMonth.year, _currentMonth.month - 1);
-                        });
-                        _loadMonthData();
-                      },
-                    ),
-                    Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: screenWidth * 0.05,
-                        vertical: screenHeight * 0.008,
-                      ),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF6C63FF), Color(0xFF5A52FF)],
-                        ),
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF6C63FF).withOpacity(0.3),
-                            blurRadius: 8,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Text(
-                        _getMonthYearText(_currentMonth),
-                        style: TextStyle(
-                          fontSize: screenWidth * 0.042,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                    _buildNavigationButton(
-                      Icons.chevron_right,
-                      () {
-                        setState(() {
-                          _currentMonth = DateTime(_currentMonth.year, _currentMonth.month + 1);
-                        });
-                        _loadMonthData();
-                      },
-                    ),
-                  ],
-                ),
-              ),
-
-              // Calendar grid with enhanced spacing - FIXED HEIGHT
-              SizedBox(
-                height: screenHeight * 0.42, // Fixed 42% of screen height for calendar
-                child: Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: screenWidth * 0.04,
-                    vertical: screenHeight * 0.01,
-                  ),
-                  child: Column(
-                    children: [
-                      // Week day headers with better styling
-                      Container(
-                        height: screenHeight * 0.05, // Fixed height for week headers
-                        padding: EdgeInsets.symmetric(vertical: screenHeight * 0.008),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF5F5F5),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(children: _buildWeekDays()),
-                      ),
-                      SizedBox(height: screenHeight * 0.01),
-                      
-                      // Calendar days grid - FIXED HEIGHT
-                      SizedBox(
-                        height: screenHeight * 0.32, // Fixed height for calendar grid
-                        child: GridView.count(
-                          crossAxisCount: 7,
-                          crossAxisSpacing: 2,
-                          mainAxisSpacing: 2,
-                          physics: const NeverScrollableScrollPhysics(),
-                          children: _buildCalendarDays(),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              // Enhanced Legend and actions - FIXED HEIGHT
-              Container(
-                height: screenHeight * 0.24, // Fixed height for bottom section
-                padding: EdgeInsets.all(screenWidth * 0.04),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFAFAFA),
-                  borderRadius: const BorderRadius.only(
-                    bottomLeft: Radius.circular(24),
-                    bottomRight: Radius.circular(24),
-                  ),
-                ),
-                child: SingleChildScrollView(
-                  child: Column(
-                    children: [
-                      // Info tip
-                      Container(
-                        padding: EdgeInsets.all(screenHeight * 0.012),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF6C63FF).withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: const Color(0xFF6C63FF).withOpacity(0.2),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.info_outline,
-                              size: screenWidth * 0.04,
-                              color: const Color(0xFF6C63FF),
-                            ),
-                            SizedBox(width: screenWidth * 0.02),
-                            Expanded(
-                              child: Text(
-                                'اضغط مطولاً على التاريخ لرؤية تفاصيل الحجوزات',
-                                style: TextStyle(
-                                  fontSize: screenWidth * 0.028,
-                                  color: const Color(0xFF6C63FF),
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      
-                      SizedBox(height: screenHeight * 0.015),
-                      
-                      // Beautiful legend
-                      Text(
-                        'حالة التواريخ:',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: screenWidth * 0.038,
-                          color: const Color(0xFF2C2C2C),
-                        ),
-                      ),
-                      SizedBox(height: screenHeight * 0.01),
-                      
-                      Wrap(
-                        spacing: screenWidth * 0.02,
-                        runSpacing: screenHeight * 0.008,
-                        children: [
-                          _buildBeautifulLegendItem('متاح للحجز', const Color(0xFF4CAF50), Icons.check_circle, screenWidth),
-                          _buildBeautifulLegendItem('في انتظار التأكيد', const Color(0xFFFFB74D), Icons.schedule, screenWidth),
-                          _buildBeautifulLegendItem('محجوز ومؤكد', const Color(0xFFFF5722), Icons.block, screenWidth),
-                          _buildBeautifulLegendItem('زفاف جماعي', const Color(0xFF00BCD4), Icons.people_alt, screenWidth),
-                          _buildBeautifulLegendItem('مختلط', const Color(0xFFE91E63), Icons.merge_type, screenWidth),
-                        ],
-                      ),
-                      
-                      SizedBox(height: screenHeight * 0.02),
-                      
-                      // Enhanced action buttons
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Container(
-                              height: screenHeight * 0.055, // Responsive button height
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: const Color(0xFF6C63FF),
-                                  width: 2,
-                                ),
-                              ),
-                              child: Material(
-                                color: Colors.transparent,
-                                child: InkWell(
-                                  borderRadius: BorderRadius.circular(16),
-                                  onTap: widget.onCancel,
-                                  child: Center(
-                                    child: Text(
-                                      'إلغاء',
-                                      style: TextStyle(
-                                        color: const Color(0xFF6C63FF),
-                                        fontSize: screenWidth * 0.038,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          SizedBox(width: screenWidth * 0.04),
-                          
-                          Expanded(
-                            flex: 2,
-                            child: Container(
-                              height: screenHeight * 0.055, // Responsive button height
-                              decoration: BoxDecoration(
-                                gradient: _selectedDate != null 
-                                    ? const LinearGradient(
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                        colors: [
-                                          Color(0xFF6C63FF),
-                                          Color(0xFF5A52FF),
-                                        ],
-                                      )
-                                    : LinearGradient(
-                                        colors: [
-                                          Colors.grey.shade400,
-                                          Colors.grey.shade300,
-                                        ],
-                                      ),
-                                borderRadius: BorderRadius.circular(16),
-                                boxShadow: _selectedDate != null ? [
-                                  BoxShadow(
-                                    color: const Color(0xFF6C63FF).withOpacity(0.4),
-                                    blurRadius: 12,
-                                    offset: const Offset(0, 6),
-                                  ),
-                                ] : [],
-                              ),
-                              child: Material(
-                                color: Colors.transparent,
-                                child: InkWell(
-                                  borderRadius: BorderRadius.circular(16),
-                                  onTap: _selectedDate != null ? () {
-                                    final availability = _getDateAvailability(_selectedDate!);
-                                    widget.onDateSelected(_selectedDate!, availability);
-                                  } : null,
-                                  child: Center(
-                                    child: Text(
-                                      'تأكيد الاختيار',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: screenWidth * 0.038,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
+              
+              // Calendar days
+              GridView.count(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisCount: 7,
+                crossAxisSpacing: 4,
+                mainAxisSpacing: 4,
+                childAspectRatio: 0.85,
+                children: _buildCalendarDays(),
               ),
             ],
           ),
         ),
+      );
+    },
+  );
+}
+
+// Modern bottom section
+Widget _buildBottomSection(double screenWidth, double screenHeight) {
+  return Container(
+    constraints: BoxConstraints(
+      maxHeight: screenHeight * 0.28,
+    ),
+    decoration: BoxDecoration(
+      color: const Color(0xFFFAFAFC),
+      borderRadius: const BorderRadius.only(
+        bottomLeft: Radius.circular(28),
+        bottomRight: Radius.circular(28),
       ),
-    );
-  }
+    ),
+    child: SingleChildScrollView(
+      padding: EdgeInsets.all(screenWidth * 0.04),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Info tip - Instagram style
+          Container(
+            padding: EdgeInsets.symmetric(
+              horizontal: screenWidth * 0.04,
+              vertical: screenHeight * 0.012,
+            ),
+            decoration: BoxDecoration(
+              color: Colors.blue.shade50,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.info_outline_rounded,
+                  size: screenWidth * 0.045,
+                  color: Colors.blue.shade700,
+                ),
+                SizedBox(width: screenWidth * 0.025),
+                Expanded(
+                  child: Text(
+                    'اضغط مطولاً لرؤية التفاصيل',
+                    style: TextStyle(
+                      fontSize: screenWidth * 0.032,
+                      color: Colors.blue.shade700,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          SizedBox(height: screenHeight * 0.015),
+          
+          // Compact legend
+          Wrap(
+            spacing: screenWidth * 0.02,
+            runSpacing: screenHeight * 0.008,
+            children: [
+              _buildCompactLegend('متاح', const Color(0xFF4CAF50), screenWidth),
+              _buildCompactLegend('معلق', const Color(0xFFFFB74D), screenWidth),
+              _buildCompactLegend('محجوز', const Color(0xFFEF4444), screenWidth),
+              _buildCompactLegend('جماعي', const Color(0xFF00BCD4), screenWidth),
+            ],
+          ),
+          
+          SizedBox(height: screenHeight * 0.02),
+          
+          // Modern action buttons
+          Row(
+            children: [
+              Expanded(
+                child: _buildActionButton(
+                  'إلغاء',
+                  false,
+                  widget.onCancel,
+                  screenWidth,
+                  screenHeight,
+                ),
+              ),
+              SizedBox(width: screenWidth * 0.03),
+              Expanded(
+                flex: 2,
+                child: _buildActionButton(
+                  'تأكيد الاختيار',
+                  true,
+                  _selectedDate != null ? () {
+                    final availability = _getDateAvailability(_selectedDate!);
+                    widget.onDateSelected(_selectedDate!, availability);
+                  } : null,
+                  screenWidth,
+                  screenHeight,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+// Compact legend item
+Widget _buildCompactLegend(String label, Color color, double screenWidth) {
+  return Container(
+    padding: EdgeInsets.symmetric(
+      horizontal: screenWidth * 0.03,
+      vertical: screenWidth * 0.015,
+    ),
+    decoration: BoxDecoration(
+      color: color.withOpacity(0.1),
+      borderRadius: BorderRadius.circular(20),
+      border: Border.all(color: color.withOpacity(0.3), width: 1),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: screenWidth * 0.025,
+          height: screenWidth * 0.025,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+          ),
+        ),
+        SizedBox(width: screenWidth * 0.015),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: screenWidth * 0.03,
+            fontWeight: FontWeight.w600,
+            color: color.withOpacity(0.9),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+// Modern action button
+Widget _buildActionButton(
+  String label,
+  bool isPrimary,
+  VoidCallback? onTap,
+  double screenWidth,
+  double screenHeight,
+) {
+  final isEnabled = onTap != null;
+  
+  return Material(
+    color: Colors.transparent,
+    child: InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: onTap,
+      child: Container(
+        height: screenHeight * 0.055,
+        decoration: BoxDecoration(
+          gradient: isPrimary && isEnabled
+              ? const LinearGradient(
+                  colors: [Color(0xFF6C63FF), Color(0xFF8B5CF6)],
+                )
+              : null,
+          color: isPrimary && !isEnabled
+              ? Colors.grey.shade300
+              : isPrimary
+                  ? null
+                  : Colors.transparent,
+          border: !isPrimary
+              ? Border.all(color: const Color(0xFF6C63FF), width: 1.5)
+              : null,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: isPrimary && isEnabled
+              ? [
+                  BoxShadow(
+                    color: const Color(0xFF6C63FF).withOpacity(0.3),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : null,
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: TextStyle(
+              color: isPrimary ? Colors.white : const Color(0xFF6C63FF),
+              fontSize: screenWidth * 0.038,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.3,
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+// /////
+
 
   Widget _buildNavigationButton(IconData icon, VoidCallback onPressed) {
     return Container(

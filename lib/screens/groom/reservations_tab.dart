@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:open_file/open_file.dart';
 import 'package:wedding_reservation_app/screens/groom/create_reservation_screen.dart';
+import 'package:wedding_reservation_app/screens/groom/groom_home_screen.dart';
 import '../../../services/api_service.dart';
 import '../../../utils/colors.dart';
 
@@ -324,45 +325,90 @@ String _getValidationDeadlineDays() {
 
 
 // Replace the existing _buildReservationInstructionText method
-String _buildReservationInstructionText() {
-  String baseText = 'للحصول على الموافقة النهائية، يجب طباعة الحجز وختمه وتوقيعه من:\n'
-                   '- الهيئة الدينية\n';
+// String _buildReservationInstructionText() {
+//   String baseText = 'للحصول على الموافقة النهائية، يجب طباعة الحجز وختمه وتوقيعه من:\n'
+//                    '- الهيئة الدينية\n';
 
-  if (_isCrossClanReservation()) {
-    Map<String, String> selectedClanTime = _getClanAcceptanceTime(false);
-    String selectedClanName = _getSelectedClanName();
+//   if (_isCrossClanReservation()) {
+//     Map<String, String> selectedClanTime = _getClanAcceptanceTime(false);
+//     String selectedClanName = _getSelectedClanName();
     
-    String formattedSchedule = _formatDayTimeSchedule(
-      selectedClanTime['day'] ?? '', 
-      selectedClanTime['time'] ?? ''
-    );
-    baseText += '\n';
-    baseText += '- الدار المضيفة ($selectedClanName) $formattedSchedule\n';
+//     String formattedSchedule = _formatDayTimeSchedule(
+//       selectedClanTime['day'] ?? '', 
+//       selectedClanTime['time'] ?? ''
+//     );
+//     baseText += '\n';
+//     baseText += '- الدار المضيفة ($selectedClanName) $formattedSchedule\n';
 
-  }
+//   }
 
-  Map<String, String> originClanTime = _getClanAcceptanceTime(true);
-  String originClanName = _getOriginClanName();
+//   Map<String, String> originClanTime = _getClanAcceptanceTime(true);
+//   String originClanName = _getOriginClanName();
 
-  String formattedSchedule = _formatDayTimeSchedule(
-    originClanTime['day'] ?? '', 
-    originClanTime['time'] ?? ''
-  );
+//   String formattedSchedule = _formatDayTimeSchedule(
+//     originClanTime['day'] ?? '', 
+//     originClanTime['time'] ?? ''
+//   );
 
-  baseText += '\n';
-  baseText += '- إدارة عشيرتك  $originClanName $formattedSchedule\n\n';
+//   baseText += '\n';
+//   baseText += '- إدارة عشيرتك  $originClanName $formattedSchedule\n\n';
 
-  // Safely get validation deadline days with fallback
-  String daysMax = _getValidationDeadlineDays();
+//   // Safely get validation deadline days with fallback
+//   String daysMax = _getValidationDeadlineDays();
   
-  baseText += '\n';
-  baseText += 'يجب استكمال هذه الإجراءات خلال $daysMax أيام كحد أقصى، وإلا يُلغى الحجز تلقائياً.\n\n'
-              'بعد ختم وتوقيع جميع الجهات، توجّه إلى إدارة عشيرتك $originClanName ليؤكد حجزك في النظام.\n\n';
+//   baseText += '\n';
+//   baseText += 'يجب استكمال هذه الإجراءات خلال $daysMax أيام كحد أقصى، وإلا يُلغى الحجز تلقائياً.\n\n'
+//               'بعد ختم وتوقيع جميع الجهات، توجّه إلى إدارة عشيرتك $originClanName ليؤكد حجزك في النظام.\n\n';
 
-  return baseText;
+//   return baseText;
+// }
+
+Widget _buildReservationInstructionWidget() {
+  final originClanTime = _getClanAcceptanceTime(true);
+  final originClanName = _getOriginClanName();
+  final formattedSchedule = _formatDayTimeSchedule(originClanTime['day'] ?? '', originClanTime['time'] ?? '');
+  final daysMax = _getValidationDeadlineDays();
+
+  return Center(
+    child: SingleChildScrollView(
+      child: Padding(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Text('━━━━━━━━━━━━━━━━━━━━━━', textAlign: TextAlign.center),
+            Text('📝 خطوات إتمام الحجز', textAlign: TextAlign.center, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            Text('━━━━━━━━━━━━━━━━━━━━━━', textAlign: TextAlign.center),
+            SizedBox(height: 20),
+            Text('للحصول على الموافقة النهائية، يجب طباعة الحجز وختمه وتوقيعه من:', textAlign: TextAlign.center),
+            SizedBox(height: 20),
+            Text('⊙ إدارة عشيرتك', textAlign: TextAlign.center, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+            Text(originClanName, textAlign: TextAlign.center),
+            Text('🕐 $formattedSchedule', textAlign: TextAlign.center),
+            SizedBox(height: 20),
+            if (_isCrossClanReservation()) ...[
+              Text('⊙ الدار المضيفة', textAlign: TextAlign.center, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+              Text(_getSelectedClanName(), textAlign: TextAlign.center),
+              Text('🕐 ${_formatDayTimeSchedule(_getClanAcceptanceTime(false)['day'] ?? '', _getClanAcceptanceTime(false)['time'] ?? '')}', textAlign: TextAlign.center),
+              SizedBox(height: 20),
+            ],
+            Text('⊙ الهيئة الدينية', textAlign: TextAlign.center, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+            SizedBox(height: 20),
+            Text('━━━━━━━━━━━━━━━━━━━━━━', textAlign: TextAlign.center),
+            Text('⚠️ تنبيه ', textAlign: TextAlign.center, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.orange)),
+            Text('━━━━━━━━━━━━━━━━━━━━━━', textAlign: TextAlign.center),
+            SizedBox(height: 12),
+            Text('يجب استكمال هذه الإجراءات خلال $daysMax أيام كحد أقصى', textAlign: TextAlign.center),
+            Text('وإلا يُلغى الحجز تلقائياً', textAlign: TextAlign.center, style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600)),
+            SizedBox(height: 12),
+            Text('بعد ختم وتوقيع جميع الجهات، توجّه إلى إدارة عشيرتك', textAlign: TextAlign.center),
+            Text(originClanName, textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.w600)),
+            Text('ليؤكد حجزك في النظام', textAlign: TextAlign.center),
+          ],
+        ),
+      ),
+    ),
+  );
 }
-
-
 
 // Add this new helper method after the existing _getClanAcceptanceTime method
 String _formatDayTimeSchedule(String days, String times) {
@@ -888,30 +934,31 @@ String _getDayName(int dayNum) {
                                 color: const Color.fromARGB(255, 249, 144, 144),
                                 size: 32,
                               ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'ملاحظة مهمة',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: const Color.fromARGB(255, 0, 0, 0),
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
+                              // const SizedBox(height: 8),
+                              // Text(
+                              //   'ملاحظة مهمة',
+                              //   style: TextStyle(
+                              //     fontSize: 16,
+                              //     fontWeight: FontWeight.bold,
+                              //     color: const Color.fromARGB(255, 0, 0, 0),
+                              //   ),
+                              //   textAlign: TextAlign.center,
+                              // ),
                             ],
                           ),
-                          const SizedBox(height: 8),
+                          // const SizedBox(height: 8),
+                          _buildReservationInstructionWidget(),
 
                           // Dynamic instruction text
-                          Text(
-                            _buildReservationInstructionText(),
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: const Color.fromARGB(255, 0, 0, 0),
-                              height: 1.5,
-                            ),
-                            textAlign: TextAlign.start,
-                          ),
+                          // Text(
+                          //   _buildReservationInstructionText(),
+                          //   style: TextStyle(
+                          //     fontSize: 14,
+                          //     color: const Color.fromARGB(255, 0, 0, 0),
+                          //     height: 1.5,
+                          //   ),
+                          //   textAlign: TextAlign.start,
+                          // ),
                         ],
                       ),
                     ),
@@ -1495,16 +1542,24 @@ Future<File?> _savePdfFile(Uint8List pdfBytes, int reservationId) async {
     );
   }
 
-  void _navigateToNewReservation() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => const CreateReservationScreen(),
-      ),
-    ).then((_) {
-      // Refresh reservations when returning from create screen
-      _refreshReservations(); // Use enhanced refresh method
-    });
-  }
+void _navigateToNewReservation() {
+  if (!mounted) return;
+  
+  Navigator.of(context).pushNamed(
+    '/groom_home',
+  ).then((_) {
+    if (mounted) {
+      _refreshReservations();
+    }
+  });
+}
+// void _navigateToNewReservation() {
+//   Navigator.of(context).pushNamed('/creat_new_reservation').then((_) {
+//     // Refresh reservations when returning from create screen
+//     _refreshReservations(); // Use enhanced refresh method
+//   });
+// }
+
 
   // Helper methods for getting proper names
   String _getClanName(Map<String, dynamic> reservation) {

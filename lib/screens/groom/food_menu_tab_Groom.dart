@@ -24,6 +24,7 @@ class FoodMenuTabGState extends State<FoodMenuTabG> {
     super.initState();
     _loadInitialData();
   }
+
   void refreshData() {
 
     _loadInitialData();
@@ -31,6 +32,7 @@ class FoodMenuTabGState extends State<FoodMenuTabG> {
       // Trigger rebuild
     });
   }
+  
 Future<void> _loadInitialData() async {
   await Future.wait([
     _loadFoodTypes(),

@@ -134,724 +134,730 @@ Future<void> _loadDashboardData() async {
     }
   }
 }
+// Spotify-Inspired Home Tab - Light Mode
 
-  @override
-  Widget build(BuildContext context) {
-    if (_isLoading) {
-      return _buildLoadingState();
-    }
-
-    return RefreshIndicator(
-      onRefresh: _loadDashboardData,
-      color: AppColors.primary,
-      child: CustomScrollView(
-        physics: const BouncingScrollPhysics(),
-        slivers: [
-          SliverPadding(
-            padding: const EdgeInsets.all(20),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                _buildModernWelcomeCard(),
-                const SizedBox(height: 24),
-                _buildReservationStatusCard(),
-                const SizedBox(height: 24),
-                _buildQuickStatsGrid(),
-                const SizedBox(height: 24),
-                _buildQuickActionsSection(),
-                const SizedBox(height: 24),
-                if (_recentReservations.isNotEmpty) ...[
-                  _buildRecentReservationsSection(),
-                  const SizedBox(height: 100),
-                ],
-              ]),
-            ),
-          ),
-        ],
-      ),
-    );
+@override
+Widget build(BuildContext context) {
+  if (_isLoading) {
+    return _buildLoadingState();
   }
 
-  Widget _buildLoadingState() {
-    return Center(
+  return Container(
+    // decoration: BoxDecoration(
+    //   gradient: LinearGradient(
+    //     begin: Alignment.bottomCenter,
+    //     end: Alignment.topCenter,
+    //     colors: [
+    //       const Color(0xFF1DB954).withOpacity(0.15),
+    //       const Color(0xFFF6F6F6),
+    //     ],
+    //   ),
+    // ),
+    color: const Color(0xFFF6F6F6), // Spotify light background
+    child: RefreshIndicator(
+      onRefresh: _loadDashboardData,
+      color: const Color(0xFF1DB954), // Spotify green
+      backgroundColor: Colors.white,
+      child: ListView(
+        padding: EdgeInsets.zero,
+        physics: const BouncingScrollPhysics(),
+        children: [
+          _buildSpotifyHeader(),
+          _buildSpotifyStatusCard(),
+          const SizedBox(height: 24),
+          _buildSpotifyStatsSection(),
+          const SizedBox(height: 32),
+          _buildSpotifyQuickActions(),
+          if (_recentReservations.isNotEmpty) ...[
+            const SizedBox(height: 32),
+            _buildSpotifyRecentReservations(),
+          ],
+          const SizedBox(height: 100),
+        ],
+      ),
+    ),
+  );
+}
+
+Widget _buildLoadingState() {
+  return Container(
+    color: const Color(0xFFF6F6F6),
+    child: Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(40),
-              gradient: LinearGradient(
-                colors: [
-                  AppColors.primary.withOpacity(0.1),
-                  AppColors.primary.withOpacity(0.3),
-                ],
-              ),
-            ),
-            child: const Center(
-              child: CircularProgressIndicator(strokeWidth: 3),
+          SizedBox(
+            width: 60,
+            height: 60,
+            child: CircularProgressIndicator(
+              strokeWidth: 3,
+              valueColor: AlwaysStoppedAnimation<Color>(const Color(0xFF1DB954)),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           const Text(
-            'جاري تحميل البيانات...',
+            'جاري التحميل...',
             style: TextStyle(
               fontSize: 16,
-              color: AppColors.textSecondary,
+              color: Color(0xFF6A6A6A),
+              fontWeight: FontWeight.w500,
             ),
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
-  Widget _buildModernWelcomeCard() {
-    final userName = _userProfile != null 
-        ? '${_userProfile!['first_name'] ?? ''} ${_userProfile!['last_name'] ?? ''}'.trim()
-        : 'العريس الكريم';
+Widget _buildSpotifyHeader() {
+  final userName = _userProfile != null 
+      ? '${_userProfile!['first_name'] ?? ''} ${_userProfile!['last_name'] ?? ''}'.trim()
+      : 'العريس الكريم';
 
-    final timeOfDay = DateTime.now().hour;
-    String greeting = 'مرحباً';
-    if (timeOfDay < 12) {
-      greeting = '☀️ السلام عليكم صباح الخير';
-    } else if (timeOfDay < 17) {
-      greeting = ' 🌙 السلام عليكم مساء الخير';
-    } else {
-      greeting = '✨ السلام عليكم مساء الخير';
-    }
-        
-    return FadeTransition(
-      opacity: _fadeAnimation,
-      child: SlideTransition(
-        position: _slideAnimation,
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                AppColors.primary,
-                AppColors.primary.withOpacity(0.8),
-                AppColors.secondary.withOpacity(0.6),
-              ],
-            ),
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.primary.withOpacity(0.3),
-                spreadRadius: 0,
-                blurRadius: 20,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '$greeting ',
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.9),
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      userName,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      _pendingReservation != null 
-                          ? 'لديك حجز معلق يحتاج متابعة'
-                          : 'مرحبا بكم',
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.85),
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(40),
-                  border: Border.all(
-                    color: Colors.white.withOpacity(0.2),
-                    width: 2,
-                  ),
-                ),
-                child: const Icon(
-                  Icons.favorite,
-                  color: Colors.white,
-                  size: 40,
-                ),
-              ),
-            ],
+  final timeOfDay = DateTime.now().hour;
+  String greeting = timeOfDay < 12 ? ' السلام عليكم صباح الخير' : timeOfDay < 18 ? 'السلام عليكم مرحبا بك' : 'السلام عليكم مساء الخير';
+
+  return Container(
+    padding: const EdgeInsets.fromLTRB(16, 48, 16, 16),
+    decoration: BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          const Color(0xFF1DB954).withOpacity(0.15),
+          const Color(0xFFF6F6F6),
+        ],
+      ),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          greeting,
+          style: const TextStyle(
+            fontSize: 28,
+            fontWeight: FontWeight.w800,
+            color: Color.fromARGB(255, 0, 144, 19),
+            height: 1.2,
+            letterSpacing: -0.5,
+
           ),
         ),
-      ),
-    );
-  }
+        const SizedBox(height: 4),
+        Text(
+          userName,
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF6A6A6A),
+          ),
+        ),
+      ],
+    ),
+  );
+}
 
-Widget _buildReservationStatusCard() {
-  // Check for validated reservation first
-  if (_reservationStats['validated'] != null && (_reservationStats['validated']! > 0)) {
+Widget _buildSpotifyStatusCard() {
+  if (_reservationStats['validated'] != null && _reservationStats['validated']! > 0) {
     return FutureBuilder<Map<String, dynamic>?>(
       future: _getValidatedReservation(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(20),
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            height: 160,
             decoration: BoxDecoration(
-              color: Colors.grey.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(16),
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
-            child: const Center(child: CircularProgressIndicator()),
+            child: Center(
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(const Color(0xFF1DB954)),
+              ),
+            ),
           );
         }
         
         if (snapshot.hasData && snapshot.data != null) {
-          final validatedReservation = snapshot.data!;
-          final weddingDate = validatedReservation['date1'] ?? 'غير محدد';
-          final weddingDate2 = validatedReservation['date2'];
-          final hallName = validatedReservation['hall_name'] ?? 'غير محدد';
+          final res = snapshot.data!;
+          final date = res['date1'] ?? 'غير محدد';
+          final date2 = res['date2'];
+          final hall = res['hall_name'] ?? 'غير محدد';
           
-          return Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Colors.green.withOpacity(0.1),
-                  Colors.green.withOpacity(0.05),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.green.withOpacity(0.2)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.green.withOpacity(0.1),
-                  spreadRadius: 0,
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.green.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(Icons.check_circle, color: Colors.green, size: 24),
-                    ),
-                    const SizedBox(width: 16),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'حجز مؤكد',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.green,
-                            ),
-                          ),
-                          Text(
-                            'تهانينا! حجزك مؤكد وجاهز',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+          return GestureDetector(
+            onTap: () => widget.onTabChanged!(2),
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    const Color(0xFF1DB954),
+                    const Color(0xFF1ED760),
                   ],
                 ),
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.7),
-                    borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF1DB954).withOpacity(0.3),
+                    blurRadius: 15,
+                    offset: const Offset(0, 4),
                   ),
-                  child: Column(
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
                     children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.event, size: 16, color: AppColors.textSecondary),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              weddingDate2 != null && weddingDate2.isNotEmpty && weddingDate2 != 'غير محدد'
-                                  ? 'تاريخ الحفل: $weddingDate و $weddingDate2'
-                                  : 'تاريخ الحفل: $weddingDate',
-                              style: const TextStyle(fontSize: 14),
-                            ),
-                          ),
-                        ],
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Icon(Icons.check_circle_rounded, color: Colors.white, size: 24),
                       ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          const Icon(Icons.location_on, size: 16, color: AppColors.textSecondary),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'القاعة: $hallName',
-                              style: const TextStyle(fontSize: 14),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'حجز مؤكد',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.white,
+                              ),
                             ),
-                          ),
-                        ],
+                            Text(
+                              'تهانينا! حجزك جاهز',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.white,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          // Navigate to reservations tab and switch to validated tab (index 2)
-                          widget.onTabChanged!(2);
-                          // You might need to add a callback to switch to the validated tab specifically
-                        },
-                        icon: const Icon(Icons.visibility),
-                        label: const Text('عرض التفاصيل'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(6),
                     ),
-                    // const SizedBox(width: 12),
-                    // Expanded(
-                    //   child: ElevatedButton.icon(
-                    //     onPressed: () async {
-                    //       try {
-                    //         // Download PDF directly from here
-                    //         final pdfBytes = await ApiService.downloadPdfFromServer(validatedReservation['id']);
-                    //         // You might want to add the PDF sharing functionality here
-                    //         ScaffoldMessenger.of(context).showSnackBar(
-                    //           const SnackBar(
-                    //             content: Text('تم تحميل الملف بنجاح'),
-                    //             backgroundColor: Colors.green,
-                    //           ),
-                    //         );
-                    //       } catch (e) {
-                    //         ScaffoldMessenger.of(context).showSnackBar(
-                    //           SnackBar(
-                    //             content: Text('خطأ في تحميل الملف: $e'),
-                    //             backgroundColor: Colors.red,
-                    //           ),
-                    //         );
-                    //       }
-                    //     },
-                    //     icon: const Icon(Icons.download),
-                    //     label: const Text('تحميل PDF'),
-                    //     style: ElevatedButton.styleFrom(
-                    //       backgroundColor: Colors.blue,
-                    //       foregroundColor: Colors.white,
-                    //       padding: const EdgeInsets.symmetric(vertical: 12),
-                    //       shape: RoundedRectangleBorder(
-                    //         borderRadius: BorderRadius.circular(12),
-                    //       ),
-                    //     ),
-                    //   ),
-                    // ),
-                  ],
-                ),
-              ],
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.event_rounded, size: 16, color: Colors.white),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                date2 != null && date2.isNotEmpty ? '$date و $date2' : date,
+                                style: const TextStyle(fontSize: 13, color: Colors.white, fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            const Icon(Icons.location_on_rounded, size: 16, color: Colors.white),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                hall,
+                                style: const TextStyle(fontSize: 13, color: Colors.white, fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           );
         }
-        
-        // Fallback if no validated reservation found
-        return _buildNormalStatusCard();
+        return _buildSpotifyReadyCard();
       },
     );
   }
   
-  // Check for pending reservation
-  if (_pendingReservation != null) {
-    return _buildPendingReservationCard();
-  }
-  
-  // Default state - ready to book
-  return _buildReadyToBookCard();
+  if (_pendingReservation != null) return _buildSpotifyPendingCard();
+  return _buildSpotifyReadyCard();
 }
 
-
-  Widget _buildQuickStatsGrid() {
-    final stats = [
-      {
-        'title': 'إجمالي الحجوزات',
-        'value': _reservationStats['total'] ?? 0,
-        'icon': Icons.calendar_today,
-        'color': Colors.blue,
-        'gradient': [Colors.blue.shade400, Colors.blue.shade600],
-      },
-      {
-        'title': 'الحجوزات المؤكدة',
-        'value': _reservationStats['validated'] ?? 0,
-        'icon': Icons.check_circle,
-        'color': Colors.green,
-        'gradient': [Colors.green.shade400, Colors.green.shade600],
-      },
-      {
-        'title': 'الحجوزات المعلقة',
-        'value': _reservationStats['pending'] ?? 0,
-        'icon': Icons.pending,
-        'color': Colors.orange,
-        'gradient': [Colors.orange.shade400, Colors.orange.shade600],
-      },
-      {
-        'title': 'الحجوزات الملغاة',
-        'value': _reservationStats['cancelled'] ?? 0,
-        'icon': Icons.cancel,
-        'color': Colors.red,
-        'gradient': [Colors.red.shade400, Colors.red.shade600],
-      },
-    ];
-
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        childAspectRatio: 1.3,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-      ),
-      itemCount: stats.length,
-      itemBuilder: (context, index) {
-        final stat = stats[index];
-        return _buildModernStatCard(
-          stat['title'] as String,
-          (stat['value'] as int).toString(),
-          stat['icon'] as IconData,
-          stat['gradient'] as List<Color>,
-        );
-      },
-    );
-  }
-
-  Widget _buildModernStatCard(String title, String value, IconData icon, List<Color> gradient) {
-    return Container(
+Widget _buildSpotifyPendingCard() {
+  final date = _pendingReservation!['date1'] ?? 'غير محدد';
+  final date2 = _pendingReservation!['date2'];
+  final hall = _pendingReservation!['hall_name'] ?? 'غير محدد';
+  
+  return GestureDetector(
+    onTap: () => widget.onTabChanged!(2),
+    child: Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: gradient,
+          colors: [
+            Colors.orange.shade500,
+            Colors.orange.shade600,
+          ],
         ),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(8),
         boxShadow: [
           BoxShadow(
-            color: gradient.first.withOpacity(0.3),
-            spreadRadius: 0,
+            color: Colors.orange.withOpacity(0.3),
             blurRadius: 15,
-            offset: const Offset(0, 8),
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Icon(Icons.pending_rounded, color: Colors.white, size: 24),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'حجز معلق',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                      ),
+                    ),
+                    Text(
+                      'في انتظار الموافقة',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.white,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(6),
             ),
-            child: Icon(icon, color: Colors.white, size: 20),
-          ),
-          const Spacer(),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 32,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.white.withOpacity(0.9),
-              fontWeight: FontWeight.w500,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.event_rounded, size: 16, color: Colors.white),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        date2 != null && date2.isNotEmpty ? '$date و $date2' : date,
+                        style: const TextStyle(fontSize: 13, color: Colors.white, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    const Icon(Icons.location_on_rounded, size: 16, color: Colors.white),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        hall,
+                        style: const TextStyle(fontSize: 13, color: Colors.white, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
-  Widget _buildQuickActionsSection() {
-    final actions = [
-      {
-        'icon': Icons.add_circle_rounded,
-        'title': 'حجز جديد',
-        'subtitle': 'احجز موعد زفافك',
-        'color': AppColors.primary,
-        'onTap': () => widget.onTabChanged!(1),
-
-        // 'onTap': widget.onNavigateToReservation,
-      },
-      {
-        'icon': Icons.calendar_view_month_rounded,
-        'title': 'حجوزاتي',
-        'subtitle': 'إدارة الحجوزات',
-        'color': AppColors.secondary,
-        'onTap': () => widget.onTabChanged!(2),
-      },
-      {
-        'icon': Icons.person_rounded,
-        'title': 'الملف الشخصي',
-        'subtitle': 'إعدادات الحساب',
-        'color': Colors.purple,
-        'onTap': () => widget.onTabChanged!(3),
-      },
-    ];
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'الإجراءات السريعة',
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        const SizedBox(height: 16),
-        ...actions.map((action) => Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: _buildModernActionCard(
-            icon: action['icon'] as IconData,
-            title: action['title'] as String,
-            subtitle: action['subtitle'] as String,
-            color: action['color'] as Color,
-            onTap: action['onTap'] as VoidCallback,
-          ),
-        )),
-      ],
-    );
-  }
-
-  Widget _buildModernActionCard({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.border.withOpacity(0.5)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              spreadRadius: 0,
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(icon, color: color, size: 24),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Icon(
-              Icons.arrow_forward_ios,
-              color: AppColors.textSecondary.withOpacity(0.5),
-              size: 16,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRecentReservationsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'الحجوزات الأخيرة',
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        const SizedBox(height: 16),
-        ...(_recentReservations.map((reservation) => Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: _buildRecentReservationCard(reservation),
-        ))),
-      ],
-    );
-  }
-
-  Widget _buildRecentReservationCard(Map<String, dynamic> reservation) {
-    final status = reservation['status'] ?? 'pending';
-    final weddingDate = reservation['wedding_date'] ?? 'غير محدد';
-    final hallName = reservation['hall_name'] ?? 'غير محدد';
-    
-    Color statusColor = Colors.orange;
-    IconData statusIcon = Icons.pending;
-    String statusText = 'معلق';
-    
-    switch (status.toLowerCase()) {
-      case 'confirmed':
-      case 'validated':
-        statusColor = Colors.green;
-        statusIcon = Icons.check_circle;
-        statusText = 'مؤكد';
-        break;
-      case 'cancelled':
-        statusColor = Colors.red;
-        statusIcon = Icons.cancel;
-        statusText = 'ملغي';
-        break;
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(16),
+Widget _buildSpotifyReadyCard() {
+  return GestureDetector(
+    onTap: () => widget.onTabChanged!(1),
+    child: Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: statusColor.withOpacity(0.2)),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            const Color.fromARGB(153, 29, 185, 84),
+            const Color.fromARGB(142, 12, 86, 38),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(8),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            spreadRadius: 0,
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: const Color(0xFF1DB954).withOpacity(0.3),
+            blurRadius: 15,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: statusColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(6),
             ),
-            child: Icon(statusIcon, color: statusColor, size: 20),
+            child: const Icon(Icons.celebration_rounded, color: Colors.white, size: 28),
           ),
-          const SizedBox(width: 12),
-          Expanded(
+          const SizedBox(width: 16),
+          const Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  hallName,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
+                  'ابدأ الحجز',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
                   ),
                 ),
-                const SizedBox(height: 4),
                 Text(
-                  weddingDate,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
+                  'احجز موعد العرس الآن',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.white,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ],
             ),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: statusColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              statusText,
-              style: TextStyle(
-                color: statusColor,
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
+          const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 18),
+        ],
+      ),
+    ),
+  );
+}
+
+Widget _buildSpotifyStatsSection() {
+  return Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 16),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'إحصائيات الحجوزات',
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w900,
+            color: Color(0xFF121212),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(child: _buildSpotifyStatCard('${_reservationStats['total'] ?? 0}', 'الإجمالي', Icons.calendar_today_rounded, const Color(0xFF1DB954))),
+            const SizedBox(width: 12),
+            Expanded(child: _buildSpotifyStatCard('${_reservationStats['validated'] ?? 0}', 'المؤكد', Icons.check_circle_rounded, const Color(0xFF1DB954))),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(child: _buildSpotifyStatCard('${_reservationStats['pending'] ?? 0}', 'المعلق', Icons.pending_rounded, Colors.orange)),
+            const SizedBox(width: 12),
+            Expanded(child: _buildSpotifyStatCard('${_reservationStats['cancelled'] ?? 0}', 'الملغي', Icons.cancel_rounded, Colors.red)),
+          ],
+        ),
+      ],
+    ),
+  );
+}
+
+Widget _buildSpotifyStatCard(String value, String title, IconData icon, Color color) {
+  return Container(
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(8),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.05),
+          blurRadius: 10,
+          offset: const Offset(0, 2),
+        ),
+      ],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, color: color, size: 24),
+        const SizedBox(height: 12),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 28,
+            fontWeight: FontWeight.w900,
+            color: Color(0xFF121212),
+          ),
+        ),
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 13,
+            color: Color(0xFF6A6A6A),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+Widget _buildSpotifyQuickActions() {
+  final actions = [
+    {'icon': Icons.add_circle_rounded, 'title': 'حجز جديد', 'subtitle': 'احجز موعد زفافك', 'onTap': () => widget.onTabChanged!(1)},
+    {'icon': Icons.calendar_month_rounded, 'title': 'حجوزاتي', 'subtitle': 'عرض وإدارة الحجوزات', 'onTap': () => widget.onTabChanged!(2)},
+    {'icon': Icons.person_rounded, 'title': 'الملف الشخصي', 'subtitle': 'إعدادات وتفضيلات', 'onTap': () => widget.onTabChanged!(3)},
+  ];
+
+  return Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 16),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'الإجراءات السريعة',
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w900,
+            color: Color(0xFF121212),
+          ),
+        ),
+        const SizedBox(height: 16),
+        ...actions.map((action) => Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: GestureDetector(
+            onTap: action['onTap'] as VoidCallback,
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1DB954).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Icon(action['icon'] as IconData, color: const Color(0xFF1DB954), size: 24),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          action['title'] as String,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF121212),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          action['subtitle'] as String,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF6A6A6A),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right_rounded, color: Color(0xFF6A6A6A), size: 24),
+                ],
               ),
             ),
           ),
-        ],
-      ),
-    );
+        )),
+      ],
+    ),
+  );
+}
+
+Widget _buildSpotifyRecentReservations() {
+  return Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 16),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'الحجوزات الأخيرة',
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w900,
+            color: Color(0xFF121212),
+          ),
+        ),
+        const SizedBox(height: 16),
+        ...(_recentReservations.map((res) => Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: _buildSpotifyReservationCard(res),
+        ))),
+      ],
+    ),
+  );
+}
+
+Widget _buildSpotifyReservationCard(Map<String, dynamic> reservation) {
+  final status = reservation['status'] ?? 'pending';
+  final date = reservation['wedding_date'] ?? 'غير محدد';
+  final hall = reservation['hall_name'] ?? 'غير محدد';
+  
+  Color color = Colors.orange;
+  IconData icon = Icons.pending_rounded;
+  String text = 'معلق';
+  
+  if (status.toLowerCase() == 'confirmed' || status.toLowerCase() == 'validated') {
+    color = const Color(0xFF1DB954);
+    icon = Icons.check_circle_rounded;
+    text = 'مؤكد';
+  } else if (status.toLowerCase() == 'cancelled') {
+    color = Colors.red.shade400;
+    icon = Icons.cancel_rounded;
+    text = 'ملغي';
   }
 
+  return Container(
+    padding: const EdgeInsets.all(16),
+    
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(8),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.05),
+          blurRadius: 10,
+          offset: const Offset(0, 2),
+        ),
+      ],
+    ),
+    child: Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Icon(icon, color: color, size: 20),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                hall,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF121212),
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 2),
+              Text(
+                date,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFF6A6A6A),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            text,
+            style: TextStyle(
+              color: color,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
 
+Widget _buildNormalStatusCard() => _buildSpotifyReadyCard();
+
+ 
 
 
 
@@ -869,215 +875,6 @@ Future<Map<String, dynamic>?> _getValidatedReservation() async {
   }
 }
 
-// Extract the pending reservation card logic
-Widget _buildPendingReservationCard() {
-  final weddingDate = _pendingReservation!['date1'] ?? 'غير محدد';
-  final weddingDate2 = _pendingReservation!['date2'];
-  final hallName = _pendingReservation!['hall_name'] ?? 'غير محدد';
-  
-  return Container(
-    width: double.infinity,
-    padding: const EdgeInsets.all(20),
-    decoration: BoxDecoration(
-      gradient: LinearGradient(
-        colors: [
-          Colors.orange.withOpacity(0.1),
-          Colors.orange.withOpacity(0.05),
-        ],
-      ),
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: Colors.orange.withOpacity(0.2)),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.orange.withOpacity(0.1),
-          spreadRadius: 0,
-          blurRadius: 10,
-          offset: const Offset(0, 4),
-        ),
-      ],
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(Icons.pending_actions, color: Colors.orange, size: 24),
-            ),
-            const SizedBox(width: 16),
-            const Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'حجز معلق',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.orange,
-                    ),
-                  ),
-                  Text(
-                    'في انتظار المراجعة والموافقة',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.7),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Column(
-            children: [
-              Row(
-                children: [
-                  const Icon(Icons.event, size: 16, color: AppColors.textSecondary),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      weddingDate2 != null && weddingDate2.isNotEmpty && weddingDate2 != 'غير محدد'
-                          ? 'تاريخ الحفل: $weddingDate و $weddingDate2'
-                          : 'تاريخ الحفل: $weddingDate',
-                      style: const TextStyle(fontSize: 14),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  const Icon(Icons.location_on, size: 16, color: AppColors.textSecondary),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'القاعة: $hallName',
-                      style: const TextStyle(fontSize: 14),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: () => widget.onTabChanged!(2),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: const Text('عرض التفاصيل', style: TextStyle(fontWeight: FontWeight.bold)),
-          ),
-        ),
-      ],
-    ),
-  );
-}
 
-// Extract the ready to book card logic
-Widget _buildReadyToBookCard() {
-  return Container(
-    width: double.infinity,
-    padding: const EdgeInsets.all(20),
-    decoration: BoxDecoration(
-      gradient: LinearGradient(
-        colors: [
-          Colors.green.withOpacity(0.1),
-          Colors.green.withOpacity(0.05),
-        ],
-      ),
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: Colors.green.withOpacity(0.2)),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.green.withOpacity(0.1),
-          spreadRadius: 0,
-          blurRadius: 10,
-          offset: const Offset(0, 4),
-        ),
-      ],
-    ),
-    child: Column(
-      children: [
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.green.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(Icons.celebration, color: Colors.green, size: 24),
-            ),
-            const SizedBox(width: 16),
-            const Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'جاهز للحجز',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.green,
-                    ),
-                  ),
-                  Text(
-                    'ابدأ رحلة حجز موعد زفافك المثالي',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: () => widget.onTabChanged!(1),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: const Text('احجز الآن', style: TextStyle(fontWeight: FontWeight.bold)),
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-// Helper method for fallback
-Widget _buildNormalStatusCard() {
-  return _buildReadyToBookCard();
-}
 
 }

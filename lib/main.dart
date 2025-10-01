@@ -4,6 +4,8 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:wedding_reservation_app/screens/auth/tempCodeRunnerFile.dart';
 import 'package:wedding_reservation_app/screens/clan%20admin/home_screen.dart';
+import 'package:wedding_reservation_app/screens/groom/create_reservation_screen.dart';
+import 'package:wedding_reservation_app/screens/groom/groom_home_screen.dart';
 import 'screens/auth/splash_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'utils/colors.dart';
@@ -46,6 +48,10 @@ class WeddingReservationApp extends StatelessWidget {
         '/signup': (context) => const MultiStepSignupScreen(), // Add signup route
         '/splash': (context) => const SplashScreen(),
         '/clan_admin_home': (context) => const ClanAdminHomeScreen(),
+        '/creat_new_reservation': (context) => const CreateReservationScreen(),
+        '/groom_home': (context) => const GroomHomeScreen(
+          initialTabIndex:1
+        ),
         // Add other routes as needed
       },
       

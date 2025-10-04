@@ -12,6 +12,9 @@ import 'package:wedding_reservation_app/screens/groom/create_reservation_screen.
 import 'package:wedding_reservation_app/screens/groom/groom_home_screen.dart';
 import '../../../services/api_service.dart';
 import '../../../utils/colors.dart';
+  
+import '../../utils/colors.dart'; 
+import '../../widgets/theme_toggle_button.dart';
 
 class ReservationsTab extends StatefulWidget {
   const ReservationsTab({super.key});
@@ -65,6 +68,23 @@ class ReservationsTabState extends State<ReservationsTab> with SingleTickerProvi
       // Trigger rebuild
     });
   }
+
+  Color _getCardColor(BuildContext context) {
+  return Theme.of(context).cardColor;
+}
+
+Color _getBackgroundColor(BuildContext context) {
+  return Theme.of(context).scaffoldBackgroundColor;
+}
+
+Color _getTextColor(BuildContext context) {
+  return Theme.of(context).textTheme.bodyLarge?.color ?? AppColors.textPrimary;
+}
+
+Color _getSecondaryTextColor(BuildContext context) {
+  return Theme.of(context).textTheme.bodyMedium?.color ?? AppColors.textSecondary;
+}
+
   Future<void> _loadReservations() async {
     setState(() => _isLoading = true);
     
@@ -368,6 +388,7 @@ Widget _buildReservationInstructionWidget() {
   final originClanName = _getOriginClanName();
   final formattedSchedule = _formatDayTimeSchedule(originClanTime['day'] ?? '', originClanTime['time'] ?? '');
   final daysMax = _getValidationDeadlineDays();
+  final isDark = Theme.of(context).brightness == Brightness.dark;
 
   return Center(
     child: SingleChildScrollView(
@@ -375,41 +396,142 @@ Widget _buildReservationInstructionWidget() {
         padding: EdgeInsets.all(16),
         child: Column(
           children: [
-            Text('━━━━━━━━━━━━━━━━━━━━━━', textAlign: TextAlign.center),
-            Text('📝 خطوات إتمام الحجز', textAlign: TextAlign.center, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            Text('━━━━━━━━━━━━━━━━━━━━━━', textAlign: TextAlign.center),
+            Text(
+              '━━━━━━━━━━━━━━━━━━━━━━',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: _getSecondaryTextColor(context)),
+            ),
+            Text(
+              '📝 خطوات إتمام الحجز',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: _getTextColor(context),
+              ),
+            ),
+            Text(
+              '━━━━━━━━━━━━━━━━━━━━━━',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: _getSecondaryTextColor(context)),
+            ),
             SizedBox(height: 20),
-            Text('للحصول على الموافقة النهائية، يجب طباعة الحجز وختمه وتوقيعه من:', textAlign: TextAlign.center),
+            Text(
+              'للحصول على الموافقة النهائية، يجب طباعة الحجز وختمه وتوقيعه من:',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: _getTextColor(context)),
+            ),
             SizedBox(height: 20),
-            Text('⊙ إدارة عشيرتك', textAlign: TextAlign.center, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
-            Text(originClanName, textAlign: TextAlign.center),
-            Text('🕐 $formattedSchedule', textAlign: TextAlign.center),
+            Text(
+              '⊙ إدارة عشيرتك',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: _getTextColor(context),
+              ),
+            ),
+            Text(
+              originClanName,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: _getTextColor(context)),
+            ),
+            Text(
+              '🕐 $formattedSchedule',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: _getSecondaryTextColor(context)),
+            ),
             SizedBox(height: 20),
             if (_isCrossClanReservation()) ...[
-              Text('⊙ الدار المضيفة', textAlign: TextAlign.center, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
-              Text(_getSelectedClanName(), textAlign: TextAlign.center),
-              Text('🕐 ${_formatDayTimeSchedule(_getClanAcceptanceTime(false)['day'] ?? '', _getClanAcceptanceTime(false)['time'] ?? '')}', textAlign: TextAlign.center),
+              Text(
+                '⊙ الدار المضيفة',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: _getTextColor(context),
+                ),
+              ),
+              Text(
+                _getSelectedClanName(),
+                textAlign: TextAlign.center,
+                style: TextStyle(color: _getTextColor(context)),
+              ),
+              Text(
+                '🕐 ${_formatDayTimeSchedule(_getClanAcceptanceTime(false)['day'] ?? '', _getClanAcceptanceTime(false)['time'] ?? '')}',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: _getSecondaryTextColor(context)),
+              ),
               SizedBox(height: 20),
             ],
-            Text('⊙ الهيئة الدينية', textAlign: TextAlign.center, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+            Text(
+              '⊙ الهيئة الدينية',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: _getTextColor(context),
+              ),
+            ),
             SizedBox(height: 20),
-            Text('━━━━━━━━━━━━━━━━━━━━━━', textAlign: TextAlign.center),
-            Text('⚠️ تنبيه ', textAlign: TextAlign.center, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.orange)),
-            Text('━━━━━━━━━━━━━━━━━━━━━━', textAlign: TextAlign.center),
+            Text(
+              '━━━━━━━━━━━━━━━━━━━━━━',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: _getSecondaryTextColor(context)),
+            ),
+            Text(
+              '⚠️ تنبيه ',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.orange,
+              ),
+            ),
+            Text(
+              '━━━━━━━━━━━━━━━━━━━━━━',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: _getSecondaryTextColor(context)),
+            ),
             SizedBox(height: 12),
-            Text('يجب استكمال هذه الإجراءات خلال $daysMax أيام كحد أقصى', textAlign: TextAlign.center),
-            Text('وإلا يُلغى الحجز تلقائياً', textAlign: TextAlign.center, style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600)),
+            Text(
+              'يجب استكمال هذه الإجراءات خلال $daysMax أيام كحد أقصى',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: _getTextColor(context)),
+            ),
+            Text(
+              'وإلا يُلغى الحجز تلقائياً',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.red,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
             SizedBox(height: 12),
-            Text('بعد ختم وتوقيع جميع الجهات، توجّه إلى إدارة عشيرتك', textAlign: TextAlign.center),
-            Text(originClanName, textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.w600)),
-            Text('ليؤكد حجزك في النظام', textAlign: TextAlign.center),
+            Text(
+              'بعد ختم وتوقيع جميع الجهات، توجّه إلى إدارة عشيرتك',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: _getTextColor(context)),
+            ),
+            Text(
+              originClanName,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: _getTextColor(context),
+              ),
+            ),
+            Text(
+              'ليؤكد حجزك في النظام',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: _getTextColor(context)),
+            ),
           ],
         ),
       ),
     ),
   );
 }
-
 // Add this new helper method after the existing _getClanAcceptanceTime method
 String _formatDayTimeSchedule(String days, String times) {
   if (days.isEmpty || times.isEmpty) {
@@ -461,43 +583,42 @@ String _getDayName(int dayNum) {
 
 
 /////
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Container(
-          color: Colors.white,
-          child: TabBar(
-            controller: _tabController,
-            labelColor: AppColors.primary,
-            unselectedLabelColor: AppColors.textSecondary,
-            indicatorColor: AppColors.primary,
-            isScrollable: true,
-            tabs: const [
-              Tab(text: 'الكل'),
-              Tab(text: 'معلق'),
-              Tab(text: 'مؤكد'),
-              Tab(text: 'ملغي'),
-            ],
-          ),
+ @override
+Widget build(BuildContext context) {
+  return Column(
+    children: [
+      Container(
+        color: Theme.of(context).appBarTheme.backgroundColor ?? _getCardColor(context),
+        child: TabBar(
+          controller: _tabController,
+          labelColor: AppColors.primary,
+          unselectedLabelColor: _getSecondaryTextColor(context),
+          indicatorColor: AppColors.primary,
+          isScrollable: true,
+          tabs: const [
+            Tab(text: 'الكل'),
+            Tab(text: 'معلق'),
+            Tab(text: 'مؤكد'),
+            Tab(text: 'ملغي'),
+          ],
         ),
-        Expanded(
-          child: _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _buildAllReservationsTab(),
-                    _buildPendingReservationTab(),
-                    _buildValidatedReservationTab(),
-                    _buildCancelledReservationsTab(),
-                  ],
-                ),
-        ),
-      ],
-    );
-  }
-
+      ),
+      Expanded(
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : TabBarView(
+                controller: _tabController,
+                children: [
+                  _buildAllReservationsTab(),
+                  _buildPendingReservationTab(),
+                  _buildValidatedReservationTab(),
+                  _buildCancelledReservationsTab(),
+                ],
+              ),
+      ),
+    ],
+  );
+}
   Widget _buildAllReservationsTab() {
     if (_allReservations.isEmpty) {
       return RefreshIndicator(
@@ -667,122 +788,121 @@ String _getDayName(int dayNum) {
       ),
     );
   }
-
- Widget _buildReservationCard(Map<String, dynamic> reservation, {bool showStatus = false}) {
-    // Format dates properly
-    String formatDates(Map<String, dynamic> reservation) {
-      final date1 = reservation['date1'];
-      final date2 = reservation['date2'];
-      final date2Bool = reservation['date2_bool'] ?? false;
-      
-      if (date1 == null) return 'غير محدد';
-      
-      if (date2Bool && date2 != null) {
-        return '$date1 - $date2';
-      }
-      return date1;
+Widget _buildReservationCard(Map<String, dynamic> reservation, {bool showStatus = false}) {
+  String formatDates(Map<String, dynamic> reservation) {
+    final date1 = reservation['date1'];
+    final date2 = reservation['date2'];
+    final date2Bool = reservation['date2_bool'] ?? false;
+    
+    if (date1 == null) return 'غير محدد';
+    
+    if (date2Bool && date2 != null) {
+      return '$date1 - $date2';
     }
-
-    bool isCancelled = reservation['status']?.toLowerCase() == 'cancelled';
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'حجز رقم: ${reservation['id']}',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                _buildStatusChip(reservation['status']),
-              ],
-            ),
-            const SizedBox(height: 12),
-            _buildInfoRow(Icons.event, 'التاريخ', formatDates(reservation)),
-            const SizedBox(height: 8),
-            _buildInfoRow(Icons.family_restroom, 'العشيرة', _getClanName(reservation)),
-            const SizedBox(height: 8),
-            _buildInfoRow(Icons.location_city, 'المحافظة', _getCountyName(reservation)),
-            const SizedBox(height: 8),
-            _buildInfoRow(Icons.home, 'القاعة', _getHallName(reservation)),
-            const SizedBox(height: 8),
-            _buildInfoRow(Icons.access_time, 'تاريخ الإنشاء', _formatDateTime(reservation['created_at'])),
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                TextButton(
-                  onPressed: () {
-                    // If reservation is pending, switch to pending tab instead of showing dialog
-                    if (reservation['status']?.toLowerCase() == 'pending_validation') {
-                      _tabController.animateTo(1); // Index 1 is the pending tab
-                    } else {
-                      _showReservationDetails(reservation);
-                    }
-                  },
-                  child: const Text('عرض التفاصيل'),
-                ),
-                // Only show download buttons if not cancelled
-                if (!isCancelled)
-                  Row(
-                    children: [
-                      Container(
-                        margin: const EdgeInsets.only(left: 4),
-                        child: ElevatedButton.icon(
-                          onPressed: () => _downloadPdf(reservation['id']),
-                          icon: const Icon(Icons.download, size: 16),
-                          label: const Text('تحميل', style: TextStyle(fontSize: 12)),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                            minimumSize: const Size(0, 28),
-                          ),
-                        ),
-                      ),
-                      Container(
-                        margin: const EdgeInsets.only(left: 4),
-                        child: ElevatedButton.icon(
-                          onPressed: () async {
-                            try {
-                              setState(() => _isLoading = true);
-                              final pdfBytes = await ApiService.downloadPdfFromServer(reservation['id']);
-                              await _sharePdf(reservation['id'], pdfBytes);
-                            } catch (e) {
-                              _showSnackBar('خطأ في مشاركة الملف: $e', Colors.red);
-                            } finally {
-                              setState(() => _isLoading = false);
-                            }
-                          },
-                          icon: const Icon(Icons.share, size: 16),
-                          label: const Text('مشاركة', style: TextStyle(fontSize: 12)),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                            minimumSize: const Size(0, 28),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
+    return date1;
   }
-  
+
+  bool isCancelled = reservation['status']?.toLowerCase() == 'cancelled';
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+
+  return Card(
+    margin: const EdgeInsets.only(bottom: 16),
+    color: isDark ? const Color.fromARGB(255, 22, 26, 45) :const Color.fromARGB(255, 255, 255, 255),  
+    // color: isDark ? const Color.fromARGB(255, 210, 22, 22) : _getCardColor(context),  
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'حجز رقم: ${reservation['id']}',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: _getTextColor(context),
+                ),
+              ),
+              _buildStatusChip(reservation['status']),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _buildInfoRow(Icons.event, 'التاريخ', formatDates(reservation)),
+          const SizedBox(height: 8),
+          _buildInfoRow(Icons.family_restroom, 'العشيرة', _getClanName(reservation)),
+          const SizedBox(height: 8),
+          _buildInfoRow(Icons.location_city, 'المحافظة', _getCountyName(reservation)),
+          const SizedBox(height: 8),
+          _buildInfoRow(Icons.home, 'القاعة', _getHallName(reservation)),
+          const SizedBox(height: 8),
+          _buildInfoRow(Icons.access_time, 'تاريخ الإنشاء', _formatDateTime(reservation['created_at'])),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              TextButton(
+                onPressed: () {
+                  if (reservation['status']?.toLowerCase() == 'pending_validation') {
+                    _tabController.animateTo(1);
+                  } else {
+                    _showReservationDetails(reservation);
+                  }
+                },
+                child: const Text('عرض التفاصيل'),
+              ),
+              if (!isCancelled)
+                Row(
+                  children: [
+                    Container(
+                      margin: const EdgeInsets.only(left: 4),
+                      child: ElevatedButton.icon(
+                        onPressed: () => _downloadPdf(reservation['id']),
+                        icon: const Icon(Icons.download, size: 16),
+                        label: const Text('تحميل', style: TextStyle(fontSize: 12)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                          minimumSize: const Size(0, 28),
+                        ),
+                      ),
+                    ),
+                    Container(
+                      margin: const EdgeInsets.only(left: 4),
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          try {
+                            setState(() => _isLoading = true);
+                            final pdfBytes = await _ensurePdfAndDownload(reservation['id']);
+                            await _sharePdf(reservation['id'], pdfBytes);
+                          } catch (e) {
+                            _showSnackBar('خطأ في مشاركة الملف: $e', Colors.red);
+                          } finally {
+                            setState(() => _isLoading = false);
+                          }
+                        },
+                        icon: const Icon(Icons.share, size: 16),
+                        label: const Text('مشاركة', style: TextStyle(fontSize: 12)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                          minimumSize: const Size(0, 28),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
   
    Widget _buildDetailedReservationCard(
     Map<String, dynamic> reservation, {
@@ -879,6 +999,7 @@ String _getDayName(int dayNum) {
               // Load clan settings only once when this card is built
               Builder(
                 builder: (context) {
+                      final isDark = Theme.of(context).brightness == Brightness.dark;
                   // Load settings only if not already loaded for this reservation
                   if (!_instructionSettingsLoaded) {
                     // Call load settings but don't wait for it in build
@@ -891,9 +1012,15 @@ String _getDayName(int dayNum) {
                     return Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Colors.blue.withOpacity(0.1),
+                        color: isDark 
+                            ? Colors.blue.withOpacity(0.15)
+                            : Colors.blue.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                        border: Border.all(
+                          color: isDark 
+                              ? Colors.blue.withOpacity(0.4)
+                              : Colors.blue.withOpacity(0.3),
+                        ),
                       ),
                       child: Row(
                         children: [
@@ -906,7 +1033,10 @@ String _getDayName(int dayNum) {
                             ),
                           ),
                           SizedBox(width: 12),
-                          Text('جاري تحميل معلومات الاستقبال...'),
+                          Text(
+                            'جاري تحميل معلومات الاستقبال...',
+                            style: TextStyle(color: _getTextColor(context)),
+                          ),
                         ],
                       ),
                     );
@@ -916,49 +1046,34 @@ String _getDayName(int dayNum) {
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: const Color.fromARGB(255, 253, 227, 227),
+                      color: isDark 
+                          ? Colors.red.withOpacity(0.15)
+                          : const Color.fromARGB(255, 253, 227, 227),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color.fromARGB(255, 249, 144, 144)),
+                      border: Border.all(
+                        color: isDark 
+                            ? Colors.red.withOpacity(0.3)
+                            : const Color.fromARGB(255, 249, 144, 144),
+                      ),
                     ),
                     child: Directionality(
                       textDirection: TextDirection.rtl,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          // Header section
                           Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(
                                 Icons.info,
-                                color: const Color.fromARGB(255, 249, 144, 144),
+                                color: isDark 
+                                    ? Colors.red.withOpacity(0.8)
+                                    : const Color.fromARGB(255, 249, 144, 144),
                                 size: 32,
                               ),
-                              // const SizedBox(height: 8),
-                              // Text(
-                              //   'ملاحظة مهمة',
-                              //   style: TextStyle(
-                              //     fontSize: 16,
-                              //     fontWeight: FontWeight.bold,
-                              //     color: const Color.fromARGB(255, 0, 0, 0),
-                              //   ),
-                              //   textAlign: TextAlign.center,
-                              // ),
                             ],
                           ),
-                          // const SizedBox(height: 8),
                           _buildReservationInstructionWidget(),
-
-                          // Dynamic instruction text
-                          // Text(
-                          //   _buildReservationInstructionText(),
-                          //   style: TextStyle(
-                          //     fontSize: 14,
-                          //     color: const Color.fromARGB(255, 0, 0, 0),
-                          //     height: 1.5,
-                          //   ),
-                          //   textAlign: TextAlign.start,
-                          // ),
                         ],
                       ),
                     ),
@@ -975,9 +1090,15 @@ String _getDayName(int dayNum) {
                   width: double.infinity,
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.1),
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.green.withOpacity(0.15)
+                        : Colors.green.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.green.withOpacity(0.3)),
+                    border: Border.all(
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.green.withOpacity(0.4)
+                          : Colors.green.withOpacity(0.3),
+                    ),
                   ),
                   child: Column(
                     children: [
@@ -987,7 +1108,7 @@ String _getDayName(int dayNum) {
                         color: Colors.green,
                       ),
                       const SizedBox(height: 12),
-                      const Text(
+                      Text(
                         'ملف الحجز جاهز للتحميل والمشاركة',
                         style: TextStyle(
                           fontSize: 16,
@@ -996,9 +1117,12 @@ String _getDayName(int dayNum) {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      const Text(
+                      Text(
                         'يمكنك تحميل ملف PDF أو مشاركته مباشرة',
-                        style: TextStyle(fontSize: 14),
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: _getTextColor(context),
+                        ),
                       ),
                       const SizedBox(height: 16),
                       Row(
@@ -1021,7 +1145,7 @@ String _getDayName(int dayNum) {
                               onPressed: () async {
                                 try {
                                   setState(() => _isLoading = true);
-                                  final pdfBytes = await ApiService.downloadPdfFromServer(reservation['id']);
+                                  final pdfBytes = await _ensurePdfAndDownload(reservation['id']);
                                   await _sharePdf(reservation['id'], pdfBytes);
                                 } catch (e) {
                                   _showSnackBar('خطأ في مشاركة الملف: $e', Colors.red);
@@ -1061,64 +1185,72 @@ String _getDayName(int dayNum) {
   }
 
   Widget _buildDetailSection(String title, List<Widget> children) {
-    return Column(
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+        decoration: BoxDecoration(
+          color: isDark 
+              ? AppColors.primary.withOpacity(0.2) 
+              : AppColors.primary.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isDark 
+                ? AppColors.primary.withOpacity(0.4) 
+                : AppColors.primary.withOpacity(0.3),
+          ),
+        ),
+        child: Text(
+          title,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: isDark ? AppColors.primary.withOpacity(0.9) : AppColors.primary,
+          ),
+        ),
+      ),
+      const SizedBox(height: 12),
+      ...children,
+    ],
+  );
+}
+
+  Widget _buildInfoRow(IconData icon, String label, String value) {
+  return Padding(
+    padding: const EdgeInsets.symmetric(vertical: 6),
+    child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-          decoration: BoxDecoration(
-            color: AppColors.primary.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: AppColors.primary.withOpacity(0.3)),
-          ),
+        Icon(icon, size: 20, color: _getSecondaryTextColor(context)),
+        const SizedBox(width: 12),
+        Expanded(
+          flex: 2,
           child: Text(
-            title,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: AppColors.primary,
+            '$label:',
+            style: TextStyle(
+              fontWeight: FontWeight.w500,
+              color: _getSecondaryTextColor(context),
             ),
           ),
         ),
-        const SizedBox(height: 12),
-        ...children,
+        Expanded(
+          flex: 3,
+          child: Text(
+            value,
+            style: TextStyle(
+              color: _getTextColor(context),
+              fontWeight: FontWeight.w400,
+            ),
+          ),
+        ),
       ],
-    );
-  }
-
-  Widget _buildInfoRow(IconData icon, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 20, color: AppColors.textSecondary),
-          const SizedBox(width: 12),
-          Expanded(
-            flex: 2,
-            child: Text(
-              '$label:',
-              style: const TextStyle(
-                fontWeight: FontWeight.w500,
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ),
-          Expanded(
-            flex: 3,
-            child: Text(
-              value,
-              style: const TextStyle(
-                color: AppColors.textPrimary,
-                fontWeight: FontWeight.w400,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildStatusChip(String? status) {
     Color color;
@@ -1288,19 +1420,65 @@ String _getDayName(int dayNum) {
       }
     }
   }
+String _generatePdfFileName(int reservationId, Map<String, dynamic>? reservation) {
+  String groomName = 'العريس';
+  
+  if (reservation != null) {
+    final firstName = reservation['first_name'] ?? '';
+    final fatherName = reservation['father_name'] ?? '';
+    final grandfatherName = reservation['grandfather_name'] ?? '';
+    final lastName = reservation['last_name'] ?? '';
+    
+    final List<String> nameParts = [firstName, fatherName, grandfatherName, lastName]
+        .where((part) => part.toString().trim().isNotEmpty)
+        .map((part) => part.toString().trim())
+        .toList();
+    
+    if (nameParts.isNotEmpty) {
+      groomName = nameParts.join(' ');
+    }
+  }
+  
+  // Include reservation ID for uniqueness
+  return 'معلومات_الحجز_للعريس_${groomName.replaceAll(' ', '_')}_رقم_$reservationId.pdf';
+}
 
-  // Updated _downloadPdf method with improved functionality
-Future<void> _downloadPdf(int reservationId) async {
+Map<String, dynamic>? _getReservationById(int id) {
+  if (_pendingReservation?['id'] == id) return _pendingReservation;
+  if (_validatedReservation?['id'] == id) return _validatedReservation;
+  
+  try {
+    return _allReservations.firstWhere((r) => r['id'] == id);
+  } catch (e) {
+    return null;
+  }
+}
+ Future<void> _downloadPdf(int reservationId) async {
   try {
     setState(() => _isLoading = true);
+    _showSnackBar('جاري التحقق من الملف...', Colors.blue.shade400);
+    
+    // Check if PDF exists
+    final status = await ApiService.checkPdfStatus(reservationId);
+    
+    if (status['pdf_exists'] != true) {
+      // Generate PDF if it doesn't exist
+      _showSnackBar('جاري إنشاء الملف...', Colors.blue.shade400);
+      await ApiService.generatePdf(reservationId);
+      
+      // Wait for generation to complete
+      await Future.delayed(const Duration(seconds: 2));
+    }
+    
     _showSnackBar('جاري تحميل الملف...', Colors.blue.shade400);
     
     // Download the PDF
-    final pdfBytes = await ApiService.downloadPdfFromServer(reservationId);
+    final pdfBytes = await ApiService.downloadPdf(reservationId);
     
     // Save the file
-    final savedFile = await _savePdfFile(pdfBytes, reservationId);
-    
+    // Pass reservation data to get custom name
+    final savedFile = await _savePdfFile(pdfBytes, reservationId, reservation: _getReservationById(reservationId));   
+
     if (savedFile != null) {
       _showSnackBar('تم تحميل الملف بنجاح', Colors.green.shade400);
       
@@ -1314,11 +1492,17 @@ Future<void> _downloadPdf(int reservationId) async {
     setState(() => _isLoading = false);
   }
 }
+
 Future<void> _sharePdf(int reservationId, Uint8List pdfBytes) async {
   try {
+    // Get reservation data for custom filename
+    final reservation = _getReservationById(reservationId);
+    
+    // Generate custom filename
+    final fileName = _generatePdfFileName(reservationId, reservation);
+    
     // Create a temporary file for sharing
     final tempDir = await getTemporaryDirectory();
-    final fileName = 'reservation_${reservationId}_${DateTime.now().millisecondsSinceEpoch}.pdf';
     final tempFile = File('${tempDir.path}/$fileName');
     
     await tempFile.writeAsBytes(pdfBytes);
@@ -1335,6 +1519,29 @@ Future<void> _sharePdf(int reservationId, Uint8List pdfBytes) async {
     print('Share error: $e');
     _showSnackBar('خطأ في مشاركة الملف: $e', Colors.red.shade400);
   }
+}
+
+
+// Add this helper method to ensure PDF exists before downloading
+Future<Uint8List> _ensurePdfAndDownload(int reservationId) async {
+  // Check if PDF exists
+  final status = await ApiService.checkPdfStatus(reservationId);
+  
+  if (status['pdf_exists'] != true) {
+    // Generate PDF if it doesn't exist
+    _showSnackBar('جاري إنشاء الملف...', Colors.blue.shade400);
+    await ApiService.generatePdf(reservationId);
+    
+    // Wait for generation with retry logic
+    bool generated = await ApiService.waitForPdfGeneration(reservationId);
+    
+    if (!generated) {
+      throw Exception('فشل في إنشاء ملف PDF. يرجى المحاولة مرة أخرى.');
+    }
+  }
+  
+  // Download the PDF
+  return await ApiService.downloadPdf(reservationId);
 }
 
 // Add this new method to show PDF action options
@@ -1404,7 +1611,7 @@ void _showPdfActionsDialog(String filePath, int reservationId, Uint8List pdfByte
 }
 
   // Save PDF file to device
-Future<File?> _savePdfFile(Uint8List pdfBytes, int reservationId) async {
+Future<File?> _savePdfFile(Uint8List pdfBytes, int reservationId, {Map<String, dynamic>? reservation}) async {
   try {
     Directory? directory;
     
@@ -1455,11 +1662,15 @@ Future<File?> _savePdfFile(Uint8List pdfBytes, int reservationId) async {
       await directory.create(recursive: true);
     }
     
-    // Create file with descriptive name
-    final timestamp = DateTime.now().millisecondsSinceEpoch;
-    final fileName = 'حجز_زفاف_${reservationId}_$timestamp.pdf';
+    // // Create file with descriptive name
+    // final timestamp = DateTime.now().millisecondsSinceEpoch;
+    // final fileName = 'حجز_زفاف_${reservationId}_$timestamp.pdf';
+    // final file = File('${directory.path}/$fileName');
+
+    // Create file with custom name
+    final fileName = _generatePdfFileName(reservationId, reservation);
     final file = File('${directory.path}/$fileName');
-    
+
     // Write bytes to file
     await file.writeAsBytes(pdfBytes);
     

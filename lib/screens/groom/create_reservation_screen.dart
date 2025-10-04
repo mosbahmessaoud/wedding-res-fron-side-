@@ -10,6 +10,8 @@ import '../../services/api_service.dart';
 import '../../utils/colors.dart';
 import 'custom_calendar_picker.dart'; // Import your custom calendar widget
 
+import '../../utils/colors.dart'; 
+import '../../widgets/theme_toggle_button.dart'; 
 class CreateReservationScreen extends StatefulWidget {
   final VoidCallback? onReservationCreated;
   
@@ -75,13 +77,13 @@ class CreateReservationScreenState extends State<CreateReservationScreen> {
 
 
  void refreshData() {
-
     _loadInitialData();
+    _refreshData();
     setState(() {
       // Trigger rebuild
     });
   }
-
+  
   @override
   void dispose() {
     _date1Controller.dispose();
@@ -95,7 +97,8 @@ void _showMessageDialog({
   Color? titleColor,
   Color? backgroundColor,
   IconData? icon,
-  bool isError = false,
+  bool isError = false, 
+
 }) {
   showDialog(
     context: context,
@@ -127,11 +130,13 @@ void _showMessageDialog({
           ],
         ),
         content: SingleChildScrollView(
+
           child: Text(
             message,
-            style: const TextStyle(
+            style:  TextStyle(
               fontSize: 16,
               height: 1.4,
+              color: const Color.fromARGB(255, 64, 73, 78),
             ),
             textAlign: TextAlign.right,
           ),
@@ -439,7 +444,7 @@ Widget _buildReservationInstructionWidget() {
   return Center(
     child: SingleChildScrollView(
       child: Padding(
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16), // Changed this line
         child: Column(
           children: [
             Text('━━━━━━━━━━━━━━━━━━━━━━', textAlign: TextAlign.center),
@@ -953,90 +958,98 @@ Future<void> _selectDate(TextEditingController controller, String title) async {
       });
     }
   }
-
 @override
 Widget build(BuildContext context) {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  
   if (_isLoading) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('إنشاء حجز جديد'),
-        backgroundColor: AppColors.primary,
+        backgroundColor: isDark ? AppColors.darkBackground : AppColors.primary,
         foregroundColor: Colors.white,
       ),
-      body: const Center(child: CircularProgressIndicator()),
+      body: Center(
+        child: CircularProgressIndicator(
+          color: isDark ? AppColors.darkPrimary : AppColors.primary,
+        ),
+      ),
     );
   }
 
   return Scaffold(
+    backgroundColor: isDark ? AppColors.darkBackground : Colors.white,
     body: Stack(
+  children: [
+    Column(
       children: [
-        Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Row(
-                children: [
-                  for (int i = 0; i < 3; i++) ...[
-                    Expanded(
-                      child: Container(
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: i <= _currentStep 
-                            ? const Color.fromARGB(255, 0, 151, 98)
-                            : const Color.fromARGB(255, 110, 174, 122).withOpacity(0.3),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
+        Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Row(
+            children: [
+              for (int i = 0; i < 3; i++) ...[
+                Expanded(
+                  child: Container(
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: i <= _currentStep 
+                        ? (isDark ? AppColors.darkPrimary : const Color.fromARGB(255, 0, 151, 98))
+                        : (isDark 
+                            ? AppColors.darkPrimary.withOpacity(0.3)
+                            : const Color.fromARGB(255, 110, 174, 122).withOpacity(0.3)),
+                      borderRadius: BorderRadius.circular(2),
                     ),
-                    if (i < 2) const SizedBox(width: 8),
-                  ],
+                  ),
+                ),
+                if (i < 2) const SizedBox(width: 8),
+              ],
+            ],
+          ),
+        ),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _refreshData,
+            color: AppColors.primary,
+            backgroundColor: Colors.white,
+            child: Form(
+              key: _formKey,
+              child: PageView(
+                controller: _pageController,
+                onPageChanged: (index) => setState(() => _currentStep = index),
+                children: [
+                  _buildClanAndHallSelectionStep(),
+                  _buildReservationDetailsStep(),
+                  _buildConfirmationStep(),
                 ],
               ),
             ),
-            Expanded(
-              child: RefreshIndicator(
-                onRefresh: _refreshData,
-                color: AppColors.primary,
-                backgroundColor: Colors.white,
-                child: Form(
-                  key: _formKey,
-                  child: PageView(
-                    controller: _pageController,
-                    onPageChanged: (index) => setState(() => _currentStep = index),
-                    children: [
-                      _buildClanAndHallSelectionStep(),
-                      _buildReservationDetailsStep(),
-                      _buildConfirmationStep(),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
-        // Add side navigation buttons
-        if (_buildSideNavigation() != null) _buildSideNavigation()!,
-
       ],
-      
     ),
+    // Changed from _buildSideNavigation to _buildBottomNavigation
+    // if (_buildBottomNavigation() != null) _buildBottomNavigation()!,
+  ],
+),
+    
   );
   
 }
-
 Widget _buildClanAndHallSelectionStep() {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  
   return SingleChildScrollView(
     physics: const AlwaysScrollableScrollPhysics(),
     padding: const EdgeInsets.all(16),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'اختيار دار إقامة العرس',
           style: TextStyle(
             fontSize: 24,
             fontWeight: FontWeight.bold,
-            color: AppColors.primary,
+            color: isDark ? AppColors.darkPrimary : AppColors.primary,
           ),
         ),
         const SizedBox(height: 8),
@@ -1045,16 +1058,18 @@ Widget _buildClanAndHallSelectionStep() {
             Expanded(
               child: Text(
                 'اختر العشيرة والقاعة المناسبة لحفلك\nالقصر: ${_userProfile?['county_name'] ?? 'غير محدد'}',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 16,
-                  color: AppColors.textSecondary,
+                  color: isDark ? AppColors.darkTextSecondary : AppColors.textSecondary,
                 ),
               ),
             ),
             IconButton(
               onPressed: _refreshData,
-              icon: const Icon(Icons.refresh, color: AppColors.primary),
-              tooltip: 'تحديث البيانات',
+              icon: Icon(
+                Icons.refresh, 
+                color: isDark ? AppColors.darkPrimary : AppColors.primary,
+              ),
             ),
           ],
         ),
@@ -1129,33 +1144,39 @@ Widget _buildClanAndHallSelectionStep() {
             validator: (value) => value == null ? 'القاعة مطلوبة' : null,
           ),
         ] else ...[
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.grey[100],
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.grey[300]!),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.info, color: Colors.grey[600]),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'اختر العشيرة أولاً لعرض القاعات المتاحة',
-                    style: TextStyle(color: Colors.grey[600]),
-                  ),
-                ),
-              ],
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.darkCard.withOpacity(0.5) : Colors.grey[100],
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: isDark ? AppColors.darkBorder : Colors.grey[300]!,
             ),
           ),
+          child: Row(
+            children: [
+              Icon(Icons.info, color: isDark ? AppColors.darkTextSecondary : Colors.grey[600]),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'اختر العشيرة أولاً لعرض القاعات المتاحة',
+                  style: TextStyle(
+                    color: isDark ? AppColors.darkTextSecondary : Colors.grey[600],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
         ],
         
         const SizedBox(height: 24),
         
         // Clan Information Display
+        // In _buildClanAndHallSelectionStep, update the card:
         if (_selectedClan != null) ...[
           Card(
+            color: isDark ? AppColors.darkCard : Colors.white,
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -1163,31 +1184,35 @@ Widget _buildClanAndHallSelectionStep() {
                 children: [
                   Text(
                     'معلومات العشيرة المختارة',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: AppColors.primary,
+                      color: isDark ? AppColors.darkPrimary : AppColors.primary,
                     ),
                   ),
                   const SizedBox(height: 12),
-                  _buildInfoRow('اسم العشيرة', _selectedClan!['name']?.toString() ?? ''),
-                  _buildInfoRow('القصر', _selectedCounty!['name']?.toString() ?? ''),
+                  _buildInfoRow('اسم العشيرة', _selectedClan!['name']?.toString() ?? '',isDark),
+                  _buildInfoRow('القصر', _selectedCounty!['name']?.toString() ?? '',isDark),
                   if (_selectedClan!['description'] != null)
-                    _buildInfoRow('الوصف', _selectedClan!['description'].toString()),
+                    _buildInfoRow('الوصف', _selectedClan!['description'].toString(),isDark),
                 ],
               ),
             ),
           ),
         ],
+        const SizedBox(height: 24),
+        _buildBottomNavigation(),
+        const SizedBox(height: 16), // Extra padding at bottom
       ],
     ),
   );
 }
-
 Widget _buildReservationDetailsStep() {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  
   return SingleChildScrollView(
     physics: const AlwaysScrollableScrollPhysics(),
-    padding: const EdgeInsets.all(16),
+    padding: const EdgeInsets.fromLTRB(16, 16, 16, 150), // Changed this line
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1197,28 +1222,23 @@ Widget _buildReservationDetailsStep() {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'معلومات الحجز',
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
-                      color: AppColors.primary,
+                      color: isDark ? AppColors.darkPrimary : AppColors.primary,
                     ),
                   ),
-                  // const SizedBox(height: 8),
-                  // const Text(
-                  //   'اختر تفاصيل الحجز والتاريخ واللجان',
-                  //   style: TextStyle(
-                  //     fontSize: 16,
-                  //     color: AppColors.textSecondary,
-                  //   ),
-                  // ),
                 ],
               ),
             ),
             IconButton(
               onPressed: _refreshData,
-              icon: const Icon(Icons.refresh, color: AppColors.primary),
+              icon: Icon(
+                Icons.refresh, 
+                color: isDark ? AppColors.darkPrimary : AppColors.primary,
+              ),
               tooltip: 'تحديث البيانات',
             ),
           ],
@@ -1274,16 +1294,26 @@ Widget _buildReservationDetailsStep() {
             const SizedBox(height: 8),
             
             // Info message for two days option
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.green[50],
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.green[200]!),
-              ),
-              child: Row(
+            // Update the two-day availability containers:
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isDark 
+                      ? Colors.green.withOpacity(0.2) 
+                      : Colors.green[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: isDark 
+                        ? Colors.green.withOpacity(0.5) 
+                        : Colors.green[200]!,
+                  ),
+                ),
+                child: Row(
                 children: [
-                  Icon(Icons.info, color: Colors.green[600]),
+                  Icon(
+                    Icons.info, 
+                    color: isDark ? Colors.green[300] : Colors.green[600],
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -1462,6 +1492,9 @@ Widget _buildReservationDetailsStep() {
             ),
           ),
         ),
+        const SizedBox(height: 24),
+        _buildBottomNavigation(),
+        const SizedBox(height: 16), // Extra padding at bottom
       ],
     ),
   );
@@ -1555,6 +1588,8 @@ Widget _buildConfirmationStep() {
         // Important Note with dynamic content
         Builder(
           builder: (context) {
+              final isDark = Theme.of(context).brightness == Brightness.dark;
+
             // Load settings only if clan is selected and settings not loaded
             if (_selectedClan != null && !_instructionSettingsLoaded) {
               // Call load settings but don't wait for it in build
@@ -1590,27 +1625,34 @@ Widget _buildConfirmationStep() {
             }
             
             return Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color.fromARGB(255, 253, 227, 227),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color.fromARGB(255, 249, 144, 144)),
-              ),
-              child: Directionality(
-                textDirection: TextDirection.rtl,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Header section
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.info,
-                          color: const Color.fromARGB(255, 249, 144, 144),
-                          size: 32,
-                        ),
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: isDark 
+                      ? Colors.red.withOpacity(0.2) 
+                      : const Color.fromARGB(255, 253, 227, 227),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isDark 
+                        ? Colors.red.withOpacity(0.5) 
+                        : const Color.fromARGB(255, 249, 144, 144),
+                  ),
+                ),
+                child: Directionality(
+                  textDirection: TextDirection.rtl,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.info,
+                            color: isDark 
+                                ? Colors.red[300] 
+                                : const Color.fromARGB(255, 249, 144, 144),
+                            size: 32,
+                          ),
                         // const SizedBox(height: 8),
                         // Text(
                         //   'ملاحظة مهمة',
@@ -1649,14 +1691,18 @@ Widget _buildConfirmationStep() {
           },
           
         ),
-        const SizedBox(height: 80),
+        // const SizedBox(height: 80),
+        const SizedBox(height: 24),
+        _buildBottomNavigation(),
+        const SizedBox(height: 50), // Extra padding at bottom
       ],
     ),
   );
 }
 
 
-  Widget _buildInfoRow(String label, String value) {
+  Widget _buildInfoRow(String label, String value ,
+   bool isDark,) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -1664,15 +1710,15 @@ Widget _buildConfirmationStep() {
         children: [
           Text(
             '$label: ',
-            style: const TextStyle(
+            style: TextStyle(
               fontWeight: FontWeight.w500,
-              color: AppColors.textSecondary,
+              color: isDark ?AppColors.background :AppColors.textSecondary,
             ),
           ),
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(color: AppColors.textPrimary),
+              style:  TextStyle(color: isDark ?AppColors.darkTextPrimary :AppColors.darkTextHint),
             ),
           ),
         ],
@@ -1681,20 +1727,23 @@ Widget _buildConfirmationStep() {
   }
 
   Widget _buildSummaryCard(String title, List<Widget> children) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: AppColors.primary,
-              ),
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  
+  return Card(
+    color: isDark ? AppColors.darkCard : Colors.white,
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: isDark ? AppColors.darkPrimary : AppColors.primary,
             ),
+          ),
             const SizedBox(height: 12),
             ...children,
           ],
@@ -1704,6 +1753,8 @@ Widget _buildConfirmationStep() {
   }
 
   Widget _buildSummaryItem(String label, String value) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -1711,83 +1762,53 @@ Widget _buildConfirmationStep() {
         children: [
           Text(
             '$label: ',
-            style: const TextStyle(
+            style: TextStyle(
               fontWeight: FontWeight.w500,
-              color: Color.fromARGB(0, 255, 255, 255),
+              color: isDark ? Colors.white :Colors.black ,
             ),
           ),
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(color: AppColors.textPrimary),
+              style: TextStyle(color:  isDark ? const Color.fromARGB(201, 255, 255, 255) :const Color.fromARGB(255, 15, 0, 99) ,),
             ),
           ),
         ],
       ),
+
     );
   }
-Widget? _buildSideNavigation() {
-  return Stack(
-    children: [
-      // Previous button on the left
-      if (_currentStep > 0)
-        Positioned(
-          left: 4,
-          top: 0,
-          bottom: 0,
-          child: Center(
-            child: Material(
-              color: const Color.fromARGB(255, 255, 255, 255),
-              elevation: 2,
-              borderRadius: BorderRadius.circular(20),
-              child: InkWell(
-                onTap: _goToPreviousStep,
-                borderRadius: BorderRadius.circular(20),
-                child: Container(
-                  width: 35,
-                  height: 35,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: const Color.fromARGB(255, 8, 136, 15).withOpacity(0.5),
-                      width: 1.5,
-                    ),
-                  ),
-                  child: Icon(
-                    Icons.arrow_forward_ios,
-                    color: const Color.fromARGB(255, 15, 143, 22),
-                    size: 18,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      
-      // Next/Submit button on the right
-      Positioned(
-        right: 4,
-        top: 0,
-        bottom: 0,
-        child: Center(
-          child: Material(
-            color: _isSubmitting 
-                ? Colors.grey.withOpacity(0.9) 
-                : const Color.fromARGB(239, 28, 147, 34),
-            elevation: 2,
-            borderRadius: BorderRadius.circular(20),
-            child: InkWell(
-              onTap: _isSubmitting ? null : _handleNextStep,
-              borderRadius: BorderRadius.circular(20),
-              child: Container(
-                width: 35,
-                height: 35,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: _isSubmitting
-                    ? const Padding(
-                        padding: EdgeInsets.all(10.0),
+
+ Widget _buildBottomNavigation() {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  
+  return Positioned(
+    left: 0,
+    right: 0,
+    bottom: 0,
+    child: Container(
+      padding: const EdgeInsets.all(0),
+      decoration: BoxDecoration(
+        // color: isDark ? const Color.fromARGB(0, 44, 44, 44) : const Color.fromARGB(0, 255, 255, 255),
+        // boxShadow: [
+        //   BoxShadow(
+        //     color: Colors.black.withOpacity(0.1),
+        //     blurRadius: 8,
+        //     offset: const Offset(0, -2),
+        //   ),
+        // ],
+      ),
+      child: SafeArea(
+        child: Row(
+          children: [
+            // Next/Submit button (on the right for RTL)
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: _isSubmitting ? null : _handleNextStep,
+                icon: _isSubmitting
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
                           color: Colors.white,
@@ -1795,17 +1816,60 @@ Widget? _buildSideNavigation() {
                       )
                     : Icon(
                         _currentStep == 2 
-                            ? Icons.check 
-                            : Icons.arrow_back_ios_new,
-                        color: Colors.white,
-                        size: 18,
+                            ? Icons.check_circle 
+                            : Icons.arrow_back,
                       ),
+                label: Text(
+                  _isSubmitting 
+                      ? 'جاري الإرسال...'
+                      : (_currentStep == 2 ? 'تأكيد الحجز' : 'التالي')
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _isSubmitting
+                      ? (isDark ? const Color.fromARGB(111, 66, 66, 66) : const Color.fromARGB(202, 158, 158, 158))
+                      : (isDark ? const Color.fromARGB(127, 102, 187, 106) : const Color.fromARGB(214, 46, 125, 50)),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
               ),
             ),
-          ),
+            
+            // Spacing between buttons
+            if (_currentStep > 0) const SizedBox(width: 12),
+            
+            // Previous button (on the left for RTL)
+            if (_currentStep > 0)
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: _goToPreviousStep,
+                  icon: const Icon(Icons.arrow_forward),
+                  label: const Text('السابق'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: isDark 
+                        ? const Color.fromARGB(104, 44, 44, 44) 
+                        :  Colors.white,
+                    foregroundColor: isDark 
+                        ? AppColors.darkPrimary 
+                        : AppColors.primary,
+                    side: BorderSide(
+                      color: isDark 
+                          ? AppColors.darkPrimary 
+                          : AppColors.primary,
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
-    ],
+    ),
   );
 }
   void _goToPreviousStep() {

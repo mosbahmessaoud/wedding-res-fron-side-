@@ -147,39 +147,42 @@ Future<void> _loadInitialData() async {
     }).toList();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-        appBar: AppBar(
-        title: Text('إدارة قوائم الطعام'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        systemOverlayStyle: SystemUiOverlayStyle.light,
-        leading: IconButton(
-            icon: Icon(Icons.arrow_back),
-            onPressed: () {
-              Navigator.pushReplacementNamed(context, '/clan_admin_home');
-            },
-          ),
+ @override
+Widget build(BuildContext context) {
+  return Scaffold(
+    appBar: AppBar(
+      title: Text('إدارة قوائم الطعام'),
+      backgroundColor: AppColors.primary,
+      foregroundColor: Colors.white,
+      systemOverlayStyle: SystemUiOverlayStyle.light,
+      leading: IconButton(
+        icon: Icon(Icons.arrow_back),
+        onPressed: () {
+          Navigator.pushReplacementNamed(context, '/clan_admin_home');
+        },
       ),
-      body: Column(
-        children: [
-          _buildFilters(),
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _buildMenusList(),
-          ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton(
+    ),
+    body: Column(
+      children: [ 
+        _buildFilters(),
+        Expanded(
+          child: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _buildMenusList(),
+        ),
+        SizedBox(height: 80), 
+      ],
+    ),
+    floatingActionButton: Padding(
+      padding: EdgeInsets.only(bottom: 50), // Add padding to lift the FAB
+      child: FloatingActionButton(
         onPressed: () => _showCreateMenuDialog(),
         backgroundColor: Colors.green,
         child: const Icon(Icons.add, color: Colors.white),
       ),
-    );
-  }
-
+    ),
+  );
+}
 
   Widget _buildFilters() {
   return Container(
@@ -254,6 +257,7 @@ Future<void> _loadInitialData() async {
                 },
               ),
             ),
+
           ],
         ),
       ],
@@ -521,6 +525,7 @@ void _showMenuFormDialog({required bool isEdit, dynamic menu}) {
         _showErrorSnackBar(message);
       },
     ),
+    
   );
 }
 

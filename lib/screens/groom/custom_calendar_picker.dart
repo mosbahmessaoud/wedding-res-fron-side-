@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:wedding_reservation_app/services/api_service.dart';
+import '../../utils/colors.dart'; 
+import '../../widgets/theme_toggle_button.dart'; 
 
 // Export DateStatus and DateAvailability for use in other files
 export 'custom_calendar_picker.dart' show DateStatus, DateAvailability;
@@ -1337,21 +1339,34 @@ Widget _buildCalendarDay(DateTime date) {
     }
   }
 
-  List<Widget> _buildWeekDays() {
-    const weekDays = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
-    return weekDays.map((day) => Container(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+List<Widget> _buildWeekDays() {
+  final screenWidth = MediaQuery.of(context).size.width;
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  
+  const weekDays = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+  
+  return weekDays.map((day) => Expanded(
+    child: Container(
+      padding: EdgeInsets.symmetric(
+        vertical: screenWidth * 0.02,
+        horizontal: screenWidth * 0.01,
+      ),
       child: Text(
         day,
         textAlign: TextAlign.center,
-        style: const TextStyle(
+        style: TextStyle(
           fontWeight: FontWeight.w600,
-          color: Color(0xFF757575),
-          fontSize: 14,
+          color: isDark 
+            ? Colors.green.shade300.withOpacity(0.7)
+            : const Color(0xFF757575),
+          fontSize: screenWidth * 0.032,
         ),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
       ),
-    )).toList();
-  }
+    ),
+  )).toList();
+}
 
   List<Widget> _buildCalendarDays() {
     final daysInMonth = DateTime(_currentMonth.year, _currentMonth.month + 1, 0).day;
@@ -1379,12 +1394,12 @@ Widget _buildCalendarDay(DateTime date) {
 
     return days;
   }
-
 @override
 Widget build(BuildContext context) {
   final screenHeight = MediaQuery.of(context).size.height;
   final screenWidth = MediaQuery.of(context).size.width;
   final safeAreaPadding = MediaQuery.of(context).padding;
+  final isDark = Theme.of(context).brightness == Brightness.dark;
   
   return SlideTransition(
     position: _slideAnimation,
@@ -1399,32 +1414,35 @@ Widget build(BuildContext context) {
           maxHeight: screenHeight - safeAreaPadding.top - safeAreaPadding.bottom - 40,
         ),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(28),
+          color: isDark 
+            ? Colors.black.withOpacity(0.95)
+            : Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: isDark 
+              ? Colors.green.shade400.withOpacity(0.3)
+              : Colors.green.shade300.withOpacity(0.5),
+            width: 1.5,
+          ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.15),
-              blurRadius: 30,
-              offset: const Offset(0, 10),
+              color: isDark 
+                ? Colors.green.shade300.withOpacity(0.2)
+                : Colors.green.shade300.withOpacity(0.3),
+              blurRadius: isDark ? 12 : 24,
+              offset: const Offset(0, 8),
             ),
           ],
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Modern Header
-            _buildModernHeader(screenWidth, screenHeight),
-            
-            // Month Navigation
-            _buildMonthNavigation(screenWidth, screenHeight),
-            
-            // Calendar Grid - Flexible
+            _buildModernHeader(screenWidth, screenHeight, isDark),
+            _buildMonthNavigation(screenWidth, screenHeight, isDark),
             Flexible(
               child: _buildCalendarGrid(screenWidth, screenHeight),
             ),
-            
-            // Legend and Actions - Scrollable if needed
-            _buildBottomSection(screenWidth, screenHeight),
+            _buildBottomSection(screenWidth, screenHeight, isDark),
           ],
         ),
       ),
@@ -1432,8 +1450,7 @@ Widget build(BuildContext context) {
   );
 }
 
-// Modern Instagram-inspired header
-Widget _buildModernHeader(double screenWidth, double screenHeight) {
+Widget _buildModernHeader(double screenWidth, double screenHeight, bool isDark) {
   return Container(
     padding: EdgeInsets.fromLTRB(
       screenWidth * 0.05,
@@ -1446,72 +1463,82 @@ Widget _buildModernHeader(double screenWidth, double screenHeight) {
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
         colors: [
-          const Color(0xFF6C63FF),
-          const Color(0xFF8B5CF6),
-          const Color(0xFFA855F7),
+          Colors.green.shade600,
+          Colors.green.shade800,
         ],
       ),
       borderRadius: const BorderRadius.only(
-        topLeft: Radius.circular(28),
-        topRight: Radius.circular(28),
+        topLeft: Radius.circular(24),
+        topRight: Radius.circular(24),
       ),
     ),
     child: SafeArea(
       bottom: false,
-      child: Column(
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              IconButton(
-                onPressed: widget.onCancel,
-                icon: const Icon(Icons.close, color: Colors.white),
-                iconSize: screenWidth * 0.06,
+          Container(
+            width: screenWidth * 0.1,
+            height: screenWidth * 0.1,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: IconButton(
+              onPressed: widget.onCancel,
+              icon: const Icon(Icons.close, color: Colors.white),
+              iconSize: screenWidth * 0.05,
+              padding: EdgeInsets.zero,
+            ),
+          ),
+          Expanded(
+            child: Text(
+              widget.title,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: screenWidth * 0.05,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.5,
               ),
-              Expanded(
-                child: Text(
-                  widget.title,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: screenWidth * 0.045,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ),
-              if (_isLoading)
-                SizedBox(
-                  width: screenWidth * 0.06,
-                  height: screenWidth * 0.06,
-                  child: const CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+            ),
+          ),
+          SizedBox(
+            width: screenWidth * 0.1,
+            height: screenWidth * 0.1,
+            child: _isLoading
+              ? Center(
+                  child: SizedBox(
+                    width: screenWidth * 0.05,
+                    height: screenWidth * 0.05,
+                    child: const CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
                   ),
                 )
-              else
-                SizedBox(width: screenWidth * 0.06),
-            ],
+              : const SizedBox.shrink(),
           ),
         ],
       ),
     ),
   );
 }
-
-
-// Clean month navigation
-Widget _buildMonthNavigation(double screenWidth, double screenHeight) {
+Widget _buildMonthNavigation(double screenWidth, double screenHeight, bool isDark) {
   return Container(
     padding: EdgeInsets.symmetric(
       horizontal: screenWidth * 0.04,
       vertical: screenHeight * 0.015,
     ),
     decoration: BoxDecoration(
-      color: Colors.white,
+      color: isDark 
+        ? Colors.black.withOpacity(0.3)
+        : Colors.white,
       border: Border(
         bottom: BorderSide(
-          color: Colors.grey.shade100,
+          color: isDark 
+            ? Colors.green.shade700.withOpacity(0.3)
+            : Colors.green.shade100,
           width: 1,
         ),
       ),
@@ -1528,13 +1555,14 @@ Widget _buildMonthNavigation(double screenWidth, double screenHeight) {
             _loadMonthData();
           },
           screenWidth,
+          isDark,
         ),
         Text(
           _getMonthYearText(_currentMonth),
           style: TextStyle(
-            fontSize: screenWidth * 0.042,
-            fontWeight: FontWeight.w700,
-            color: const Color(0xFF1C1C1E),
+            fontSize: screenWidth * 0.045,
+            fontWeight: FontWeight.bold,
+            color: isDark ? Colors.green.shade300 : Colors.green.shade800,
             letterSpacing: 0.3,
           ),
         ),
@@ -1547,58 +1575,62 @@ Widget _buildMonthNavigation(double screenWidth, double screenHeight) {
             _loadMonthData();
           },
           screenWidth,
+          isDark,
         ),
       ],
     ),
   );
 }
 
-// Modern navigation button
-Widget _buildModernNavButton(IconData icon, VoidCallback onPressed, double screenWidth) {
-  return Material(
-    color: Colors.transparent,
-    child: InkWell(
+Widget _buildModernNavButton(IconData icon, VoidCallback onPressed, double screenWidth, bool isDark) {
+  return Container(
+    decoration: BoxDecoration(
+      color: isDark 
+        ? Colors.green.shade800.withOpacity(0.3)
+        : Colors.green.shade50,
       borderRadius: BorderRadius.circular(12),
-      onTap: onPressed,
-      child: Container(
-        padding: EdgeInsets.all(screenWidth * 0.02),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF5F5F7),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Icon(
-          icon,
-          color: const Color(0xFF6C63FF),
-          size: screenWidth * 0.06,
+      border: Border.all(
+        color: isDark 
+          ? Colors.green.shade600.withOpacity(0.5)
+          : Colors.green.shade300.withOpacity(0.5),
+        width: 1,
+      ),
+    ),
+    child: Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onPressed,
+        child: Padding(
+          padding: EdgeInsets.all(screenWidth * 0.02),
+          child: Icon(
+            icon,
+            color: isDark ? Colors.green.shade300 : Colors.green.shade700,
+            size: screenWidth * 0.06,
+          ),
         ),
       ),
     ),
   );
 }
-
-
-
-
-// Calendar grid with proper constraints
 Widget _buildCalendarGrid(double screenWidth, double screenHeight) {
   return LayoutBuilder(
     builder: (context, constraints) {
       return SingleChildScrollView(
         child: Padding(
           padding: EdgeInsets.symmetric(
-            horizontal: screenWidth * 0.03,
+            horizontal: screenWidth * 0.02,
             vertical: screenHeight * 0.01,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Week headers
-              Container(
-                padding: EdgeInsets.symmetric(vertical: screenHeight * 0.01),
-                child: Row(
-                  children: _buildWeekDays(),
-                ),
+              // Week headers - use Row instead of Container
+              Row(
+                children: _buildWeekDays(),
               ),
+              
+              const SizedBox(height: 8),
               
               // Calendar days
               GridView.count(
@@ -1618,17 +1650,20 @@ Widget _buildCalendarGrid(double screenWidth, double screenHeight) {
   );
 }
 
-// Modern bottom section
-Widget _buildBottomSection(double screenWidth, double screenHeight) {
+
+
+Widget _buildBottomSection(double screenWidth, double screenHeight, bool isDark) {
   return Container(
     constraints: BoxConstraints(
       maxHeight: screenHeight * 0.28,
     ),
     decoration: BoxDecoration(
-      color: const Color(0xFFFAFAFC),
+      color: isDark 
+        ? Colors.black.withOpacity(0.4)
+        : const Color(0xFFFAFAFC),
       borderRadius: const BorderRadius.only(
-        bottomLeft: Radius.circular(28),
-        bottomRight: Radius.circular(28),
+        bottomLeft: Radius.circular(24),
+        bottomRight: Radius.circular(24),
       ),
     ),
     child: SingleChildScrollView(
@@ -1637,22 +1672,29 @@ Widget _buildBottomSection(double screenWidth, double screenHeight) {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Info tip - Instagram style
           Container(
             padding: EdgeInsets.symmetric(
               horizontal: screenWidth * 0.04,
               vertical: screenHeight * 0.012,
             ),
             decoration: BoxDecoration(
-              color: Colors.blue.shade50,
-              borderRadius: BorderRadius.circular(16),
+              color: isDark 
+                ? Colors.green.shade900.withOpacity(0.3)
+                : Colors.green.shade50,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isDark 
+                  ? Colors.green.shade600.withOpacity(0.5)
+                  : Colors.green.shade300.withOpacity(0.5),
+                width: 1,
+              ),
             ),
             child: Row(
               children: [
                 Icon(
                   Icons.info_outline_rounded,
                   size: screenWidth * 0.045,
-                  color: Colors.blue.shade700,
+                  color: isDark ? Colors.green.shade300 : Colors.green.shade700,
                 ),
                 SizedBox(width: screenWidth * 0.025),
                 Expanded(
@@ -1660,7 +1702,7 @@ Widget _buildBottomSection(double screenWidth, double screenHeight) {
                     'اضغط مطولاً لرؤية التفاصيل',
                     style: TextStyle(
                       fontSize: screenWidth * 0.032,
-                      color: Colors.blue.shade700,
+                      color: isDark ? Colors.green.shade300 : Colors.green.shade700,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -1671,21 +1713,19 @@ Widget _buildBottomSection(double screenWidth, double screenHeight) {
           
           SizedBox(height: screenHeight * 0.015),
           
-          // Compact legend
           Wrap(
             spacing: screenWidth * 0.02,
             runSpacing: screenHeight * 0.008,
             children: [
-              _buildCompactLegend('متاح', const Color(0xFF4CAF50), screenWidth),
-              _buildCompactLegend('معلق', const Color(0xFFFFB74D), screenWidth),
-              _buildCompactLegend('محجوز', const Color(0xFFEF4444), screenWidth),
-              _buildCompactLegend('جماعي', const Color(0xFF00BCD4), screenWidth),
+              _buildCompactLegend('متاح', const Color(0xFF4CAF50), screenWidth, isDark),
+              _buildCompactLegend('معلق', const Color(0xFFFFB74D), screenWidth, isDark),
+              _buildCompactLegend('محجوز', const Color(0xFFEF4444), screenWidth, isDark),
+              _buildCompactLegend('جماعي', const Color(0xFF00BCD4), screenWidth, isDark),
             ],
           ),
           
           SizedBox(height: screenHeight * 0.02),
           
-          // Modern action buttons
           Row(
             children: [
               Expanded(
@@ -1695,6 +1735,7 @@ Widget _buildBottomSection(double screenWidth, double screenHeight) {
                   widget.onCancel,
                   screenWidth,
                   screenHeight,
+                  isDark,
                 ),
               ),
               SizedBox(width: screenWidth * 0.03),
@@ -1709,6 +1750,7 @@ Widget _buildBottomSection(double screenWidth, double screenHeight) {
                   } : null,
                   screenWidth,
                   screenHeight,
+                  isDark,
                 ),
               ),
             ],
@@ -1719,17 +1761,21 @@ Widget _buildBottomSection(double screenWidth, double screenHeight) {
   );
 }
 
-// Compact legend item
-Widget _buildCompactLegend(String label, Color color, double screenWidth) {
+Widget _buildCompactLegend(String label, Color color, double screenWidth, bool isDark) {
   return Container(
     padding: EdgeInsets.symmetric(
       horizontal: screenWidth * 0.03,
       vertical: screenWidth * 0.015,
     ),
     decoration: BoxDecoration(
-      color: color.withOpacity(0.1),
+      color: isDark 
+        ? color.withOpacity(0.2)
+        : color.withOpacity(0.1),
       borderRadius: BorderRadius.circular(20),
-      border: Border.all(color: color.withOpacity(0.3), width: 1),
+      border: Border.all(
+        color: color.withOpacity(isDark ? 0.5 : 0.3),
+        width: 1,
+      ),
     ),
     child: Row(
       mainAxisSize: MainAxisSize.min,
@@ -1748,7 +1794,7 @@ Widget _buildCompactLegend(String label, Color color, double screenWidth) {
           style: TextStyle(
             fontSize: screenWidth * 0.03,
             fontWeight: FontWeight.w600,
-            color: color.withOpacity(0.9),
+            color: isDark ? color.withOpacity(0.9) : color.withOpacity(0.9),
           ),
         ),
       ],
@@ -1756,56 +1802,68 @@ Widget _buildCompactLegend(String label, Color color, double screenWidth) {
   );
 }
 
-// Modern action button
 Widget _buildActionButton(
   String label,
   bool isPrimary,
   VoidCallback? onTap,
   double screenWidth,
   double screenHeight,
+  bool isDark,
 ) {
   final isEnabled = onTap != null;
   
-  return Material(
-    color: Colors.transparent,
-    child: InkWell(
-      borderRadius: BorderRadius.circular(16),
-      onTap: onTap,
-      child: Container(
-        height: screenHeight * 0.055,
-        decoration: BoxDecoration(
-          gradient: isPrimary && isEnabled
-              ? const LinearGradient(
-                  colors: [Color(0xFF6C63FF), Color(0xFF8B5CF6)],
-                )
-              : null,
-          color: isPrimary && !isEnabled
-              ? Colors.grey.shade300
-              : isPrimary
-                  ? null
-                  : Colors.transparent,
-          border: !isPrimary
-              ? Border.all(color: const Color(0xFF6C63FF), width: 1.5)
-              : null,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: isPrimary && isEnabled
-              ? [
-                  BoxShadow(
-                    color: const Color(0xFF6C63FF).withOpacity(0.3),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ]
-              : null,
-        ),
-        child: Center(
-          child: Text(
-            label,
-            style: TextStyle(
-              color: isPrimary ? Colors.white : const Color(0xFF6C63FF),
-              fontSize: screenWidth * 0.038,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.3,
+  return Container(
+    decoration: BoxDecoration(
+      gradient: isPrimary && isEnabled
+          ? LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Colors.green.shade600,
+                Colors.green.shade800,
+              ],
+            )
+          : null,
+      color: isPrimary && !isEnabled
+          ? (isDark ? Colors.grey.shade700 : Colors.grey.shade300)
+          : isPrimary
+              ? null
+              : Colors.transparent,
+      border: !isPrimary
+          ? Border.all(
+              color: isDark ? Colors.green.shade400 : Colors.green.shade700,
+              width: 1.5,
+            )
+          : null,
+      borderRadius: BorderRadius.circular(12),
+      boxShadow: isPrimary && isEnabled
+          ? [
+              BoxShadow(
+                color: Colors.green.shade300.withOpacity(0.4),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ]
+          : null,
+    ),
+    child: Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Container(
+          height: screenHeight * 0.055,
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: isPrimary
+                    ? Colors.white
+                    : (isDark ? Colors.green.shade300 : Colors.green.shade700),
+                fontSize: screenWidth * 0.038,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.3,
+              ),
             ),
           ),
         ),
@@ -1813,6 +1871,7 @@ Widget _buildActionButton(
     ),
   );
 }
+
 
 // /////
 

@@ -2,11 +2,14 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:wedding_reservation_app/screens/groom/food_menu_tab.dart';
 import 'package:wedding_reservation_app/screens/groom/food_menu_tab_Groom.dart';
 import 'package:wedding_reservation_app/services/api_service.dart';
 import '../../utils/colors.dart';
 import '../../utils/constants.dart';
+import '../../providers/theme_provider.dart';
+import '../../widgets/theme_toggle_button.dart';
 import 'create_reservation_screen.dart';
 import 'home_tab.dart';
 import 'reservations_tab.dart';
@@ -98,22 +101,29 @@ class _GroomHomeScreenState extends State<GroomHomeScreen> {
     });
   }
 
-  void _showLogoutDialog() {
+  void _showLogoutDialog(bool isDark) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
+        title: Text(
           'تسجيل الخروج',
-          style: TextStyle(fontWeight: FontWeight.w600),
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            color: isDark ? Colors.white : Colors.black87,
+          ),
         ),
-        content: const Text('هل أنت متأكد من رغبتك في تسجيل الخروج؟'),
+        content: Text(
+          'هل أنت متأكد من رغبتك في تسجيل الخروج؟',
+          style: TextStyle(color: isDark ? Colors.white70 : Colors.black87),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: Text(
               'إلغاء',
-              style: TextStyle(color: Colors.grey[700]),
+              style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[700]),
             ),
           ),
           ElevatedButton(
@@ -135,6 +145,9 @@ class _GroomHomeScreenState extends State<GroomHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final isDark = themeProvider.isDarkMode;
+
     return WillPopScope(
       onWillPop: () async {
         if (_externalScreen != null) {
@@ -144,9 +157,9 @@ class _GroomHomeScreenState extends State<GroomHomeScreen> {
         return true;
       },
       child: Scaffold(
-        backgroundColor: const Color(0xFFF6F6F6),
-        appBar: _buildSpotifyAppBar(),
-        drawer: _buildSpotifyDrawer(),
+        backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF6F6F6),
+        appBar: _buildSpotifyAppBar(isDark),
+        drawer: _buildSpotifyDrawer(isDark),
         body: Stack(
           children: [
             // Main content - FULL SCREEN (including bottom nav area)
@@ -161,10 +174,10 @@ class _GroomHomeScreenState extends State<GroomHomeScreen> {
                             vertical: 8,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.05),
+                                color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
                                 blurRadius: 10,
                                 offset: const Offset(0, 2),
                               ),
@@ -173,20 +186,25 @@ class _GroomHomeScreenState extends State<GroomHomeScreen> {
                           child: Row(
                             children: [
                               IconButton(
-                                icon: const Icon(Icons.arrow_back, size: 22),
+                                icon: Icon(
+                                  Icons.arrow_back,
+                                  size: 22,
+                                  color: isDark ? Colors.white : Colors.black87,
+                                ),
                                 onPressed: _closeExternalScreen,
                               ),
                               Expanded(
                                 child: Text(
                                   _externalScreenTitle ?? '',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.w600,
+                                    color: isDark ? Colors.white : Colors.black87,
                                   ),
                                   textAlign: TextAlign.center,
                                 ),
                               ),
-                              const SizedBox(width: 48), // Balance the back button
+                              const SizedBox(width: 48),
                             ],
                           ),
                         ),
@@ -202,12 +220,14 @@ class _GroomHomeScreenState extends State<GroomHomeScreen> {
                     ),
             ),
             
+
+            
             // Bottom Navigation Bar - FLOATING ON TOP
             Positioned(
               left: 0,
               right: 0,
               bottom: 0,
-              child: _buildSpotifyBottomNav(),
+              child: _buildSpotifyBottomNav(isDark),
             ),
           ],
         ),
@@ -215,18 +235,21 @@ class _GroomHomeScreenState extends State<GroomHomeScreen> {
     );
   }
 
-  PreferredSizeWidget _buildSpotifyAppBar() {
+  PreferredSizeWidget _buildSpotifyAppBar(bool isDark) {
     return AppBar(
       title: Text(
         _getAppBarTitle(),
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 20,
           fontWeight: FontWeight.w700,
           letterSpacing: -0.5,
+          color: isDark ? Colors.white : Colors.black87,
         ),
       ),
-      backgroundColor: Colors.white,
-      foregroundColor: Colors.black87,
+      backgroundColor: isDark 
+          ? const Color(0xFF1E1E1E) 
+          : const Color.fromARGB(201, 255, 255, 255),
+      foregroundColor: isDark ? Colors.white : Colors.black87,
       elevation: 0,
       automaticallyImplyLeading: false,
       leading: Builder(
@@ -234,10 +257,14 @@ class _GroomHomeScreenState extends State<GroomHomeScreen> {
           icon: Container(
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-              color: Colors.grey[100],
+              color: isDark ? Colors.grey[800] : Colors.grey[100],
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Icon(Icons.menu, size: 20),
+            child: Icon(
+              Icons.menu,
+              size: 20,
+              color: isDark ? Colors.white : Colors.black87,
+            ),
           ),
           onPressed: () => Scaffold.of(context).openDrawer(),
         ),
@@ -249,10 +276,14 @@ class _GroomHomeScreenState extends State<GroomHomeScreen> {
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: Colors.grey[100],
+                  color: isDark ? Colors.grey[800] : Colors.grey[100],
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(Icons.notifications_outlined, size: 20),
+                child: Icon(
+                  Icons.notifications_outlined,
+                  size: 20,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
               ),
               Positioned(
                 right: 4,
@@ -268,30 +299,54 @@ class _GroomHomeScreenState extends State<GroomHomeScreen> {
               ),
             ],
           ),
-          onPressed: _showNotifications,
+          onPressed: () => _showNotifications(isDark),
         ),
         const SizedBox(width: 4),
         IconButton(
           icon: Container(
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-              color: Colors.grey[100],
+              color: isDark ? Colors.grey[800] : Colors.grey[100],
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Icon(Icons.logout_outlined, size: 20),
+            child: Icon(
+              Icons.logout_outlined,
+              size: 20,
+              color: isDark ? Colors.white : Colors.black87,
+            ),
           ),
-          onPressed: _showLogoutDialog,
+          onPressed: () => _showLogoutDialog(isDark),
           tooltip: 'تسجيل الخروج',
         ),
         const SizedBox(width: 8),
+        IconButton(
+          icon: Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: isDark ? Colors.grey[800] : Colors.grey[100],
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
+              size: 20,
+              color: isDark ? Colors.white : Colors.black87,
+            ),
+          ),
+          onPressed: () {
+            // Toggle theme using the provider
+            final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+            themeProvider.toggleTheme();
+          },
+          tooltip: isDark ? 'الوضع الفاتح' : 'الوضع الداكن',
+        ),
       ],
     );
   }
 
-  Widget _buildSpotifyDrawer() {
+  Widget _buildSpotifyDrawer(bool isDark) {
     return Drawer(
       child: Container(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         child: SafeArea(
           child: Column(
             children: [
@@ -338,29 +393,51 @@ class _GroomHomeScreenState extends State<GroomHomeScreen> {
                 child: ListView(
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   children: [
-                    _buildDrawerItem(Icons.home_rounded, 'الرئيسية', 0),
-                    _buildDrawerItem(Icons.add_circle_outline_rounded, 'انشاء حجز', 1),
-                    _buildDrawerItem(Icons.calendar_today_rounded, 'حجوزاتي', 2),
-                    _buildDrawerItem(Icons.restaurant_menu_rounded, 'قائمة مقادير الوليمة', 3),
-                    _buildDrawerItem(Icons.person_outline_rounded, 'الملف الشخصي', 4),
+                    _buildDrawerItem(Icons.home_rounded, 'الرئيسية', 0, isDark),
+                    _buildDrawerItem(Icons.add_circle_outline_rounded, 'انشاء حجز', 1, isDark),
+                    _buildDrawerItem(Icons.calendar_today_rounded, 'حجوزاتي', 2, isDark),
+                    _buildDrawerItem(Icons.restaurant_menu_rounded, 'قائمة مقادير الوليمة', 3, isDark),
+                    _buildDrawerItem(Icons.person_outline_rounded, 'الملف الشخصي', 4, isDark),
                     
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      child: Divider(color: Colors.grey[300], thickness: 1),
+                      child: Divider(
+                        color: isDark ? Colors.grey[700] : Colors.grey[300],
+                        thickness: 1,
+                      ),
                     ),
                     
-                    _buildExternalDrawerItem(Icons.settings_outlined, 'الإعدادات', 
-                      const Center(child: Text('شاشة الإعدادات'))),
-                    _buildExternalDrawerItem(Icons.help_outline_rounded, 'المساعدة والدعم', 
-                      const Center(child: Text('شاشة المساعدة والدعم'))),
-                    _buildExternalDrawerItem(Icons.info_outline_rounded, 'حول التطبيق', 
-                      const Center(child: Text('شاشة حول التطبيق'))),
-                    _buildExternalDrawerItem(Icons.star_outline_rounded, 'تقييم التطبيق', 
-                      const Center(child: Text('شاشة تقييم التطبيق'))),
+                    _buildExternalDrawerItem(
+                      Icons.settings_outlined,
+                      'الإعدادات',
+                      const Center(child: Text('شاشة الإعدادات')),
+                      isDark,
+                    ),
+                    _buildExternalDrawerItem(
+                      Icons.help_outline_rounded,
+                      'المساعدة والدعم',
+                      const Center(child: Text('شاشة المساعدة والدعم')),
+                      isDark,
+                    ),
+                    _buildExternalDrawerItem(
+                      Icons.info_outline_rounded,
+                      'حول التطبيق',
+                      const Center(child: Text('شاشة حول التطبيق')),
+                      isDark,
+                    ),
+                    _buildExternalDrawerItem(
+                      Icons.star_outline_rounded,
+                      'تقييم التطبيق',
+                      const Center(child: Text('شاشة تقييم التطبيق')),
+                      isDark,
+                    ),
                     
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      child: Divider(color: Colors.grey[300], thickness: 1),
+                      child: Divider(
+                        color: isDark ? Colors.grey[700] : Colors.grey[300],
+                        thickness: 1,
+                      ),
                     ),
                     
                     ListTile(
@@ -383,7 +460,7 @@ class _GroomHomeScreenState extends State<GroomHomeScreen> {
                       ),
                       onTap: () {
                         Navigator.pop(context);
-                        _showLogoutDialog();
+                        _showLogoutDialog(isDark);
                       },
                     ),
                   ],
@@ -396,7 +473,7 @@ class _GroomHomeScreenState extends State<GroomHomeScreen> {
     );
   }
 
-  Widget _buildDrawerItem(IconData icon, String title, int index) {
+  Widget _buildDrawerItem(IconData icon, String title, int index, bool isDark) {
     final isSelected = _currentIndex == index && _externalScreen == null;
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
@@ -409,19 +486,19 @@ class _GroomHomeScreenState extends State<GroomHomeScreen> {
         leading: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: isSelected ? AppColors.primary : Colors.grey[100],
+            color: isSelected ? AppColors.primary : (isDark ? Colors.grey[800] : Colors.grey[100]),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(
             icon,
-            color: isSelected ? Colors.white : Colors.grey[700],
+            color: isSelected ? Colors.white : (isDark ? Colors.grey[400] : Colors.grey[700]),
             size: 20,
           ),
         ),
         title: Text(
           title,
           style: TextStyle(
-            color: isSelected ? AppColors.primary : Colors.grey[800],
+            color: isSelected ? AppColors.primary : (isDark ? Colors.grey[300] : Colors.grey[800]),
             fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
             fontSize: 15,
           ),
@@ -434,7 +511,7 @@ class _GroomHomeScreenState extends State<GroomHomeScreen> {
     );
   }
 
-  Widget _buildExternalDrawerItem(IconData icon, String title, Widget screen) {
+  Widget _buildExternalDrawerItem(IconData icon, String title, Widget screen, bool isDark) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
       child: ListTile(
@@ -442,15 +519,19 @@ class _GroomHomeScreenState extends State<GroomHomeScreen> {
         leading: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: Colors.grey[100],
+            color: isDark ? Colors.grey[800] : Colors.grey[100],
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(icon, color: Colors.grey[700], size: 20),
+          child: Icon(
+            icon,
+            color: isDark ? Colors.grey[400] : Colors.grey[700],
+            size: 20,
+          ),
         ),
         title: Text(
           title,
           style: TextStyle(
-            color: Colors.grey[800],
+            color: isDark ? Colors.grey[300] : Colors.grey[800],
             fontWeight: FontWeight.w500,
             fontSize: 15,
           ),
@@ -463,37 +544,40 @@ class _GroomHomeScreenState extends State<GroomHomeScreen> {
     );
   }
 
-  Widget _buildSpotifyBottomNav() {
+  Widget _buildSpotifyBottomNav(bool isDark) {
     return Container(
-      margin: const EdgeInsets.all(10),
-      // padding: EdgeInsets.all(0),
+      margin: const EdgeInsets.symmetric(vertical: 0, horizontal: 0),
+      padding: EdgeInsets.zero,
       decoration: BoxDecoration(
-        color: const Color.fromARGB(47, 79, 79, 79),
-        borderRadius: BorderRadius.circular(45),
+        color: isDark 
+            ? const Color.fromARGB(57, 72, 72, 72)
+            : const Color.fromARGB(47, 79, 79, 79),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 35,
-            offset: const Offset(0, -4),
-            spreadRadius: 0,
+            color: isDark ? const Color.fromARGB(142, 102, 187, 106).withOpacity( 0.2 ) : Colors.green.shade400.withOpacity( 0.2)  ,
+            blurRadius: 45,
+            offset: const Offset(0, -0),
+            spreadRadius: 10,
           ),
-          // BoxShadow(
-          //   color: const Color.fromARGB(255, 21, 219, 90).withOpacity(0.1),
-          //   blurRadius: 14,
-          //   offset: const Offset(0, -0),
-          //   spreadRadius: 12,
-          // ),
+          BoxShadow(
+            color: const Color.fromARGB(255, 21, 219, 90).withOpacity(0.2),
+            blurRadius: 55,
+            offset: const Offset(0, -2),
+            spreadRadius: 5,
+          ),
         ],
         border: Border.all(
-          color: Colors.black.withOpacity(0.05),
-          width: 1,
+          color: const Color.fromARGB(255, 4, 99, 1).withOpacity(isDark ? 0.2 : 0.3),
+          width: 0,
         ),
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(45),
+        borderRadius: BorderRadius.circular(25),
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2),
           child: SafeArea(
+            bottom: true,
             top: false,
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
@@ -501,11 +585,11 @@ class _GroomHomeScreenState extends State<GroomHomeScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  _buildNavItem(Icons.home_rounded, 'الرئيسية', 0),
-                  _buildNavItem(Icons.add_circle_outline_rounded, 'انشاء حجز', 1),
-                  _buildNavItem(Icons.calendar_today_rounded, 'الحجوزات', 2),
-                  _buildNavItem(Icons.restaurant_menu_rounded, 'الوليمة', 3),
-                  _buildNavItem(Icons.person_outline_rounded, 'الملف الشخصي', 4),
+                  _buildNavItem(Icons.add_circle_outline_rounded, 'انشاء حجز', 1, isDark),
+                  _buildNavItem(Icons.calendar_today_rounded, 'الحجوزات', 2, isDark),
+                  _buildNavItem(Icons.home_rounded, 'الرئيسية', 0, isDark),
+                  _buildNavItem(Icons.restaurant_menu_rounded, 'الوليمة', 3, isDark),
+                  _buildNavItem(Icons.person_outline_rounded, 'الملف الشخصي', 4, isDark),
                 ],
               ),
             ),
@@ -515,7 +599,7 @@ class _GroomHomeScreenState extends State<GroomHomeScreen> {
     );
   }
 
-  Widget _buildNavItem(IconData icon, String label, int index) {
+  Widget _buildNavItem(IconData icon, String label, int index, bool isDark) {
     final isSelected = _currentIndex == index && _externalScreen == null;
     
     return GestureDetector(
@@ -556,7 +640,9 @@ class _GroomHomeScreenState extends State<GroomHomeScreen> {
           children: [
             Icon(
               icon,
-              color: isSelected ? Colors.white : Colors.black.withOpacity(0.5),
+              color: isSelected 
+                  ? Colors.white 
+                  : (isDark ? Colors.white.withOpacity(0.6) : Colors.black.withOpacity(0.5)),
               size: isSelected ? 26 : 24,
             ),
             if (isSelected) ...[
@@ -588,11 +674,11 @@ class _GroomHomeScreenState extends State<GroomHomeScreen> {
       case 0:
         return AppConstants.appName;
       case 1:
-        return 'انشاء حجز جديد';
+        return 'حجز جديد';
       case 2:
         return 'الحجوزات';
       case 3:
-        return 'قائمة مقادير الوليمة';
+        return 'مقادير الوليمة';
       case 4:
         return 'الملف الشخصي';
       default:
@@ -600,14 +686,19 @@ class _GroomHomeScreenState extends State<GroomHomeScreen> {
     }
   }
 
-  void _showNotifications() {
+  void _showNotifications(bool isDark) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text(
+        title: Text(
           'الإشعارات',
-          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 20),
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 20,
+            color: isDark ? Colors.white : Colors.black87,
+          ),
         ),
         content: SingleChildScrollView(
           child: Column(
@@ -618,6 +709,7 @@ class _GroomHomeScreenState extends State<GroomHomeScreen> {
                 Colors.blue,
                 'مرحباً بك في التطبيق',
                 'نتمنى لك تجربة ممتعة في حجز قاعة زفافك',
+                isDark,
               ),
               const SizedBox(height: 12),
               _buildNotificationItem(
@@ -625,6 +717,7 @@ class _GroomHomeScreenState extends State<GroomHomeScreen> {
                 Colors.green,
                 'تحديث التطبيق',
                 'تم إضافة ميزات جديدة للتطبيق',
+                isDark,
               ),
             ],
           ),
@@ -648,11 +741,17 @@ class _GroomHomeScreenState extends State<GroomHomeScreen> {
     );
   }
 
-  Widget _buildNotificationItem(IconData icon, Color color, String title, String subtitle) {
+  Widget _buildNotificationItem(
+    IconData icon,
+    Color color,
+    String title,
+    String subtitle,
+    bool isDark,
+  ) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withOpacity(isDark ? 0.2 : 0.1),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -672,9 +771,10 @@ class _GroomHomeScreenState extends State<GroomHomeScreen> {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 14,
+                    color: isDark ? Colors.white : Colors.black87,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -682,7 +782,7 @@ class _GroomHomeScreenState extends State<GroomHomeScreen> {
                   subtitle,
                   style: TextStyle(
                     fontSize: 12,
-                    color: Colors.grey[700],
+                    color: isDark ? Colors.grey[400] : Colors.grey[700],
                   ),
                 ),
               ],
@@ -692,4 +792,4 @@ class _GroomHomeScreenState extends State<GroomHomeScreen> {
       ),
     );
   }
-}  
+}

@@ -18,7 +18,8 @@ import 'package:http/http.dart' as http;
 class ApiService {
   // static const String baseUrl = 'https://f09e1a125031.ngrok-free.app'; // Replace with your actual API URL
   // static const String baseUrl = 'http://192.168.1.3:8000'; // Replace with your actual API URL
-  static const String baseUrl = 'http://127.0.0.1:8000'; // Replace with your actual API URL
+  static const String baseUrl = 'https://valiant-courtesy-production.up.railway.app'; // Replace with your actual API URL
+  // static const String baseUrl = 'http://127.0.0.1:8000'; // Replace with your actual API URL
   static String? _token;
 
   static void setToken(String token) {
@@ -2713,7 +2714,304 @@ static Future<Map<String, dynamic>?> getGroomClanRulesOrNull(int clanId) async {
 
 
 
+// ==================== PDF GENERATION AND DOWNLOAD ENDPOINTS ====================
 
+/// Generate PDF for a specific reservation
+/// Can be called independently after reservation creation
+static Future<Map<String, dynamic>> generatePdf(int reservationId) async {
+  try {
+    final response = await http.post(
+      Uri.parse('$baseUrl/pdf/generate/$reservationId'),
+      headers: _headers,
+    );
+
+    print('Generate PDF response status: ${response.statusCode}');
+    print('Generate PDF response body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل في إنشاء ملف PDF');
+    }
+  } catch (e) {
+    throw Exception('خطأ في إنشاء ملف PDF: $e');
+  }
+}
+
+/// Force regenerate PDF for a specific reservation (overwrites existing)
+/// Useful for updates or fixes
+static Future<Map<String, dynamic>> regeneratePdf(int reservationId) async {
+  try {
+    final response = await http.post(
+      Uri.parse('$baseUrl/pdf/regenerate/$reservationId'),
+      headers: _headers,
+    );
+
+    print('Regenerate PDF response status: ${response.statusCode}');
+    print('Regenerate PDF response body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل في إعادة إنشاء ملف PDF');
+    }
+  } catch (e) {
+    throw Exception('خطأ في إعادة إنشاء ملف PDF: $e');
+  }
+}
+
+/// Download PDF for a specific reservation
+/// Accessible by groom or clan admin
+/// Returns the PDF file as bytes
+static Future<Uint8List> downloadPdf(int reservationId) async {
+  try {
+    final response = await http.get(
+      Uri.parse('$baseUrl/pdf/download/$reservationId'),
+      headers: _headers,
+    );
+
+    print('Download PDF response status: ${response.statusCode}');
+
+    if (response.statusCode == 200) {
+      return response.bodyBytes;
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل في تحميل ملف PDF');
+    }
+  } catch (e) {
+    throw Exception('خطأ في تحميل ملف PDF: $e');
+  }
+}
+
+/// Check if PDF exists for a reservation
+/// Returns status information about the PDF
+/// Returns status information about the PDF
+static Future<Map<String, dynamic>> checkPdfStatus(int reservationId) async {
+  try {
+    final response = await http.get(
+      Uri.parse('$baseUrl/pdf/status/$reservationId'),
+      headers: _headers,
+    );
+
+    print('Check PDF status response: ${response.statusCode}');
+    print('Check PDF status body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return {
+        'reservation_id': data['reservation_id'],
+        'pdf_exists': data['pdf_exists'] ?? false,
+        'pdf_url': data['pdf_url'],
+      };
+    } else if (response.statusCode == 404) {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'الحجز غير موجود');
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل في التحقق من حالة PDF');
+    }
+  } catch (e) {
+    if (e is Exception) rethrow;
+    throw Exception('خطأ في التحقق من حالة PDF: $e');
+  }
+}
+
+// ==================== PDF CONVENIENCE METHODS ====================
+
+/// Generate PDF and wait for completion
+/// Returns the PDF URL if successful
+static Future<String?> generateAndGetPdfUrl(int reservationId) async {
+  try {
+    final result = await generatePdf(reservationId);
+    return result['pdf_url'] as String?;
+  } catch (e) {
+    print('Error in generateAndGetPdfUrl: $e');
+    return null;
+  }
+}
+
+/// Check if PDF exists and download it if available
+/// Returns null if PDF doesn't exist
+static Future<Uint8List?> downloadPdfIfExists(int reservationId) async {
+  try {
+    // First check if PDF exists
+    final status = await checkPdfStatus(reservationId);
+    
+    if (status['pdf_exists'] == true) {
+      // PDF exists, download it
+      return await downloadPdf(reservationId);
+    } else {
+      // PDF doesn't exist
+      return null;
+    }
+  } catch (e) {
+    print('Error in downloadPdfIfExists: $e');
+    return null;
+  }
+}
+
+/// Generate PDF if it doesn't exist, then download it
+/// This is a complete flow method
+static Future<Uint8List?> ensurePdfAndDownload(int reservationId) async {
+  try {
+    // Check if PDF exists
+    final status = await checkPdfStatus(reservationId);
+    
+    if (status['pdf_exists'] != true) {
+      // Generate PDF if it doesn't exist
+      print('PDF does not exist, generating...');
+      await generatePdf(reservationId);
+      
+      // Wait a bit for generation to complete
+      await Future.delayed(const Duration(seconds: 2));
+    }
+    
+    // Download the PDF
+    return await downloadPdf(reservationId);
+  } catch (e) {
+    print('Error in ensurePdfAndDownload: $e');
+    throw Exception('فشل في إنشاء أو تحميل PDF: $e');
+  }
+}
+
+/// Regenerate PDF and download the new version
+/// Useful when reservation data has been updated
+static Future<Uint8List> regenerateAndDownloadPdf(int reservationId) async {
+  try {
+    // Regenerate the PDF
+    print('Regenerating PDF...');
+    await regeneratePdf(reservationId);
+    
+    // Wait a bit for regeneration to complete
+    await Future.delayed(const Duration(seconds: 2));
+    
+    // Download the new PDF
+    return await downloadPdf(reservationId);
+  } catch (e) {
+    print('Error in regenerateAndDownloadPdf: $e');
+    throw Exception('فشل في إعادة إنشاء وتحميل PDF: $e');
+  }
+}
+
+/// Save PDF to device storage
+/// Returns the file path if successful
+static Future<String?> savePdfToDevice(
+  int reservationId, 
+  Uint8List pdfBytes,
+  String fileName,
+) async {
+  try {
+    // This is a placeholder - actual implementation depends on your file storage strategy
+    // You might use path_provider and file system APIs here
+    
+    // Example implementation would be:
+    // final directory = await getApplicationDocumentsDirectory();
+    // final file = File('${directory.path}/$fileName');
+    // await file.writeAsBytes(pdfBytes);
+    // return file.path;
+    
+    print('Saving PDF with ${pdfBytes.length} bytes');
+    print('This method needs to be implemented based on your storage strategy');
+    
+    return null; // Placeholder return
+  } catch (e) {
+    print('Error saving PDF: $e');
+    throw Exception('فشل في حفظ ملف PDF: $e');
+  }
+}
+
+/// Download and save PDF in one operation
+static Future<String?> downloadAndSavePdf(
+  int reservationId,
+  {String? customFileName}
+) async {
+  try {
+    // Download the PDF
+    final pdfBytes = await downloadPdf(reservationId);
+    
+    // Generate filename if not provided
+    final fileName = customFileName ?? 'reservation_$reservationId.pdf';
+    
+    // Save to device
+    return await savePdfToDevice(reservationId, pdfBytes, fileName);
+  } catch (e) {
+    print('Error in downloadAndSavePdf: $e');
+    throw Exception('فشل في تحميل وحفظ PDF: $e');
+  }
+}
+
+/// Check PDF generation status with retry
+/// Useful when PDF generation might take time
+static Future<bool> waitForPdfGeneration(
+  int reservationId, {
+  int maxRetries = 10,
+  Duration retryDelay = const Duration(seconds: 2),
+}) async {
+  for (int i = 0; i < maxRetries; i++) {
+    try {
+      final status = await checkPdfStatus(reservationId);
+      
+      if (status['pdf_exists'] == true) {
+        return true;
+      }
+      
+      // Wait before next retry
+      if (i < maxRetries - 1) {
+        await Future.delayed(retryDelay);
+      }
+    } catch (e) {
+      print('Retry $i failed: $e');
+    }
+  }
+  
+  return false;
+}
+
+/// Get PDF URL without downloading the file
+static Future<String?> getPdfUrl(int reservationId) async {
+  try {
+    final status = await checkPdfStatus(reservationId);
+    return status['pdf_url'] as String?;
+  } catch (e) {
+    print('Error getting PDF URL: $e');
+    return null;
+  }
+}
+
+/// Batch generate PDFs for multiple reservations
+static Future<Map<int, bool>> batchGeneratePdfs(
+  List<int> reservationIds,
+) async {
+  final results = <int, bool>{};
+  
+  for (final id in reservationIds) {
+    try {
+      await generatePdf(id);
+      results[id] = true;
+    } catch (e) {
+      print('Failed to generate PDF for reservation $id: $e');
+      results[id] = false;
+    }
+    
+    // Small delay between requests to avoid overwhelming the server
+    await Future.delayed(const Duration(milliseconds: 500));
+  }
+  
+  return results;
+}
+
+/// Verify PDF generation completed successfully
+static Future<bool> verifyPdfGeneration(int reservationId) async {
+  try {
+    final status = await checkPdfStatus(reservationId);
+    return status['pdf_exists'] == true;
+  } catch (e) {
+    print('Error verifying PDF: $e');
+    return false;
+  }
+}
 
 
 

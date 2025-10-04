@@ -1,6 +1,7 @@
 // lib/screens/splash_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
+import 'package:wedding_reservation_app/screens/auth/event_type_selection_screen.dart';
 import '../../utils/colors.dart';
 import '../../utils/constants.dart';
 import '../auth/welcome_screen.dart';
@@ -49,7 +50,7 @@ class _SplashScreenState extends State<SplashScreen>
     Future.delayed(Duration(milliseconds: 3000), () {
       if (mounted) {
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => WelcomeScreen()),
+          MaterialPageRoute(builder: (context) => EventTypeSelectionScreen()),
         );
       }
     });

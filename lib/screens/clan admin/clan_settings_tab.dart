@@ -325,6 +325,8 @@ void _populateFormFields() {
                             _buildSettingsForm(isMobile, isTablet),
                             SizedBox(height: 32),
                             _buildSaveButton(isMobile),
+                            SizedBox(height: 60), 
+
                           ],
                         ),
                       ),

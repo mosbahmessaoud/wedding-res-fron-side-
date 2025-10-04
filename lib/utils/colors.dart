@@ -33,6 +33,29 @@ class AppColors {
   static const Color border = Color(0xFFE0E0E0);          // Light Grey
   static const Color borderFocus = Color(0xFF2E7D32);     // Green
   
+  // Dark Mode Colors
+  static const Color darkBackground = Color(0xFF121212);     // Dark Background
+  static const Color darkSurface = Color(0xFF1E1E1E);       // Dark Surface
+  static const Color darkCard = Color(0xFF2C2C2C);          // Dark Card
+  static const Color darkPrimary = Color(0xFF66BB6A);       // Light Green for dark mode
+  static const Color darkSecondary = Color(0xFFFFD54F);     // Light Gold for dark mode
+  
+  // Dark Mode Text Colors
+  static const Color darkTextPrimary = Color(0xFFE0E0E0);   // Light Grey text
+  static const Color darkTextSecondary = Color(0xFFB0B0B0); // Medium Grey text
+  static const Color darkTextHint = Color(0xFF757575);      // Dark Grey text
+  
+  // Dark Mode Border Colors
+  static const Color darkBorder = Color(0xFF424242);        // Dark Grey border
+  static const Color darkBorderFocus = Color(0xFF66BB6A);   // Light Green border
+  
+  // Add to Dark Mode Colors section
+  static const Color darkInputBackground = Color(0xFF2C2C2C);
+  static const Color darkInputBorder = Color(0xFF424242);
+  static const Color darkInputBorderFocus = Color(0xFF66BB6A);
+  static const Color darkInputText = Color(0xFFE0E0E0);
+  static const Color darkInputHint = Color(0xFF757575);
+
   // Gradients
   static const LinearGradient primaryGradient = LinearGradient(
     begin: Alignment.topLeft,
@@ -50,6 +73,19 @@ class AppColors {
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
     colors: [Color(0xFFF8F9FA), Color(0xFFE8F5E8)],
+  );
+  
+  // Dark Mode Gradients
+  static const LinearGradient darkPrimaryGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xFF66BB6A), Color(0xFF81C784)],
+  );
+  
+  static const LinearGradient darkBackgroundGradient = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [Color(0xFF121212), Color(0xFF1E1E1E)],
   );
 }
 

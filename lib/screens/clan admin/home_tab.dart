@@ -1,5 +1,7 @@
 // lib/screens/clan admin/home_tab.dart
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:wedding_reservation_app/providers/theme_provider.dart';
 import 'package:wedding_reservation_app/utils/constants.dart';
 import '../../utils/colors.dart';
 import '../../services/api_service.dart';
@@ -8,7 +10,7 @@ class HomeTab extends StatefulWidget {
   final Function(int)? onNavigateToTab;
   
   const HomeTab({super.key, this.onNavigateToTab});
-
+  
   @override
   HomeTabState createState() => HomeTabState();
 }
@@ -282,10 +284,12 @@ Widget build(BuildContext context) {
                     SizedBox(height: isMobile ? 24 : 32),
                     _buildStatsCards(isMobile, isTablet),
                     SizedBox(height: isMobile ? 24 : 32),
-                    _buildQuickActions(isMobile, isTablet),
+                    _buildQuickActions(context),
                     SizedBox(height: isMobile ? 24 : 32),
                     _buildRecentActivity(isMobile, isTablet),
-                    SizedBox(height: 20),
+                    SizedBox(height: 80),
+
+
                   ],
                 ),
               ),
@@ -296,140 +300,142 @@ Widget build(BuildContext context) {
     ),
   );
 }
+
 PreferredSizeWidget _buildSliverAppBar(bool isMobile) {
-    return AppBar(
-      backgroundColor: Colors.white,
-      elevation: 0,
-      automaticallyImplyLeading: false, // Remove automatic back button
-      flexibleSpace: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              AppColors.primary,
-              AppColors.primary.withOpacity(0.8),
-              Colors.deepPurple.withOpacity(0.9),
-            ],
-          ),
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+
+  return AppBar(
+    
+    backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+    elevation: 0,
+    automaticallyImplyLeading: false,
+    flexibleSpace: Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppColors.primary,
+            isDark ? AppColors.primary.withOpacity(0.4):AppColors.primary.withOpacity(0.8) ,
+            isDark ? AppColors.primary.withOpacity(0.4):const Color.fromARGB(255, 130, 161, 112).withOpacity(0.9),
+            
+          ],
         ),
       ),
-      title: Text(
-        AppConstants.appName,
-        style: TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.w700,
-          fontSize: isMobile ? 16 : 20,
-        ),
+    ),
+    title: Text(
+      AppConstants.appName,
+      style: TextStyle(
+        color: Colors.white,
+        fontWeight: FontWeight.w700,
+        fontSize: isMobile ? 16 : 20,
       ),
-      actions: [
-        Container(
-          margin: EdgeInsets.only(right: isMobile ? 4 : 8),
-          child: Stack(
-            children: [
-              IconButton(
-                icon: Icon(Icons.notifications_outlined, 
-                  color: Colors.white, 
-                  size: isMobile ? 20 : 24),
-                onPressed: () {
-                  // TODO: Navigate to notifications
-                },
-              ),
-              Positioned(
-                right: isMobile ? 6 : 8,
-                top: isMobile ? 6 : 8,
-                child: AnimatedBuilder(
-                  animation: _refreshAnimation,
-                  child: Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: Colors.red,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  builder: (context, child) {
-                    return Transform.scale(
-                      scale: 1.0 + (_refreshAnimation.value * 0.3),
-                      child: child,
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
-        // Profile menu with logout option
-        PopupMenuButton<String>(
-          icon: CircleAvatar(
-            radius: isMobile ? 16 : 18,
-            backgroundColor: Colors.white.withOpacity(0.2),
-            child: Icon(Icons.person, 
-              color: Colors.white, 
-              size: isMobile ? 18 : 20),
-          ),
-          onSelected: (String value) {
-            if (value == 'logout') {
-              _showLogoutDialog();
-            } else if (value == 'profile') {
-              _navigateToTab(7); // Navigate to profile tab
-            }
-          },
-          itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-            PopupMenuItem<String>(
-              value: 'profile',
-              child: Row(
-                children: [
-                  Icon(Icons.person_outline, color: AppColors.primary),
-                  SizedBox(width: 8),
-                  Text('الملف الشخصي'),
-                ],
-              ),
+    ),
+    actions: [
+      Container(
+        margin: EdgeInsets.only(right: isMobile ? 4 : 8),
+        child: Stack(
+          children: [
+            IconButton(
+              icon: Icon(Icons.notifications_outlined, 
+                color: Colors.white, 
+                size: isMobile ? 20 : 24),
+              onPressed: () {},
             ),
-            PopupMenuDivider(),
-            PopupMenuItem<String>(
-              value: 'logout',
-              child: Row(
-                children: [
-                  Icon(Icons.logout, color: Colors.red),
-                  SizedBox(width: 8),
-                  Text('تسجيل الخروج', style: TextStyle(color: Colors.red)),
-                ],
+               
+            Positioned(
+              right: isMobile ? 6 : 8,
+              top: isMobile ? 6 : 8,
+              child: AnimatedBuilder(
+                animation: _refreshAnimation,
+                child: Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: Colors.red,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                builder: (context, child) {
+                  return Transform.scale(
+                    scale: 1.0 + (_refreshAnimation.value * 0.3),
+                    child: child,
+                  );
+                },
               ),
             ),
           ],
-          color: Colors.white,
-          elevation: 8,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
-      ],
-    );
-  }
-  //  void _showLogoutDialog() {
-  //   showDialog(
-  //     context: context,
-  //     builder: (context) => AlertDialog(
-  //       title: const Text('تسجيل الخروج'),
-  //       content: const Text('هل أنت متأكد من رغبتك في تسجيل الخروج؟'),
-  //       actions: [
-  //         TextButton(
-  //           onPressed: () => Navigator.pop(context),
-  //           child: const Text('إلغاء'),
-  //         ),
-  //         ElevatedButton(
-  //           onPressed: () {
-  //             ApiService.clearToken();
-  //             Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
-  //           },
-  //           style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-  //           child: const Text('تسجيل الخروج'),
-  //         ),
-  //       ],
-  //     ),
-  //   );
-  // }
-
+      ),
+              const SizedBox(width: 8),
+        IconButton(
+          icon: Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: isDark ? Colors.grey[800] : Colors.grey[100],
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
+              size: 20,
+              color: isDark ? Colors.white : Colors.black87,
+            ),
+          ),
+          onPressed: () {
+            // Toggle theme using the provider
+            final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+            themeProvider.toggleTheme();
+          },
+          tooltip: isDark ? 'الوضع الفاتح' : 'الوضع الداكن',
+        ),
+      PopupMenuButton<String>(
+        icon: CircleAvatar(
+          radius: isMobile ? 16 : 18,
+          backgroundColor: Colors.white.withOpacity(0.2),
+          child: Icon(Icons.person, 
+            color: Colors.white, 
+            size: isMobile ? 18 : 20),
+        ),
+        onSelected: (String value) {
+          if (value == 'logout') {
+            _showLogoutDialog();
+          } else if (value == 'profile') {
+            _navigateToTab(7);
+          }
+        },
+        itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+          PopupMenuItem<String>(
+            value: 'profile',
+            child: Row(
+              children: [
+                Icon(Icons.person_outline, color: AppColors.primary),
+                SizedBox(width: 8),
+                Text('الملف الشخصي'),
+              ],
+            ),
+          ),
+          PopupMenuDivider(),
+          PopupMenuItem<String>(
+            value: 'logout',
+            child: Row(
+              children: [
+                Icon(Icons.logout, color: Colors.red),
+                SizedBox(width: 8),
+                Text('تسجيل الخروج', style: TextStyle(color: Colors.red)),
+              ],
+            ),
+          ),
+        ],
+        color: Theme.of(context).cardColor, // Changed for dark mode
+        elevation: 8,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    ],
+  );
+}
   Widget _buildWelcomeCard(bool isMobile, bool isTablet) {
+      final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       width: double.infinity,
       padding: EdgeInsets.all(isMobile ? 20 : 24),
@@ -440,15 +446,16 @@ PreferredSizeWidget _buildSliverAppBar(bool isMobile) {
           colors: [
             AppColors.primary,
             AppColors.primary.withOpacity(0.7),
-            Colors.purple.withOpacity(0.8),
-            Colors.deepPurple.withOpacity(0.9),
+            isDark ? const Color.fromARGB(102, 118, 84, 25).withOpacity(0.8) : const Color.fromARGB(255, 176, 126, 39).withOpacity(0.8) ,
+            isDark ? const Color.fromARGB(103, 107, 76, 22).withOpacity(0.8) : const Color.fromARGB(255, 183, 143, 58).withOpacity(0.9) ,
+            
           ],
         ),
         borderRadius: BorderRadius.circular(isMobile ? 16 : 20),
         boxShadow: [
           BoxShadow(
             color: AppColors.primary.withOpacity(0.3),
-            spreadRadius: 0,
+            spreadRadius: 10,
             blurRadius: 20,
             offset: Offset(0, 8),
           ),
@@ -546,403 +553,491 @@ PreferredSizeWidget _buildSliverAppBar(bool isMobile) {
     );
   }
 
-  Widget _buildStatsCards(bool isMobile, bool isTablet) {
-    final stats = [
-      {
-        'title': 'القاعات',
-        'value': _dashboardData['halls_count'].toString(),
-        'icon': Icons.castle_outlined,
-        'color': Colors.blue,
-        'trend': '+2.5%'
-      },
-      {
-        'title': 'الحجوزات',
-        'value': _dashboardData['reservations_count'].toString(),
-        'icon': Icons.book_outlined,
-        'color': Colors.green,
-        'trend': '+12.3%'
-      },
-      {
-        'title': 'العرسان',
-        'value': _dashboardData['grooms_count'].toString(),
-        'icon': Icons.group_outlined,
-        'color': Colors.orange,
-        'trend': '+8.1%'
-      },
-      if (!isMobile) {
-        'title': 'القوائم',
-        'value': _dashboardData['menus_count'].toString(),
-        'icon': Icons.restaurant_menu,
-        'color': Colors.purple,
-        'trend': '+5.7%'
-      },
-    ];
+ Widget _buildStatsCards(bool isMobile, bool isTablet) {
+  final stats = [
+    {
+      'title': 'القاعات',
+      'value': _dashboardData['halls_count'].toString(),
+      'icon': Icons.castle_outlined,
+      'color': Colors.blue,
+      'trend': '+2.5%'
+    },
+    {
+      'title': 'الحجوزات',
+      'value': _dashboardData['reservations_count'].toString(),
+      'icon': Icons.book_outlined,
+      'color': Colors.green,
+      'trend': '+12.3%'
+    },
+    {
+      'title': 'العرسان',
+      'value': _dashboardData['grooms_count'].toString(),
+      'icon': Icons.group_outlined,
+      'color': Colors.orange,
+      'trend': '+8.1%'
+    },
+    if (!isMobile) {
+      'title': 'القوائم',
+      'value': _dashboardData['menus_count'].toString(),
+      'icon': Icons.restaurant_menu,
+      'color': Colors.purple,
+      'trend': '+5.7%'
+    },
+  ];
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final crossAxisCount = isMobile ? 2 : (isTablet ? 4 : 3);
-        final childAspectRatio = isMobile ? 1.3 : (isTablet ? 1.5 : 1.4);
-        
-        return GridView.builder(
-          shrinkWrap: true,
-          physics: NeverScrollableScrollPhysics(),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: crossAxisCount,
-            mainAxisSpacing: isMobile ? 12 : 16,
-            crossAxisSpacing: isMobile ? 12 : 16,
-            childAspectRatio: childAspectRatio,
-          ),
-          itemCount: stats.length,
-          itemBuilder: (context, index) {
-            final stat = stats[index] as Map<String, dynamic>;
-            return _buildStatCard(
-              stat['title'],
-              stat['value'],
-              stat['icon'],
-              stat['color'],
-              stat['trend'],
-              isMobile,
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildStatCard(String title, String value, IconData icon, Color color, 
-                       String trend, bool isMobile) {
-    return Container(
-      padding: EdgeInsets.all(isMobile ? 16 : 20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(isMobile ? 12 : 16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            spreadRadius: 0,
-            blurRadius: 12,
-            offset: Offset(0, 4),
-          ),
-        ],
-        border: Border.all(color: Colors.grey.withOpacity(0.1)),
+  return LayoutBuilder(
+    builder: (context, constraints) {
+      final crossAxisCount = isMobile ? 2 : (isTablet ? 4 : 3);
+      final childAspectRatio = isMobile ? 1.1 : (isTablet ? 1.3 : 1.2);
+      
+      return GridView.builder(
+        shrinkWrap: true,
+        physics: NeverScrollableScrollPhysics(),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: crossAxisCount,
+          mainAxisSpacing: isMobile ? 10 : 16,
+          crossAxisSpacing: isMobile ? 10 : 16,
+          childAspectRatio: childAspectRatio,
+        ),
+        itemCount: stats.length,
+        itemBuilder: (context, index) {
+          final stat = stats[index] as Map<String, dynamic>;
+          return _buildStatCard(
+            stat['title'],
+            stat['value'],
+            stat['icon'],
+            stat['color'],
+            stat['trend'],
+            isMobile,
+          );
+        },
+      );
+    },
+  );
+}
+Widget _buildStatCard(String title, String value, IconData icon, Color color, 
+                     String trend, bool isMobile) {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  
+  return Container(
+    padding: EdgeInsets.all(isMobile ? 12 : 16),
+    decoration: BoxDecoration(
+      color: Theme.of(context).cardColor, // Changed for dark mode
+      borderRadius: BorderRadius.circular(isMobile ? 12 : 16),
+      boxShadow: [
+        BoxShadow(
+          color: isDark 
+            ? const Color.fromARGB(255, 20, 102, 13).withOpacity(0.3)
+            : const Color.fromARGB(255, 173, 255, 135).withOpacity(0.04),
+          spreadRadius: 0,
+          blurRadius: 12,
+          offset: Offset(0, 4),
+        ),
+      ],
+      border: Border.all(
+        color: isDark 
+          ? Colors.white.withOpacity(0.1)
+          : Colors.grey.withOpacity(0.1)
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: EdgeInsets.all(isMobile ? 8 : 10),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(isMobile ? 8 : 10),
-                ),
-                child: Icon(icon, color: color, size: isMobile ? 18 : 22),
-              ),
-              if (!isMobile)
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    trend,
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: Colors.green.shade700,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          SizedBox(height: isMobile ? 12 : 16),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: isMobile ? 20 : 26,
-              fontWeight: FontWeight.w800,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          SizedBox(height: 4),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: isMobile ? 11 : 13,
-              color: AppColors.textSecondary,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildQuickActions(bool isMobile, bool isTablet) {
-    return Column(
+    ),
+    child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Container(
+              padding: EdgeInsets.all(isMobile ? 6 : 8),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(isMobile ? 8 : 10),
+              ),
+              child: Icon(icon, color: color, size: isMobile ? 16 : 20),
+            ),
+            if (!isMobile)
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  trend,
+                  style: TextStyle(
+                    fontSize: 9,
+                    color: Colors.green.shade700,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: isMobile ? 18 : 24,
+                fontWeight: FontWeight.w800,
+                color: Theme.of(context).textTheme.bodyLarge?.color, // Changed
+              ),
+            ),
+            SizedBox(height: 2),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: isMobile ? 10 : 12,
+                color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.7), // Changed
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
+}
+Widget _buildQuickActions(BuildContext context) {
+  final screenWidth = MediaQuery.of(context).size.width;
+  final isCompact = screenWidth < 600;
+  final crossAxisCount = screenWidth < 600 ? 2 : screenWidth < 900 ? 3 : screenWidth < 1200 ? 4 : 5;
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  
+  final actions = [
+    (Icons.castle_outlined, 'القاعات', '${_dashboardData['halls_count']} قاعة', Color(0xFF1877F2), 1),
+    (Icons.group_outlined, 'العرسان', '${_dashboardData['grooms_count']} مسجل', Color(0xFF42B72A), 2),
+    (Icons.book_outlined, 'الحجوزات', '${_dashboardData['pending_reservations']} معلق', Color(0xFFE4405F), 3),
+    (Icons.restaurant_outlined, 'قوائم الطعام', '${_dashboardData['menus_count']} قائمة', Color(0xFFFF6F00), 4),
+    (Icons.lock_outline, 'رموز التحقق', 'بحث عن رموز', Color(0xFF9C27B0), 6),
+  ];
+
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Padding(
+        padding: EdgeInsets.symmetric(horizontal: isCompact ? 4 : 0),
+        child: Text(
           'الإجراءات السريعة',
           style: TextStyle(
-            fontSize: isMobile ? 20 : (isTablet ? 28 : 24),
+            fontSize: isCompact ? 20 : 24,
             fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        SizedBox(height: isMobile ? 16 : 20),
-        GridView.count(
-          crossAxisCount: isMobile ? 2 : (isTablet ? 4 : 2),
-          shrinkWrap: true,
-          physics: NeverScrollableScrollPhysics(),
-          mainAxisSpacing: isMobile ? 12 : 16,
-          crossAxisSpacing: isMobile ? 12 : 16,
-          childAspectRatio: isMobile ? 1.0 : (isTablet ? 1.1 : 1.1),
-          children: [
-            _buildModernActionCard(
-              icon: Icons.castle_outlined,
-              title: 'القاعات',
-              subtitle: 'إدارة ${_dashboardData['halls_count']} قاعة',
-              gradient: [Colors.blue.shade400, Colors.blue.shade600],
-              onTap: () => widget.onNavigateToTab?.call(1),
-              isMobile: isMobile,
-            ),
-            _buildModernActionCard(
-              icon: Icons.group_outlined,
-              title: 'العرسان',
-              subtitle: '${_dashboardData['grooms_count']} عريس مسجل',
-              gradient: [Colors.green.shade400, Colors.green.shade600],
-              onTap: () => widget.onNavigateToTab?.call(2),
-              isMobile: isMobile,
-            ),
-            _buildModernActionCard(
-              icon: Icons.book_outlined,
-              title: 'الحجوزات',
-              subtitle: '${_dashboardData['pending_reservations']} معلق',
-              gradient: [Colors.purple.shade400, Colors.purple.shade600],
-              onTap: () => widget.onNavigateToTab?.call(3),
-              isMobile: isMobile,
-            ),
-            _buildModernActionCard(
-              icon: Icons.restaurant_outlined,
-              title: 'قوائم الطعام',
-              subtitle: '${_dashboardData['menus_count']} قائمة متاحة',
-              gradient: [Colors.orange.shade400, Colors.orange.shade600],
-              onTap: () => widget.onNavigateToTab?.call(4),
-              isMobile: isMobile,
-            ),
-            _buildModernActionCard(
-              icon: Icons.lock_outline,
-              title: 'رموز التحقق',
-              subtitle: 'البحث عن رموز المستخدمين',
-              gradient: [Colors.red.shade400, Colors.red.shade600],
-              onTap: () => widget.onNavigateToTab?.call(6),
-              isMobile: isMobile,
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildModernActionCard({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required List<Color> gradient,
-    required VoidCallback onTap,
-    required bool isMobile,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: gradient,
-          ),
-          borderRadius: BorderRadius.circular(isMobile ? 16 : 20),
-          boxShadow: [
-            BoxShadow(
-              color: gradient[0].withOpacity(0.3),
-              spreadRadius: 0,
-              blurRadius: 15,
-              offset: Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Container(
-          padding: EdgeInsets.all(isMobile ? 16 : 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: EdgeInsets.all(isMobile ? 10 : 12),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(isMobile ? 10 : 12),
-                ),
-                child: Icon(
-                  icon,
-                  color: Colors.white,
-                  size: isMobile ? 24 : 28,
-                ),
-              ),
-              Spacer(),
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: isMobile ? 16 : 18,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                ),
-              ),
-              SizedBox(height: 4),
-              Text(
-                subtitle,
-                style: TextStyle(
-                  fontSize: isMobile ? 11 : 12,
-                  color: Colors.white.withOpacity(0.8),
-                  fontWeight: FontWeight.w400,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
+            color: Theme.of(context).textTheme.bodyLarge?.color, // Changed
+            letterSpacing: -0.5,
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildRecentActivity(bool isMobile, bool isTablet) {
-    if (_recentActivities.isEmpty && !_isLoading) {
-      return SizedBox.shrink();
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'النشاط الأخير',
-          style: TextStyle(
-            fontSize: isMobile ? 20 : (isTablet ? 28 : 24),
-            fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        SizedBox(height: isMobile ? 16 : 20),
-        Container(
-          padding: EdgeInsets.all(isMobile ? 16 : 20),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(isMobile ? 12 : 16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.04),
-                spreadRadius: 0,
-                blurRadius: 12,
-                offset: Offset(0, 4),
-              ),
-            ],
-            border: Border.all(color: Colors.grey.withOpacity(0.1)),
-          ),
-          child: _isLoading
-              ? Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(20),
-                    child: CircularProgressIndicator(color: AppColors.primary),
-                  ),
-                )
-              : _recentActivities.isEmpty
-                  ? Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(20),
-                        child: Text(
-                          'لا توجد أنشطة حديثة',
-                          style: TextStyle(
-                            color: AppColors.textSecondary,
-                            fontSize: 14,
+      SizedBox(height: isCompact ? 12 : 16),
+      LayoutBuilder(
+        builder: (context, constraints) {
+          return GridView.builder(
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: crossAxisCount,
+              mainAxisSpacing: 12,
+              crossAxisSpacing: 12,
+              childAspectRatio: 1.0,
+            ),
+            shrinkWrap: true,
+            physics: NeverScrollableScrollPhysics(),
+            itemCount: actions.length,
+            padding: EdgeInsets.zero,
+            itemBuilder: (_, i) {
+              final a = actions[i];
+              return Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () => widget.onNavigateToTab?.call(a.$5),
+                  borderRadius: BorderRadius.circular(12),
+                  splashColor: a.$4.withOpacity(0.1),
+                  highlightColor: a.$4.withOpacity(0.05),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).cardColor, // Changed
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isDark 
+                          ? Colors.white.withOpacity(0.1)
+                          : Color(0xFFE4E6EB),
+                        width: 1
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: isDark
+                            ? const Color.fromARGB(255, 20, 102, 13).withOpacity(0.3)
+                            : Colors.black.withOpacity(0.04),
+                          blurRadius: 8,
+                          offset: Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          padding: EdgeInsets.all(isCompact ? 12 : 14),
+                          decoration: BoxDecoration(
+                            color: a.$4.withOpacity(0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            a.$1,
+                            color: a.$4,
+                            size: isCompact ? 28 : 32,
                           ),
                         ),
-                      ),
-                    )
-                  : Column(
-                      children: _recentActivities.map<Widget>((activity) {
-                        final index = _recentActivities.indexOf(activity);
-                        return Column(
-                          children: [
-                            _buildActivityItem(
-                              icon: activity['icon'],
-                              title: activity['title'],
-                              subtitle: activity['subtitle'],
-                              color: activity['color'],
-                              isMobile: isMobile,
+                        SizedBox(height: 12),
+                        Text(
+                          a.$2,
+                          style: TextStyle(
+                            color: Theme.of(context).textTheme.bodyLarge?.color, // Changed
+                            fontSize: isCompact ? 14 : 15,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: -0.2,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        SizedBox(height: 4),
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 8),
+                          child: Text(
+                            a.$3,
+                            style: TextStyle(
+                              color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.7), // Changed
+                              fontSize: isCompact ? 12 : 13,
+                              fontWeight: FontWeight.w400,
                             ),
-                            if (index < _recentActivities.length - 1)
-                              Divider(height: isMobile ? 20 : 24, color: Colors.grey.shade200),
-                          ],
-                        );
-                      }).toList(),
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
                     ),
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    ],
+  );
+}
+
+Widget _buildModernActionCard({
+  required IconData icon,
+  required String title,
+  required String subtitle,
+  required List<Color> gradient,
+  required VoidCallback onTap,
+  required bool isMobile,
+}) {
+  return GestureDetector(
+    onTap: onTap,
+    child: Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: gradient,
         ),
-      ],
-    );
+        borderRadius: BorderRadius.circular(isMobile ? 14 : 18),
+        boxShadow: [
+          BoxShadow(
+            color: gradient[0].withOpacity(0.3),
+            spreadRadius: 0,
+            blurRadius: 15,
+            offset: Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Container(
+        padding: EdgeInsets.all(isMobile ? 12 : 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Container(
+              padding: EdgeInsets.all(isMobile ? 8 : 10),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(isMobile ? 8 : 10),
+              ),
+              child: Icon(
+                icon,
+                color: Colors.white,
+                size: isMobile ? 20 : 24,
+              ),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: isMobile ? 14 : 16,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+                SizedBox(height: 3),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: isMobile ? 10 : 11,
+                    color: Colors.white.withOpacity(0.85),
+                    fontWeight: FontWeight.w400,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+Widget _buildRecentActivity(bool isMobile, bool isTablet) {
+  if (_recentActivities.isEmpty && !_isLoading) {
+    return SizedBox.shrink();
   }
 
-  Widget _buildActivityItem({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required Color color,
-    required bool isMobile,
-  }) {
-    return Row(
-      children: [
-        Container(
-          padding: EdgeInsets.all(isMobile ? 8 : 10),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(isMobile ? 8 : 10),
-          ),
-          child: Icon(icon, color: color, size: isMobile ? 18 : 20),
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        'النشاط الأخير',
+        style: TextStyle(
+          fontSize: isMobile ? 20 : (isTablet ? 28 : 24),
+          fontWeight: FontWeight.w700,
+          color: Theme.of(context).textTheme.bodyLarge?.color, // Changed
         ),
-        SizedBox(width: isMobile ? 12 : 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: isMobile ? 13 : 14,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              SizedBox(height: 2),
-              Text(
-                subtitle,
-                style: TextStyle(
-                  fontSize: isMobile ? 11 : 12,
-                  color: AppColors.textSecondary,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
+      ),
+      SizedBox(height: isMobile ? 16 : 20),
+      Container(
+        padding: EdgeInsets.all(isMobile ? 16 : 20),
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor, // Changed
+          borderRadius: BorderRadius.circular(isMobile ? 12 : 16),
+          boxShadow: [
+            BoxShadow(
+              color: isDark
+                ? Colors.black.withOpacity(0.3)
+                : Colors.black.withOpacity(0.04),
+              spreadRadius: 0,
+              blurRadius: 12,
+              offset: Offset(0, 4),
+            ),
+          ],
+          border: Border.all(
+            color: isDark
+              ? Colors.white.withOpacity(0.1)
+              : Colors.grey.withOpacity(0.1)
           ),
         ),
-        Icon(
-          Icons.chevron_right,
-          color: AppColors.textSecondary,
-          size: isMobile ? 16 : 18,
+        child: _isLoading
+            ? Center(
+                child: Padding(
+                  padding: EdgeInsets.all(20),
+                  child: CircularProgressIndicator(color: AppColors.primary),
+                ),
+              )
+            : _recentActivities.isEmpty
+                ? Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(20),
+                      child: Text(
+                        'لا توجد أنشطة حديثة',
+                        style: TextStyle(
+                          color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.7), // Changed
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  )
+                : Column(
+                    children: _recentActivities.map<Widget>((activity) {
+                      final index = _recentActivities.indexOf(activity);
+                      return Column(
+                        children: [
+                          _buildActivityItem(
+                            icon: activity['icon'],
+                            title: activity['title'],
+                            subtitle: activity['subtitle'],
+                            color: activity['color'],
+                            isMobile: isMobile,
+                          ),
+                          if (index < _recentActivities.length - 1)
+                            Divider(
+                              height: isMobile ? 20 : 24,
+                              color: isDark
+                                ? Colors.white.withOpacity(0.1)
+                                : Colors.grey.shade200
+                            ),
+                        ],
+                      );
+                    }).toList(),
+                  ),
+      ),
+    ],
+  );
+}
+
+Widget _buildActivityItem({
+  required IconData icon,
+  required String title,
+  required String subtitle,
+  required Color color,
+  required bool isMobile,
+}) {
+  return Row(
+    children: [
+      Container(
+        padding: EdgeInsets.all(isMobile ? 8 : 10),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(isMobile ? 8 : 10),
         ),
-      ],
-    );
-  }
+        child: Icon(icon, color: color, size: isMobile ? 18 : 20),
+      ),
+      SizedBox(width: isMobile ? 12 : 16),
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: isMobile ? 13 : 14,
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).textTheme.bodyLarge?.color, // Changed
+              ),
+            ),
+            SizedBox(height: 2),
+            Text(
+              subtitle,
+              style: TextStyle(
+                fontSize: isMobile ? 11 : 12,
+                color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.7), // Changed
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+      Icon(
+        Icons.chevron_right,
+        color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.5), // Changed
+        size: isMobile ? 16 : 18,
+      ),
+    ],
+  );
+}
 }

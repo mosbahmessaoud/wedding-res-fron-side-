@@ -1,6 +1,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import 'package:wedding_reservation_app/providers/theme_provider.dart';
 import 'package:wedding_reservation_app/screens/auth/signup_screen.dart';
 import 'package:wedding_reservation_app/screens/auth/tempCodeRunnerFile.dart';
 import 'package:wedding_reservation_app/screens/super%20admin/otp_verification_screen.dart';
@@ -872,6 +874,7 @@ Widget _buildModernButton({
 // Updated main build method with modern AppBar
 @override
 Widget build(BuildContext context) {
+  
   return Scaffold(
     appBar: _buildModernAppBar(),
     body: Container(
@@ -889,7 +892,9 @@ Widget build(BuildContext context) {
         onRefresh: _loadGrooms,
         color: Colors.blue.shade700,
         child: _buildBody(),
+        
       ),
+
     ),
   );
 }
@@ -974,12 +979,11 @@ Widget _buildBody() {
   }
   
   return ListView.builder(
-    padding: EdgeInsets.symmetric(vertical: 16),
+    padding: EdgeInsets.only(top: 16, left: 2, right: 2, bottom: 75), // Added bottom padding
     itemCount: grooms.length,
     itemBuilder: (context, index) => _buildGroomCard(grooms[index]),
   );
 }
-
 Widget _buildLoadingState() {
   return Center(
     child: Column(
@@ -1805,7 +1809,10 @@ static Future<Map<String, dynamic>?> _getGroomReservationStatus(int groomId) asy
     return null;
   }  
 }
-  Widget _buildDetailRow(String label, String value) {
+  Widget _buildDetailRow(String label, String value, bool isDark) {
+
+
+
     return Padding(
       padding: EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -1817,7 +1824,7 @@ static Future<Map<String, dynamic>?> _getGroomReservationStatus(int groomId) asy
               '$label:',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
-                color: Colors.grey[700],
+                color: isDark ? Colors.white  : Colors.grey[700],
               ),
             ),
           ),
@@ -1825,7 +1832,7 @@ static Future<Map<String, dynamic>?> _getGroomReservationStatus(int groomId) asy
             child: Text(
               value.isNotEmpty ? value : 'غير محدد',
               style: TextStyle(
-                color: value.isNotEmpty ? Colors.black87 : Colors.grey,
+                color:  const Color.fromARGB(255, 218, 218, 218),
               ),
             ),
           ),
@@ -1852,7 +1859,8 @@ static Future<Map<String, dynamic>?> _getGroomReservationStatus(int groomId) asy
   Widget build(BuildContext context) {
     final status = groom['status']?.toString() ?? 'inactive';
     final isActive = status == 'active';
-
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final isDark = themeProvider.isDarkMode;
     return Dialog(
       child: Container(
         width: MediaQuery.of(context).size.width * 0.9,
@@ -1897,29 +1905,29 @@ static Future<Map<String, dynamic>?> _getGroomReservationStatus(int groomId) asy
                   children: [
                     // Basic Information
                     _buildSectionTitle('المعلومات الأساسية'),
-                    _buildDetailRow('الاسم الأول', groom['first_name'] ?? ''),
-                    _buildDetailRow('اسم العائلة', groom['last_name'] ?? ''),
-                    _buildDetailRow('اسم الأب', groom['father_name'] ?? ''),
-                    _buildDetailRow('اسم الجد', groom['grandfather_name'] ?? ''),
-                    _buildDetailRow('رقم الهاتف', groom['phone_number']?.toString() ?? ''),
-                    _buildDetailRow('تاريخ الميلاد', groom['birth_date'] ?? ''),
-                    _buildDetailRow('مكان الميلاد', groom['birth_address'] ?? ''),
-                    _buildDetailRow('عنوان السكن', groom['home_address'] ?? ''),
+                    _buildDetailRow('الاسم الأول', groom['first_name'] ?? '', isDark),
+                    _buildDetailRow('اسم العائلة', groom['last_name'] ?? '', isDark),
+                    _buildDetailRow('اسم الأب', groom['father_name'] ?? '' , isDark),
+                    _buildDetailRow('اسم الجد', groom['grandfather_name'] ?? '', isDark),
+                    _buildDetailRow('رقم الهاتف', groom['phone_number']?.toString() ?? '', isDark),
+                    _buildDetailRow('تاريخ الميلاد', groom['birth_date'] ?? '', isDark),
+                    _buildDetailRow('مكان الميلاد', groom['birth_address'] ?? '', isDark),
+                    _buildDetailRow('عنوان السكن', groom['home_address'] ?? '', isDark),
                     
                     // Guardian Information
                     _buildSectionTitle('معلومات الولي'),
-                    _buildDetailRow('اسم الولي', groom['guardian_name'] ?? ''),
-                    _buildDetailRow('هاتف الولي', groom['guardian_phone'] ?? ''),
-                    _buildDetailRow('عنوان سكن الولي', groom['guardian_home_address'] ?? ''),
-                    _buildDetailRow('مكان ميلاد الولي', groom['guardian_birth_address'] ?? ''),
-                    _buildDetailRow('تاريخ ميلاد الولي', groom['guardian_birth_date'] ?? ''),
-                    _buildDetailRow('صلة القرابة', groom['guardian_relation'] ?? ''),
+                    _buildDetailRow('اسم الولي', groom['guardian_name'] ?? '', isDark),
+                    _buildDetailRow('هاتف الولي', groom['guardian_phone'] ?? '', isDark),
+                    _buildDetailRow('عنوان سكن الولي', groom['guardian_home_address'] ?? '', isDark),
+                    _buildDetailRow('مكان ميلاد الولي', groom['guardian_birth_address'] ?? '', isDark),
+                    _buildDetailRow('تاريخ ميلاد الولي', groom['guardian_birth_date'] ?? '', isDark),
+                    _buildDetailRow('صلة القرابة', groom['guardian_relation'] ?? '', isDark),
                     
                     // Additional Information
                     _buildSectionTitle('معلومات إضافية'),
-                    _buildDetailRow('تاريخ الإنشاء', groom['created_at'] ?? ''),
-                    _buildDetailRow('تاريخ آخر تحديث', groom['updated_at'] ?? ''),
-                    _buildDetailRow('معرف العريس', groom['id']?.toString() ?? ''),
+                    _buildDetailRow('تاريخ الإنشاء', groom['created_at'] ?? '', isDark),
+                    _buildDetailRow('تاريخ آخر تحديث', groom['updated_at'] ?? '', isDark),
+                    _buildDetailRow('معرف العريس', groom['id']?.toString() ?? '', isDark),
 
                     // reservation info if available
                     _buildSectionTitle('معلومات الحجز'),
@@ -1968,20 +1976,20 @@ static Future<Map<String, dynamic>?> _getGroomReservationStatus(int groomId) asy
                             return Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _buildDetailRow('حالة الحجز', statusText),
+                                _buildDetailRow('حالة الحجز', statusText, isDark),
                                 if (reservation['hall_name'] != null)
-                                  _buildDetailRow('اسم القاعة', reservation['hall_name'] ?? ''),
+                                  _buildDetailRow('اسم القاعة', reservation['hall_name'] ?? '', isDark),
                                 if (reservation['event_date'] != null)
-                                  _buildDetailRow('تاريخ الحدث', reservation['event_date'] ?? ''),
+                                  _buildDetailRow('تاريخ الحدث', reservation['event_date'] ?? '', isDark),
                                 if (reservation['created_at'] != null)
-                                  _buildDetailRow('تاريخ الحجز', reservation['created_at'] ?? ''),
+                                  _buildDetailRow('تاريخ الحجز', reservation['created_at'] ?? '', isDark),
                                 if (reservation['total_cost'] != null)
-                                  _buildDetailRow('التكلفة الإجمالية', '${reservation['total_cost']} دينار'),
+                                  _buildDetailRow('التكلفة الإجمالية', '${reservation['total_cost']} دينار', isDark),
                               ],
                             );
                           }
                           
-                          return _buildDetailRow('حالة الحجز', 'لا يوجد حجز');
+                          return _buildDetailRow('حالة الحجز', 'لا يوجد حجز', isDark);
                         },
                       ),          
                   ],

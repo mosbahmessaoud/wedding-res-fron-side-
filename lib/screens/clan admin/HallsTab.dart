@@ -203,7 +203,9 @@ Widget build(BuildContext context) {
       ),
     ),
     body: LayoutBuilder(
+      
       builder: (context, constraints) {
+        Padding(padding: EdgeInsetsGeometry.directional(bottom: 80));
         bool isSmallScreen = constraints.maxWidth < 800;
         
         if (isSmallScreen) {
@@ -518,7 +520,10 @@ Widget build(BuildContext context) {
             ],
           );
         }
+        
+
       },
+      
     ),
   );
 }

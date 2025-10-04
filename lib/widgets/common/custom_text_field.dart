@@ -2,7 +2,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../utils/colors.dart';
-
 class CustomTextField extends StatefulWidget {
   final TextEditingController? controller;
   final String label;
@@ -19,6 +18,8 @@ class CustomTextField extends StatefulWidget {
   final bool readOnly;
   final int? maxLength;
   final List<TextInputFormatter>? inputFormatters;
+  final Color? labelColor; // Changed to optional Color
+  final Color? boxcolor; // Box border color
 
   const CustomTextField({
     Key? key,
@@ -37,12 +38,13 @@ class CustomTextField extends StatefulWidget {
     this.readOnly = false,
     this.maxLength,
     this.inputFormatters,
+    this.labelColor, // Made optional
+    this.boxcolor, // Made optional
   }) : super(key: key);
 
   @override
   _CustomTextFieldState createState() => _CustomTextFieldState();
 }
-
 class _CustomTextFieldState extends State<CustomTextField>
     with TickerProviderStateMixin {
   late AnimationController _animationController;
@@ -102,19 +104,33 @@ class _CustomTextFieldState extends State<CustomTextField>
         if (widget.label.isNotEmpty) ...[
           Padding(
             padding: EdgeInsets.only(bottom: 8, right: 4),
+            // child: AnimatedDefaultTextStyle(
+            //   duration: Duration(milliseconds: 200),
+            //   style: TextStyle(
+            //     fontSize: _isFocused ? 15 : 14,
+            //     fontWeight: FontWeight.w600,
+            //     color: _hasError
+            //         ? AppColors.error
+            //         : _isFocused
+            //             ? AppColors.primary
+            //             : AppColors.textPrimary,
+            //   ),
+            //   child: Text(widget.label),
+            // ),
             child: AnimatedDefaultTextStyle(
-              duration: Duration(milliseconds: 200),
-              style: TextStyle(
-                fontSize: _isFocused ? 15 : 14,
-                fontWeight: FontWeight.w600,
-                color: _hasError
-                    ? AppColors.error
-                    : _isFocused
-                        ? AppColors.primary
-                        : AppColors.textPrimary,
-              ),
-              child: Text(widget.label),
+            duration: Duration(milliseconds: 200),
+            style: TextStyle(
+              fontSize: _isFocused ? 15 : 14,
+              fontWeight: FontWeight.w600,
+              color: widget.labelColor ?? // Use labelColor if provided
+                  (_hasError
+                      ? AppColors.error
+                      : _isFocused
+                          ? AppColors.primary
+                          : AppColors.textPrimary),
             ),
+            child: Text(widget.label),
+          ),
           ),
         ],
         AnimatedBuilder(

@@ -33,7 +33,9 @@ class SettingsTabState extends State<SettingsTab>
   bool _allowTwoDayReservations = true;
   int _validationDeadlineDays = 10;
   int _calendarYearsAhead = 3;
-  
+  int _yearsMaxReservGroomFromOutClan = 3;
+  int _yearsMaxReservGroomFromOriginClan = 1;
+
   // Month selection lists
   List<int> _selectedSingleDayMonths = [11, 12, 1, 2, 3, 4];
   List<int> _selectedTwoDayMonths = [5, 6, 7, 8, 9, 10];
@@ -77,8 +79,9 @@ class SettingsTabState extends State<SettingsTab>
     _loadSettings();
   }
   void refreshData() {
-
     _loadInitialData();
+    _initAnimations();
+    _loadSettings();
     setState(() {
       
     });
@@ -171,6 +174,8 @@ void _populateFormFields() {
   _allowTwoDayReservations = _settings['allow_two_day_reservations'] ?? true;
   _validationDeadlineDays = _settings['validation_deadline_days'] ?? 10;
   _calendarYearsAhead = _settings['calendar_years_ahead'] ?? 3;
+  _yearsMaxReservGroomFromOutClan = _settings['years_max_reserv_GroomFromOutClan'] ?? 3;
+  _yearsMaxReservGroomFromOriginClan = _settings['years_max_reserv_GrooomFromOriginClan'] ?? 1;
 
   // Parse month strings to lists
   if (_settings['allowed_months_single_day'] != null) {
@@ -243,17 +248,19 @@ void _populateFormFields() {
     });
 
     try {
-      final settingsData = {
-        'allow_cross_clan_reservations': _allowCrossClanReservations,
-        'max_grooms_per_date': _maxGroomsPerDate,
-        'allow_two_day_reservations': _allowTwoDayReservations,
-        'validation_deadline_days': _validationDeadlineDays,
-        'allowed_months_single_day': _selectedSingleDayMonths.join(','),
-        'allowed_months_two_day': _selectedTwoDayMonths.join(','),
-        'calendar_years_ahead': _calendarYearsAhead,
-        'days_to_accept_invites': _selectedInviteDays.join(','),
-        'accept_invites_times': _buildTimesString(),
-      };
+    final settingsData = {
+            'allow_cross_clan_reservations': _allowCrossClanReservations,
+            'max_grooms_per_date': _maxGroomsPerDate,
+            'years_max_reserv_GroomFromOutClan': _yearsMaxReservGroomFromOutClan,
+            'years_max_reserv_GrooomFromOriginClan': _yearsMaxReservGroomFromOriginClan,
+            'allow_two_day_reservations': _allowTwoDayReservations,
+            'validation_deadline_days': _validationDeadlineDays,
+            'allowed_months_single_day': _selectedSingleDayMonths.join(','),
+            'allowed_months_two_day': _selectedTwoDayMonths.join(','),
+            'calendar_years_ahead': _calendarYearsAhead,
+            'days_to_accept_invites': _selectedInviteDays.join(','),
+            'accept_invites_times': _buildTimesString(),
+          };
  
       await ApiService.updateSettings(_clanId!, settingsData);
 
@@ -695,6 +702,33 @@ void _populateFormFields() {
             max: 10,
             icon: Icons.group_outlined,
           ),
+
+          SizedBox(height: 20),
+          
+          // Years max reserv from out clan
+          _buildNumberInputTile(
+            title: 'عدد السنوات المسموحة للحجز من خارج العشيرة',
+            subtitle: 'عدد السنوات المستقبلية المتاحة للحجز للاعراس من عشائر أخرى',
+            value: _yearsMaxReservGroomFromOutClan,
+            onChanged: (value) => setState(() => _yearsMaxReservGroomFromOutClan = value),
+            min: 1,
+            max: 8,
+            icon: Icons.event_available_outlined,
+          ),
+          
+          SizedBox(height: 20),
+          
+          // Years max reserv from origin clan
+          _buildNumberInputTile(
+            title: 'عدد السنوات المسموحة للحجز من داخل العشيرة',
+            subtitle: 'عدد السنوات المستقبلية المتاحة للحجز للاعراس من داخل العشيرة ',
+            value: _yearsMaxReservGroomFromOriginClan,
+            onChanged: (value) => setState(() => _yearsMaxReservGroomFromOriginClan = value),
+            min: 1,
+            max: 8,
+            icon: Icons.home_outlined,
+          ),
+
           
           SizedBox(height: 20),
           
@@ -712,15 +746,15 @@ void _populateFormFields() {
           SizedBox(height: 20),
           
           // Calendar years ahead
-          _buildNumberInputTile(
-            title: 'سنوات التقويم المستقبلية',
-            subtitle: 'عدد السنوات المستقبلية المتاحة للحجز',
-            value: _calendarYearsAhead,
-            onChanged: (value) => setState(() => _calendarYearsAhead = value),
-            min: 1,
-            max: 5,
-            icon: Icons.calendar_today_outlined,
-          ),
+          // _buildNumberInputTile(
+          //   title: 'سنوات التقويم المستقبلية',
+          //   subtitle: 'عدد السنوات المستقبلية المتاحة للحجز',
+          //   value: _calendarYearsAhead,
+          //   onChanged: (value) => setState(() => _calendarYearsAhead = value),
+          //   min: 1,
+          //   max: 5,
+          //   icon: Icons.calendar_today_outlined,
+          // ),
         ],
       ),
     );

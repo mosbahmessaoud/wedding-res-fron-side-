@@ -134,7 +134,7 @@ class _EventTypeSelectionScreenState extends State<EventTypeSelectionScreen>
                                   borderRadius: BorderRadius.circular(16),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.green.shade300.withOpacity(0.4),
+                                      color: Colors.green.shade300.withOpacity(isDark ? 0.4 : 0.4),
                                       blurRadius: 12,
                                       offset: const Offset(0, 6),
                                     ),
@@ -190,9 +190,9 @@ class _EventTypeSelectionScreenState extends State<EventTypeSelectionScreen>
                             child: Opacity(
                               opacity: _fadeAnimation.value * 0.8,
                               child: Text(
-                                'يرجى تحديد نوع الحفل الذي ستنضمه',
+                                'يرجى تحديد نوع الحفل الذي ستنظمه',
                                 style: TextStyle(
-                                  fontSize: 18,
+                                  fontSize: 16,
                                   color: isDark ? const Color.fromARGB(255, 217, 255, 218) : Colors.green.shade700,
                                   height: 1.5,
                                   fontWeight: FontWeight.w400,
@@ -296,14 +296,14 @@ class _EventCard extends StatelessWidget {
         border: Border.all(
           color: isDark 
             ? Colors.green.shade400.withOpacity(0.3)
-            : Colors.green.shade300.withOpacity(0.5),
+            : const Color.fromARGB(255, 17, 80, 21).withOpacity(0.3),
           width: 1.5,
         ),
         boxShadow: [
           BoxShadow(
             color: isDark 
               ? Colors.green.shade300.withOpacity(0.2)
-              : Colors.green.shade300.withOpacity(0.3),
+              : Colors.green.shade300.withOpacity(0.1),
             blurRadius: isDark ? 8 : 18,
             offset: const Offset(0, 4),
           ),

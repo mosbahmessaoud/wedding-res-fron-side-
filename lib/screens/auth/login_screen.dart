@@ -3,7 +3,8 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:wedding_reservation_app/screens/auth/forgot_password_screen.dart';
-import 'package:wedding_reservation_app/screens/auth/tempCodeRunnerFile.dart';
+import 'package:wedding_reservation_app/screens/auth/sing_up_screen.dart';
+import 'package:wedding_reservation_app/screens/auth/welcome_screen.dart';
 import 'package:wedding_reservation_app/screens/clan%20admin/home_screen.dart';
 import 'package:wedding_reservation_app/screens/groom/groom_home_screen.dart';
 import 'package:wedding_reservation_app/screens/super%20admin/home_screen.dart';
@@ -12,8 +13,9 @@ import '../../services/api_service.dart';
 import '../../widgets/common/custom_text_field.dart' hide LoadingButton, AppColors;
 import '../../widgets/common/loading_button.dart';
 import '../../widgets/theme_toggle_button.dart';
+import '../../providers/theme_provider.dart';
 import '../groom/home_tab.dart';
-import 'signup_screen.dart';
+import 'signup_screen copy .dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -60,6 +62,17 @@ class _LoginScreenState extends State<LoginScreen>
     _animationController.forward();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Clear form fields when navigating to this screen
+    _phoneController.clear();
+    _passwordController.clear();
+    // Reset form validation state
+    _formKey.currentState?.reset();
+  }
+
+
   String? _validatePhone(String? value) {
     if (value == null || value.isEmpty) {
       return 'رقم الهاتف مطلوب';
@@ -74,67 +87,6 @@ class _LoginScreenState extends State<LoginScreen>
     return null;
   }
 
-  // Future<void> _login() async {
-  //   if (!_formKey.currentState!.validate()) {
-  //     return;
-  //   }
-
-  //   setState(() {
-  //     _isLoading = true;
-  //   });
-
-  //   try {
-  //     final response = await ApiService.login(
-  //       _phoneController.text.trim(),
-  //       _passwordController.text,
-  //     );
-
-  //     final role = await ApiService.getRole();
-    
-  //     // Navigate to home screen based on user role
-  //     if (role == 'groom') {
-  //       Navigator.pushReplacement(
-  //         context,
-  //         MaterialPageRoute(
-  //           builder: (context) => GroomHomeScreen(initialTabIndex: 0,),
-  //         ),
-  //       );
-  //     } else if (role == 'super_admin') {
-  //       Navigator.pushReplacement(
-  //         context,
-  //         MaterialPageRoute(
-  //           builder: (context) => SuperAdminHomeScreen(),
-  //         ),
-  //       );
-  //     } else if (role == 'clan_admin') {
-  //       Navigator.pushReplacement(
-  //         context,
-  //         MaterialPageRoute(
-  //           builder: (context) => ClanAdminHomeScreen(),
-  //         ),
-  //       );
-  //     } else  {
-  //       ScaffoldMessenger.of(context).showSnackBar(
-  //         SnackBar(
-  //           content: Text('دور المستخدم غير معروف'),
-  //           backgroundColor: AppColors.error,
-  //         ),
-  //       );
-  //     }
-
-  //   } catch (e) {
-  //     ScaffoldMessenger.of(context).showSnackBar(
-  //       SnackBar(
-  //         content: Text('فشل في تسجيل الدخول: $e'),
-  //         backgroundColor: AppColors.error,
-  //       ),
-  //     );
-  //   } finally {
-  //     setState(() {
-  //       _isLoading = false;
-  //     });
-  //   }
-  // }
 Future<void> _login() async {
   if (!_formKey.currentState!.validate()) {
     return;
@@ -186,22 +138,59 @@ Future<void> _login() async {
         ),
       );
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('دور المستخدم غير معروف'),
-          backgroundColor: AppColors.error,
-        ),
-      );
-    }
+        showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: Row(
+                children: [
+                  Icon(Icons.error_outline, color: AppColors.error, size: 28),
+                  const SizedBox(width: 12),
+                  const Text('خطأ'),
+                ],
+              ),
+              content: const Text('دور المستخدم غير معروف'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('حسناً'),
+                ),
+              ],
+            );
+          },
+        );
+      }
 
-  } catch (e) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('فشل في تسجيل الدخول: $e'),
-        backgroundColor: AppColors.error,
-      ),
-    );
-  } finally {
+
+    } catch (e) {
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: Row(
+              children: [
+                Icon(Icons.error_outline, color: AppColors.error, size: 28),
+                const SizedBox(width: 12),
+                const Text('خطأ في تسجيل الدخول'),
+              ],
+            ),
+            content: Text('$e'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('حسناً'),
+              ),
+            ],
+          );
+        },
+      );
+    } finally {
     setState(() {
       _isLoading = false;
     });
@@ -544,24 +533,26 @@ Future<void> _login() async {
                   ),
                   
                   // Back button on top left - MUST be after ScrollView to be on top
-                  Positioned(
-                    top: 8,
-                    right: 16,
-                    child: Material(
-                      color: Colors.transparent,
-                      child: IconButton(
-                        onPressed: () {
-                          Navigator.pop(context);
-                        },
-                        icon: Icon(
-                          Icons.arrow_back,
-                          color: isDark ? Colors.green.shade300 : Colors.green.shade700,
-                          size: 24,
+                    Positioned(
+                      top: 8,
+                      right: 16,
+                      child: Material(
+                        color: Colors.transparent,
+                        child: IconButton(
+                          onPressed: () {
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(builder: (context) => WelcomeScreen()),
+                            );
+                          },
+                          icon: Icon(
+                            Icons.arrow_back, // Changed icon to home
+                            color: isDark ? Colors.green.shade300 : Colors.green.shade700,
+                            size: 24,
+                          ),
                         ),
-
                       ),
                     ),
-                  ),
                   
                   // Theme Toggle Button on top right - MUST be after ScrollView to be on top
                   Positioned(

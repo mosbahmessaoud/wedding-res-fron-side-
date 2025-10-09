@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:wedding_reservation_app/screens/groom/food_menu_tab.dart';
 import 'package:wedding_reservation_app/screens/groom/food_menu_tab_Groom.dart';
+import 'package:wedding_reservation_app/screens/groom/clan_rules_view_page.dart';
 import 'package:wedding_reservation_app/services/api_service.dart';
 import '../../utils/colors.dart';
 import '../../utils/constants.dart';
@@ -14,6 +15,14 @@ import 'create_reservation_screen.dart';
 import 'home_tab.dart';
 import 'reservations_tab.dart';
 import 'profile_tab.dart';
+// 
+import 'dart:ui';
+
+import 'package:flutter/material.dart';
+import '../../constants/color.dart';
+import '../../constants/text_style.dart';
+import '../../data/model.dart';
+import '../../widgets/custom_paint.dart';
 
 class GroomHomeScreen extends StatefulWidget {
   final int initialTabIndex;
@@ -29,12 +38,16 @@ class _GroomHomeScreenState extends State<GroomHomeScreen> {
   late List<Widget> _tabs;
   Widget? _externalScreen;
   String? _externalScreenTitle;
-  
+  int? _clanId;
+  String? _clanName;
+  int selectBtn = 0;
+
   final GlobalKey<HomeTabState> _homeTabKey = GlobalKey<HomeTabState>();
   final GlobalKey<ReservationsTabState> _reservationsTabKey = GlobalKey<ReservationsTabState>();
   final GlobalKey<ProfileTabState> _profileTabKey = GlobalKey<ProfileTabState>();
   final GlobalKey<FoodMenuTabGState> _foodMenuTabKey = GlobalKey<FoodMenuTabGState>();
   final GlobalKey<CreateReservationScreenState> _creatResTabKey = GlobalKey<CreateReservationScreenState>();
+  final GlobalKey<GroomClanRulesPageState> _rulesTabKey = GlobalKey<GroomClanRulesPageState>();
 
   @override
   void initState() {
@@ -55,8 +68,63 @@ class _GroomHomeScreenState extends State<GroomHomeScreen> {
       ReservationsTab(key: _reservationsTabKey),
       FoodMenuTabG(key: _foodMenuTabKey),
       ProfileTab(key: _profileTabKey),
+      GroomClanRulesPage(key: _rulesTabKey),
+
     ];
   }
+
+  // Future<void> _loadClanInfo() async {
+  //   try {
+  //     final clanInfo = await ApiService.getClanInfo();
+  //     setState(() {
+  //       _clanId = clanInfo['id'];
+  //       _clanName = clanInfo['name'] ?? 'العشيرة';
+  //       // Rebuild tabs with clan info
+  //       _tabs = [
+  //         HomeTab(
+  //           key: _homeTabKey,
+  //           onTabChanged: _changeTab,
+  //         ),
+  //         CreateReservationScreen(
+  //           key: _creatResTabKey,
+  //           onReservationCreated: () {
+  //             _changeTab(2);
+  //           },
+  //         ),
+  //         ReservationsTab(key: _reservationsTabKey),
+  //         FoodMenuTabG(key: _foodMenuTabKey),
+  //         ProfileTab(key: _profileTabKey),
+  //         ClanRulesViewPage(
+
+  //         ),
+  //       ];
+  //     });
+  //   } catch (e) {
+  //     print('Error loading clan info: $e');
+  //     setState(() {
+  //       _clanId = 0;
+  //       _clanName = 'العشيرة';
+  //       _tabs = [
+  //         HomeTab(
+  //           key: _homeTabKey,
+  //           onTabChanged: _changeTab,
+  //         ),
+  //         CreateReservationScreen(
+  //           key: _creatResTabKey,
+  //           onReservationCreated: () {
+  //             _changeTab(2);
+  //           },
+  //         ),
+  //         ReservationsTab(key: _reservationsTabKey),
+  //         FoodMenuTabG(key: _foodMenuTabKey),
+  //         ProfileTab(key: _profileTabKey),
+  //         ClanRulesViewPage(
+
+  //         ),
+  //       ];
+  //     });
+  //   }
+  // }
 
   void _changeTab(int index) {
     setState(() {
@@ -83,6 +151,9 @@ class _GroomHomeScreenState extends State<GroomHomeScreen> {
         break;
       case 4:
         _profileTabKey.currentState?.refreshData();
+        break;
+      case 5:
+        _rulesTabKey.currentState?.refreshData();
         break;
     }
   }
@@ -147,6 +218,7 @@ class _GroomHomeScreenState extends State<GroomHomeScreen> {
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final isDark = themeProvider.isDarkMode;
+
 
     return WillPopScope(
       onWillPop: () async {
@@ -227,7 +299,8 @@ class _GroomHomeScreenState extends State<GroomHomeScreen> {
               left: 0,
               right: 0,
               bottom: 0,
-              child: _buildSpotifyBottomNav(isDark),
+              child: navigationBar(isDark),
+              // child: _buildSpotifyBottomNav(isDark),
             ),
           ],
         ),
@@ -235,6 +308,211 @@ class _GroomHomeScreenState extends State<GroomHomeScreen> {
     );
   }
 
+  // Responsive Navigation Bar with smooth transitions
+AnimatedContainer navigationBar(bool isDark) {
+  // Get screen width for responsive sizing
+  final screenWidth = MediaQuery.of(context).size.width;
+  final isSmallScreen = screenWidth < 360;
+  final isMediumScreen = screenWidth >= 360 && screenWidth < 600;
+  
+  // Responsive dimensions
+  final navHeight = isSmallScreen ? 65.0 : 70.0;
+  final borderRadius = isSmallScreen ? 15.0 : 20.0;
+  
+  return AnimatedContainer(
+    height: navHeight,
+    duration: const Duration(milliseconds: 400),
+    curve: Curves.easeInOutCubic,
+    decoration: BoxDecoration(
+      color: isDark 
+          ? const Color.fromARGB(173, 52, 52, 52) 
+          : const Color.fromARGB(180, 212, 212, 212),
+      borderRadius: BorderRadius.only(
+        topLeft: Radius.circular(_currentIndex == 5 ? 0.0 : borderRadius),
+        topRight: Radius.circular(_currentIndex == 5 ? 0.0 : borderRadius),
+      ),
+      border: Border.all(
+        color: const Color.fromARGB(255, 4, 99, 1).withOpacity(isDark ? 0.2 : 0.1),
+        width: 0.5,
+      ),
+    ),
+    child: ClipRRect(
+      borderRadius: BorderRadius.only(
+        topLeft: Radius.circular(_currentIndex == 5 ? 0.0 : borderRadius),
+        topRight: Radius.circular(_currentIndex == 5 ? 0.0 : borderRadius),
+      ),
+      child: SafeArea(
+        bottom: true,
+        top: false,
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 1.5, sigmaY: 1.5),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              // Calculate item width based on available space
+              final itemWidth = constraints.maxWidth / 5; // Changed from 6 to 5 items
+              
+              return Stack(
+                children: [
+                  // Animated sliding indicator background
+                  AnimatedPositioned(
+                    duration: const Duration(milliseconds: 600),
+                    curve: Curves.easeInOutCubic,
+                    left: _getIndicatorPosition(itemWidth),
+                    top: 0,
+                    bottom: 0,
+                    width: itemWidth,
+                    child: AnimatedOpacity(
+                      duration: const Duration(milliseconds: 300),
+                      opacity: _externalScreen == null ? 0.1 : 0.0,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              (isDark ? AppColors.primary : AppColors.primaryLight)
+                                  .withOpacity(0.15),
+                              (isDark ? AppColors.primary : AppColors.primaryLight)
+                                  .withOpacity(0.05),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Navigation items
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _buildNavItem(Icons.add_circle_outline_rounded, 'انشاء حجز', 1, isDark, itemWidth),
+                      _buildNavItem(Icons.calendar_today_rounded, 'الحجوزات', 2, isDark, itemWidth),
+                      _buildNavItem(Icons.home_rounded, 'الرئيسية', 0, isDark, itemWidth),
+                      _buildNavItem(Icons.restaurant_menu_rounded, 'الوليمة', 3, isDark, itemWidth),
+                      _buildNavItem(Icons.rule_outlined, 'القوانين', 5, isDark, itemWidth),
+                    ],
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+// Helper method to calculate indicator position
+double _getIndicatorPosition(double itemWidth) {
+  // Map current index to position (accounting for RTL layout)
+  final indexToPosition = {
+    1: 0,  // انشاء حجز (leftmost)
+    2: 1,  // الحجوزات
+    0: 2,  // الرئيسية (center)
+    3: 3,  // الوليمة
+    5: 4,  // القوانين (rightmost)
+  };
+  
+  return (indexToPosition[_currentIndex] ?? 2) * itemWidth;
+}
+// Responsive _buildNavItem with dynamic sizing
+Widget _buildNavItem(IconData icon, String label, int index, bool isDark, double itemWidth) {
+  final isSelected = _currentIndex == index && _externalScreen == null;
+  final screenWidth = MediaQuery.of(context).size.width;
+  final isSmallScreen = screenWidth < 360;
+  final isMediumScreen = screenWidth >= 360 && screenWidth < 600;
+  
+  // Responsive notch dimensions
+  var notchHeight = isSelected ? (isSmallScreen ? 50.0 : 60.0) : 0.0;
+  var notchWidth = isSelected ? (isSmallScreen ? 45.0 : 50.0) : 0.0;
+  
+  // Responsive icon sizes
+  final selectedIconSize = isSmallScreen ? 24.0 : 28.0;
+  final unselectedIconSize = isSmallScreen ? 20.0 : 24.0;
+  
+  // Responsive font size
+  final fontSize = isSmallScreen ? 9.0 : (isMediumScreen ? 10.0 : 11.0);
+  
+  // Constrain item width
+  final constrainedWidth = itemWidth.clamp(50.0, 80.0);
+  
+  return GestureDetector(
+    onTap: () => _changeTab(index),
+    behavior: HitTestBehavior.opaque,
+    child: SizedBox(
+      width: constrainedWidth,
+      child: Stack(
+        children: [
+          // CustomPaint Notch at top
+          Align(
+            alignment: Alignment.topCenter,
+            child: AnimatedContainer(
+              height: notchHeight,
+              width: notchWidth,
+              duration: const Duration(milliseconds: 600),
+              curve: Curves.easeOutCubic,
+              child: isSelected
+                  ? CustomPaint(
+                      painter: ButtonNotch(
+                        isDark: isDark,
+                      ),
+                    )
+                  : const SizedBox(),
+            ),
+          ),
+          // Icon in center
+          Align(
+            alignment: Alignment.center,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              padding: EdgeInsets.all(isSmallScreen ? 6 : 8),
+              child: Icon(
+                icon,
+                color: isSelected 
+                    ? isDark ? AppColors.primary : AppColors.primaryLight
+                    : (isDark 
+                        ? Colors.white.withOpacity(0.6) 
+                        : Colors.black.withOpacity(0.5)),
+                size: isSelected ? selectedIconSize : unselectedIconSize,
+              ),
+            ),
+          ),
+          // Label at bottom
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: Padding(
+              padding: EdgeInsets.only(bottom: isSmallScreen ? 2 : 4),
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: fontSize,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                  color: isSelected 
+                      ? isDark ? AppColors.primary : AppColors.primaryLight
+                      : (isDark 
+                          ? Colors.white.withOpacity(0.6) 
+                          : Colors.black.withOpacity(0.7)),
+                  letterSpacing: 0.2,
+                  height: 1.2,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+// Optional: Add SafeArea wrapper for better compatibility
+Widget buildNavigationWithSafeArea(bool isDark) {
+  return SafeArea(
+    top: false,
+    child: navigationBar(isDark),
+  );
+}
   PreferredSizeWidget _buildSpotifyAppBar(bool isDark) {
     return AppBar(
       title: Text(
@@ -398,6 +676,7 @@ class _GroomHomeScreenState extends State<GroomHomeScreen> {
                     _buildDrawerItem(Icons.calendar_today_rounded, 'حجوزاتي', 2, isDark),
                     _buildDrawerItem(Icons.restaurant_menu_rounded, 'قائمة مقادير الوليمة', 3, isDark),
                     _buildDrawerItem(Icons.person_outline_rounded, 'الملف الشخصي', 4, isDark),
+                    _buildDrawerItem(Icons.rule_outlined, 'قوانين العشيرة', 5, isDark),
                     
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -544,126 +823,127 @@ class _GroomHomeScreenState extends State<GroomHomeScreen> {
     );
   }
 
-  Widget _buildSpotifyBottomNav(bool isDark) {
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 0, horizontal: 0),
-      padding: EdgeInsets.zero,
-      decoration: BoxDecoration(
-        color: isDark 
-            ? const Color.fromARGB(57, 72, 72, 72)
-            : const Color.fromARGB(47, 79, 79, 79),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
-        boxShadow: [
-          BoxShadow(
-            color: isDark ? const Color.fromARGB(142, 102, 187, 106).withOpacity( 0.2 ) : Colors.green.shade400.withOpacity( 0.2)  ,
-            blurRadius: 45,
-            offset: const Offset(0, -0),
-            spreadRadius: 10,
-          ),
-          BoxShadow(
-            color: const Color.fromARGB(255, 21, 219, 90).withOpacity(0.2),
-            blurRadius: 55,
-            offset: const Offset(0, -2),
-            spreadRadius: 5,
-          ),
-        ],
-        border: Border.all(
-          color: const Color.fromARGB(255, 4, 99, 1).withOpacity(isDark ? 0.2 : 0.3),
-          width: 0,
-        ),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(25),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2),
-          child: SafeArea(
-            bottom: true,
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  _buildNavItem(Icons.add_circle_outline_rounded, 'انشاء حجز', 1, isDark),
-                  _buildNavItem(Icons.calendar_today_rounded, 'الحجوزات', 2, isDark),
-                  _buildNavItem(Icons.home_rounded, 'الرئيسية', 0, isDark),
-                  _buildNavItem(Icons.restaurant_menu_rounded, 'الوليمة', 3, isDark),
-                  _buildNavItem(Icons.person_outline_rounded, 'الملف الشخصي', 4, isDark),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+  // Widget _buildSpotifyBottomNav(bool isDark) {
+  //   return Container(
+  //     margin: const EdgeInsets.symmetric(vertical: 0, horizontal: 0),
+  //     padding: EdgeInsets.zero,
+  //     decoration: BoxDecoration(
+  //       color: isDark 
+  //           ? const Color.fromARGB(57, 72, 72, 72)
+  //           : const Color.fromARGB(47, 79, 79, 79),
+  //       borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
+  //       boxShadow: [
+  //         BoxShadow(
+  //           color: isDark ? const Color.fromARGB(142, 102, 187, 106).withOpacity( 0.2 ) : Colors.green.shade400.withOpacity( 0.2)  ,
+  //           blurRadius: 45,
+  //           offset: const Offset(0, -0),
+  //           spreadRadius: 10,
+  //         ),
+  //         BoxShadow(
+  //           color: const Color.fromARGB(255, 21, 219, 90).withOpacity(0.1),
+  //           blurRadius: 55,
+  //           offset: const Offset(0, -0),
+  //           spreadRadius: 15,
+  //         ),
+  //       ],
+  //       border: Border.all(
+  //         color: const Color.fromARGB(255, 4, 99, 1).withOpacity(isDark ? 0.2 : 0.3),
+  //         width: 0.5,
+  //       ),
+  //     ),
+  //     child: ClipRRect(
+  //       borderRadius: BorderRadius.circular(25),
+  //       child: BackdropFilter(
+  //         filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2),
+  //         child: SafeArea(
+  //           bottom: true,
+  //           top: false,
+  //           child: Padding(
+  //             padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
+  //             child: Row(
+  //               mainAxisAlignment: MainAxisAlignment.spaceAround,
+  //               crossAxisAlignment: CrossAxisAlignment.center,
+  //               children: [
+  //                 _buildNavItem(Icons.add_circle_outline_rounded, 'انشاء حجز', 1, isDark),
+  //                 _buildNavItem(Icons.calendar_today_rounded, 'الحجوزات', 2, isDark),
+  //                 _buildNavItem(Icons.home_rounded, 'الرئيسية', 0, isDark),
+  //                 _buildNavItem(Icons.restaurant_menu_rounded, 'الوليمة', 3, isDark),
+  //                 _buildNavItem(Icons.person_outline_rounded, 'الملف الشخصي', 4, isDark),
+  //                 _buildNavItem(Icons.rule_outlined, 'القوانين', 5, isDark),
+  //               ],
+  //             ),
+  //           ),
+  //         ),
+  //       ),
+  //     ),
+  //   );
+  // }
 
-  Widget _buildNavItem(IconData icon, String label, int index, bool isDark) {
-    final isSelected = _currentIndex == index && _externalScreen == null;
+  // Widget _buildNavItem(IconData icon, String label, int index, bool isDark) {
+  //   final isSelected = _currentIndex == index && _externalScreen == null;
     
-    return GestureDetector(
-      onTap: () => _changeTab(index),
-      behavior: HitTestBehavior.opaque,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOutCubic,
-        padding: EdgeInsets.symmetric(
-          horizontal: isSelected ? 16 : 12,
-          vertical: 8,
-        ),
-        decoration: BoxDecoration(
-          gradient: isSelected
-              ? const LinearGradient(
-                  colors: [
-                    Color.fromARGB(82, 98, 216, 139),
-                    Color.fromARGB(43, 2, 168, 110),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                )
-              : null,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: const Color.fromARGB(255, 0, 0, 0).withOpacity(0.3),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ]
-              : null,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              color: isSelected 
-                  ? Colors.white 
-                  : (isDark ? Colors.white.withOpacity(0.6) : Colors.black.withOpacity(0.5)),
-              size: isSelected ? 26 : 24,
-            ),
-            if (isSelected) ...[
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
-                  letterSpacing: 0.2,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
+  //   return GestureDetector(
+  //     onTap: () => _changeTab(index),
+  //     behavior: HitTestBehavior.opaque,
+  //     child: AnimatedContainer(
+  //       duration: const Duration(milliseconds: 300),
+  //       curve: Curves.easeOutCubic,
+  //       padding: EdgeInsets.symmetric(
+  //         horizontal: isSelected ? 16 : 12,
+  //         vertical: 8,
+  //       ),
+  //       decoration: BoxDecoration(
+  //         gradient: isSelected
+  //             ? const LinearGradient(
+  //                 colors: [
+  //                   Color.fromARGB(82, 98, 216, 139),
+  //                   Color.fromARGB(43, 2, 168, 110),
+  //                 ],
+  //                 begin: Alignment.topLeft,
+  //                 end: Alignment.bottomRight,
+  //               )
+  //             : null,
+  //         borderRadius: BorderRadius.circular(16),
+  //         boxShadow: isSelected
+  //             ? [
+  //                 BoxShadow(
+  //                   color: const Color.fromARGB(255, 0, 0, 0).withOpacity(0.3),
+  //                   blurRadius: 12,
+  //                   offset: const Offset(0, 4),
+  //                 ),
+  //               ]
+  //             : null,
+  //       ),
+  //       child: Column(
+  //         mainAxisSize: MainAxisSize.min,
+  //         mainAxisAlignment: MainAxisAlignment.center,
+  //         children: [
+  //           Icon(
+  //             icon,
+  //             color: isSelected 
+  //                 ? Colors.white 
+  //                 : (isDark ? Colors.white.withOpacity(0.6) : Colors.black.withOpacity(0.5)),
+  //             size: isSelected ? 26 : 24,
+  //           ),
+  //           if (isSelected) ...[
+  //             const SizedBox(height: 4),
+  //             Text(
+  //               label,
+  //               style: const TextStyle(
+  //                 fontSize: 11,
+  //                 fontWeight: FontWeight.w600,
+  //                 color: Colors.white,
+  //                 letterSpacing: 0.2,
+  //               ),
+  //               maxLines: 1,
+  //               overflow: TextOverflow.ellipsis,
+  //             ),
+  //           ],
+  //         ],
+  //       ),
+  //     ),
+  //   );
+  // }
 
   String _getAppBarTitle() {
     if (_externalScreen != null) {
@@ -681,6 +961,8 @@ class _GroomHomeScreenState extends State<GroomHomeScreen> {
         return 'مقادير الوليمة';
       case 4:
         return 'الملف الشخصي';
+      case 5:
+        return 'قوانين العشيرة';
       default:
         return AppConstants.appName;
     }

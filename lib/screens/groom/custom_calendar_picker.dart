@@ -45,7 +45,6 @@ class DateAvailability {
     this.allowMassWedding = false,
   });
 }
-
 class BeautifulCustomCalendarPicker extends StatefulWidget {
   final DateTime? initialDate;
   final DateTime firstDate;
@@ -57,6 +56,9 @@ class BeautifulCustomCalendarPicker extends StatefulWidget {
   final int clanId;
   final int? hallId;
   final int maxCapacityPerDate;
+  final bool isOriginClan; // ADD THIS
+  final int yearsMaxReservGroomFromOriginClan; // ADD THIS
+  final int yearsMaxReservGroomFromOutClan; // ADD THIS
 
   const BeautifulCustomCalendarPicker({
     Key? key,
@@ -70,12 +72,14 @@ class BeautifulCustomCalendarPicker extends StatefulWidget {
     required this.clanId,
     this.hallId,
     this.maxCapacityPerDate = 10,
+    required this.isOriginClan, // ADD THIS
+    this.yearsMaxReservGroomFromOriginClan = 1, // ADD THIS
+    this.yearsMaxReservGroomFromOutClan = 3, // ADD THIS
   }) : super(key: key);
 
   @override
   State<BeautifulCustomCalendarPicker> createState() => _BeautifulCustomCalendarPickerState();
 }
-
 class _BeautifulCustomCalendarPickerState extends State<BeautifulCustomCalendarPicker>
     with TickerProviderStateMixin {
   late DateTime _currentMonth;
@@ -88,7 +92,13 @@ class _BeautifulCustomCalendarPickerState extends State<BeautifulCustomCalendarP
   Map<String, List<String>> _groomMultiDayReservations = {};
   Map<String, String> _dateToGroomMap = {};
   Map<String, List<DateTime>> _connectedDateRanges = {};
+  
+  // ADD THESE
+  bool _showYearPicker = false;
+  late int _maxYearsAllowed;
+  late DateTime _effectiveLastDate;
 
+  
   late AnimationController _slideController;
   late AnimationController _pulseController;
   late AnimationController _shimmerController;
@@ -99,11 +109,24 @@ class _BeautifulCustomCalendarPickerState extends State<BeautifulCustomCalendarP
   late Animation<double> _shimmerAnimation;
   late Animation<double> _bounceAnimation;
 
-  @override
-  void initState() {
-    super.initState();
-    _currentMonth = widget.initialDate ?? DateTime.now();
-    _selectedDate = widget.initialDate;
+@override
+void initState() {
+  super.initState();
+  
+  // Calculate max years and effective last date based on clan origin
+  _maxYearsAllowed = widget.isOriginClan 
+      ? widget.yearsMaxReservGroomFromOriginClan 
+      : widget.yearsMaxReservGroomFromOutClan;
+  
+  final today = DateTime.now();
+  _effectiveLastDate = DateTime(
+    today.year + _maxYearsAllowed,
+    today.month,
+    today.day,
+  );
+  
+  _currentMonth = widget.initialDate ?? DateTime.now();
+  _selectedDate = widget.initialDate;
     
     // Initialize animations
     _slideController = AnimationController(
@@ -373,28 +396,41 @@ class _BeautifulCustomCalendarPickerState extends State<BeautifulCustomCalendarP
     }
   }
 
-  DateAvailability _getDateAvailability(DateTime date) {
-    final key = DateFormat('yyyy-MM-dd').format(date);
-    
-    final today = DateTime.now();
-    final dateOnly = DateTime(date.year, date.month, date.day);
-    final todayOnly = DateTime(today.year, today.month, today.day);
-    
-    if (dateOnly.isBefore(todayOnly)) {
-      return DateAvailability(
-        date: date,
-        status: DateStatus.disabled,
-        maxCapacity: _maxGroomsPerDate,
-        note: 'تاريخ منتهي',
-      );
-    }
-    
-    return _dateAvailabilities[key] ?? DateAvailability(
+DateAvailability _getDateAvailability(DateTime date) {
+  final key = DateFormat('yyyy-MM-dd').format(date);
+  
+  final today = DateTime.now();
+  final dateOnly = DateTime(date.year, date.month, date.day);
+  final todayOnly = DateTime(today.year, today.month, today.day);
+  
+  // Check if date is in the past
+  if (dateOnly.isBefore(todayOnly)) {
+    return DateAvailability(
       date: date,
-      status: DateStatus.available,
+      status: DateStatus.disabled,
       maxCapacity: _maxGroomsPerDate,
+      note: 'تاريخ منتهي',
     );
   }
+  
+  // Check if date exceeds max years allowed
+  if (dateOnly.isAfter(_effectiveLastDate)) {
+    return DateAvailability(
+      date: date,
+      status: DateStatus.disabled,
+      maxCapacity: _maxGroomsPerDate,
+      note: widget.isOriginClan 
+          ? 'يمكن الحجز حتى $_maxYearsAllowed ${_maxYearsAllowed == 1 ? "سنة" : "سنوات"} فقط'
+          : 'يمكن الحجز حتى $_maxYearsAllowed سنوات فقط',
+    );
+  }
+  
+  return _dateAvailabilities[key] ?? DateAvailability(
+    date: date,
+    status: DateStatus.available,
+    maxCapacity: _maxGroomsPerDate,
+  );
+}
 
   bool _isSameDay(DateTime date1, DateTime date2) {
     return date1.year == date2.year &&
@@ -548,7 +584,7 @@ Widget _buildCalendarDay(DateTime date) {
   
   final isSelectable = isCurrentMonth &&
                       (date.isAfter(widget.firstDate.subtract(const Duration(days: 1))) &&
-                       date.isBefore(widget.lastDate.add(const Duration(days: 1)))) &&
+                       date.isBefore(widget.lastDate.add(const Duration(days: 3 * 365)))) &&
                       _isDateSelectable(date, availability);
 
   if (_isLoading && isCurrentMonth) {
@@ -1557,15 +1593,57 @@ Widget _buildMonthNavigation(double screenWidth, double screenHeight, bool isDar
           screenWidth,
           isDark,
         ),
-        Text(
-          _getMonthYearText(_currentMonth),
-          style: TextStyle(
-            fontSize: screenWidth * 0.045,
-            fontWeight: FontWeight.bold,
-            color: isDark ? Colors.green.shade300 : Colors.green.shade800,
-            letterSpacing: 0.3,
+        
+        // UPDATED: Make month/year text clickable
+        InkWell(
+          onTap: () {
+            setState(() {
+              _showYearPicker = !_showYearPicker;
+            });
+          },
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: EdgeInsets.symmetric(
+              horizontal: screenWidth * 0.04,
+              vertical: screenHeight * 0.01,
+            ),
+            decoration: BoxDecoration(
+              color: _showYearPicker 
+                  ? (isDark ? Colors.green.shade800.withOpacity(0.3) : Colors.green.shade50)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(12),
+              border: _showYearPicker 
+                  ? Border.all(
+                      color: isDark 
+                        ? Colors.green.shade600.withOpacity(0.5)
+                        : Colors.green.shade300.withOpacity(0.5),
+                      width: 1,
+                    )
+                  : null,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _getMonthYearText(_currentMonth),
+                  style: TextStyle(
+                    fontSize: screenWidth * 0.045,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.green.shade300 : Colors.green.shade800,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+                SizedBox(width: screenWidth * 0.02),
+                Icon(
+                  _showYearPicker ? Icons.expand_less : Icons.expand_more,
+                  color: isDark ? Colors.green.shade300 : Colors.green.shade800,
+                  size: screenWidth * 0.05,
+                ),
+              ],
+            ),
           ),
         ),
+        
         _buildModernNavButton(
           Icons.chevron_right_rounded,
           () {
@@ -1581,6 +1659,142 @@ Widget _buildMonthNavigation(double screenWidth, double screenHeight, bool isDar
     ),
   );
 }
+
+Widget _buildYearPicker(double screenWidth, double screenHeight, bool isDark) {
+  final today = DateTime.now();
+  final currentYear = today.year;
+  final List<int> availableYears = List.generate(
+    _maxYearsAllowed + 1,
+    (index) => currentYear + index,
+  );
+
+  return Container(
+    height: screenHeight * 0.15,
+    padding: EdgeInsets.symmetric(vertical: screenHeight * 0.01),
+    decoration: BoxDecoration(
+      color: isDark 
+        ? Colors.black.withOpacity(0.3)
+        : Colors.grey.shade50,
+      border: Border(
+        bottom: BorderSide(
+          color: isDark 
+            ? Colors.green.shade700.withOpacity(0.3)
+            : Colors.green.shade100,
+          width: 1,
+        ),
+      ),
+    ),
+    child: Column(
+      children: [
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.04),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'اختر السنة',
+                style: TextStyle(
+                  fontSize: screenWidth * 0.04,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.green.shade300 : Colors.green.shade700,
+                ),
+              ),
+              Text(
+                widget.isOriginClan 
+                    ? 'متاح حتى $_maxYearsAllowed ${_maxYearsAllowed == 1 ? "سنة" : "سنوات"}'
+                    : 'متاح حتى $_maxYearsAllowed سنوات',
+                style: TextStyle(
+                  fontSize: screenWidth * 0.03,
+                  color: isDark 
+                    ? Colors.green.shade400.withOpacity(0.7)
+                    : Colors.green.shade600.withOpacity(0.7),
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(height: screenHeight * 0.01),
+        Expanded(
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            reverse: true,
+            padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.04),
+            itemCount: availableYears.length,
+            itemBuilder: (context, index) {
+              final year = availableYears[index];
+              final isSelected = year == _currentMonth.year;
+              
+              return Padding(
+                padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.01),
+                child: InkWell(
+                  onTap: () {
+                    setState(() {
+                      _currentMonth = DateTime(year, _currentMonth.month);
+                      _showYearPicker = false;
+                    });
+                    _loadMonthData();
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    width: screenWidth * 0.2,
+                    decoration: BoxDecoration(
+                      gradient: isSelected
+                          ? LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                Colors.green.shade600,
+                                Colors.green.shade800,
+                              ],
+                            )
+                          : null,
+                      color: isSelected 
+                          ? null
+                          : (isDark 
+                              ? Colors.green.shade900.withOpacity(0.3)
+                              : Colors.white),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isSelected
+                            ? Colors.transparent
+                            : (isDark 
+                                ? Colors.green.shade600.withOpacity(0.5)
+                                : Colors.green.shade300.withOpacity(0.5)),
+                        width: 1.5,
+                      ),
+                      boxShadow: isSelected
+                          ? [
+                              BoxShadow(
+                                color: Colors.green.shade300.withOpacity(0.4),
+                                blurRadius: 8,
+                                offset: const Offset(0, 4),
+                              ),
+                            ]
+                          : null,
+                    ),
+                    child: Center(
+                      child: Text(
+                        year.toString(),
+                        style: TextStyle(
+                          fontSize: screenWidth * 0.04,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                          color: isSelected 
+                              ? Colors.white
+                              : (isDark ? Colors.green.shade300 : Colors.green.shade700),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
 
 Widget _buildModernNavButton(IconData icon, VoidCallback onPressed, double screenWidth, bool isDark) {
   return Container(
@@ -1613,6 +1827,7 @@ Widget _buildModernNavButton(IconData icon, VoidCallback onPressed, double scree
     ),
   );
 }
+
 Widget _buildCalendarGrid(double screenWidth, double screenHeight) {
   return LayoutBuilder(
     builder: (context, constraints) {
@@ -1625,7 +1840,12 @@ Widget _buildCalendarGrid(double screenWidth, double screenHeight) {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Week headers - use Row instead of Container
+              // ADD YEAR PICKER HERE
+              if (_showYearPicker)
+                _buildYearPicker(screenWidth, screenHeight, 
+                  Theme.of(context).brightness == Brightness.dark),
+              
+              // Week headers
               Row(
                 children: _buildWeekDays(),
               ),
@@ -1649,7 +1869,6 @@ Widget _buildCalendarGrid(double screenWidth, double screenHeight) {
     },
   );
 }
-
 
 
 Widget _buildBottomSection(double screenWidth, double screenHeight, bool isDark) {

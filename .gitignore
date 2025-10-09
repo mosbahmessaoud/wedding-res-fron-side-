@@ -104,3 +104,8 @@ coverage/
 # API keys and secrets
 secrets.dart
 api_keys.dart
+
+
+# Release builds
+android/app/release/
+android/app/build/outputs/

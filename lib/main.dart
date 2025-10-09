@@ -4,7 +4,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 import 'package:wedding_reservation_app/providers/theme_provider.dart';
-import 'package:wedding_reservation_app/screens/auth/tempCodeRunnerFile.dart';
+import 'package:wedding_reservation_app/screens/auth/sing_up_screen.dart';
 import 'package:wedding_reservation_app/screens/clan%20admin/home_screen.dart';
 import 'package:wedding_reservation_app/screens/groom/create_reservation_screen.dart';
 import 'package:wedding_reservation_app/screens/groom/groom_home_screen.dart';

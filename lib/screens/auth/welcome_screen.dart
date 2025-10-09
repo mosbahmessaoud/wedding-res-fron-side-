@@ -1,6 +1,7 @@
 // lib/screens/auth/welcome_screen.dart
 import 'package:flutter/material.dart';
-import 'package:wedding_reservation_app/screens/auth/tempCodeRunnerFile.dart';
+import 'package:wedding_reservation_app/screens/auth/event_type_selection_screen.dart';
+import 'package:wedding_reservation_app/screens/auth/sing_up_screen.dart';
 import 'package:wedding_reservation_app/widgets/theme_toggle_button.dart';
 import '../../utils/colors.dart';
 import 'login_screen.dart';
@@ -108,8 +109,10 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                     },
                     child: IconButton(
                       onPressed: () {
-                        Navigator.pop(context);
-                      },
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(builder: (context) => EventTypeSelectionScreen()),
+                            );                      },
                       icon: Icon(
                         Icons.arrow_back,
                         color: isDark ? Colors.green.shade300 : Colors.green.shade700,

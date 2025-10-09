@@ -90,7 +90,13 @@ class CreateReservationScreenState extends State<CreateReservationScreen> {
     _pageController.dispose();
     super.dispose();
   }
-
+// Add this method in the CreateReservationScreenState class
+bool get _isOriginClan {
+  if (_userProfile == null || _selectedClan == null) {
+    return false;
+  }
+  return _userProfile!['clan_id'] == _selectedClan!['id'];
+}
 void _showMessageDialog({
   required String title,
   required String message,
@@ -771,6 +777,7 @@ Future<void> _selectDate(TextEditingController controller, String title) async {
         context: context,
         barrierDismissible: false,
         builder: (context) => BeautifulCustomCalendarPicker(
+
           title: title,
           clanId: _selectedClan!['id'],
           hallId: _selectedHall?['id'],
@@ -836,6 +843,9 @@ Future<void> _selectDate(TextEditingController controller, String title) async {
           onCancel: () {
             Navigator.of(context).pop();
           },
+          isOriginClan: _isOriginClan, // or false based on your logic
+          yearsMaxReservGroomFromOriginClan: _clanSettings?['years_max_reserv_groom_from_origin_clan'] ?? 3,
+          yearsMaxReservGroomFromOutClan: _clanSettings?['years_max_reserv_groom_from_out_clan'] ?? 1,
         ),
       );
     }
@@ -958,6 +968,86 @@ Future<void> _selectDate(TextEditingController controller, String title) async {
       });
     }
   }
+
+
+// @override
+// Widget build(BuildContext context) {
+//   final isDark = Theme.of(context).brightness == Brightness.dark;
+  
+//   if (_isLoading) {
+//     return Scaffold(
+//       appBar: AppBar(
+//         title: const Text('إنشاء حجز جديد'),
+//         backgroundColor: isDark ? AppColors.darkBackground : AppColors.primary,
+//         foregroundColor: Colors.white,
+//       ),
+//       body: Center(
+//         child: CircularProgressIndicator(
+//           color: isDark ? AppColors.darkPrimary : AppColors.primary,
+//         ),
+//       ),
+//     );
+//   }
+
+//   return Scaffold(
+//     backgroundColor: isDark ? AppColors.darkBackground : Colors.white,
+//     body: Stack(
+//   children: [
+//     Column(
+//       children: [
+//         Padding(
+//           padding: const EdgeInsets.all(16.0),
+//           child: Row(
+//             children: [
+//               for (int i = 0; i < 3; i++) ...[
+//                 Expanded(
+//                   child: Container(
+//                     height: 4,
+//                     decoration: BoxDecoration(
+//                       color: i <= _currentStep 
+//                         ? (isDark ? AppColors.darkPrimary : const Color.fromARGB(255, 0, 151, 98))
+//                         : (isDark 
+//                             ? AppColors.darkPrimary.withOpacity(0.3)
+//                             : const Color.fromARGB(255, 110, 174, 122).withOpacity(0.3)),
+//                       borderRadius: BorderRadius.circular(2),
+//                     ),
+//                   ),
+//                 ),
+//                 if (i < 2) const SizedBox(width: 8),
+//               ],
+//             ],
+//           ),
+//         ),
+//         Expanded(
+//           child: RefreshIndicator(
+//             onRefresh: _refreshData,
+//             color: AppColors.primary,
+//             backgroundColor: Colors.white,
+//             child: Form(
+//               key: _formKey,
+//               child: PageView(
+//                 controller: _pageController,
+//                 onPageChanged: (index) => setState(() => _currentStep = index),
+//                 children: [
+//                   _buildClanAndHallSelectionStep(),
+//                   _buildReservationDetailsStep(),
+//                   _buildConfirmationStep(),
+//                 ],
+//               ),
+//             ),
+//           ),
+//         ),
+//       ],
+//     ),
+//     // Changed from _buildSideNavigation to _buildBottomNavigation
+//     // if (_buildBottomNavigation() != null) _buildBottomNavigation()!,
+//   ],
+// ),
+    
+//   );
+  
+// }
+
 @override
 Widget build(BuildContext context) {
   final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -978,11 +1068,15 @@ Widget build(BuildContext context) {
   }
 
   return Scaffold(
+    // appBar: AppBar(
+    //   title: const Text('إنشاء حجز جديد'),
+    //   backgroundColor: isDark ? AppColors.darkBackground : AppColors.primary,
+    //   foregroundColor: Colors.white,
+    // ),
     backgroundColor: isDark ? AppColors.darkBackground : Colors.white,
-    body: Stack(
-  children: [
-    Column(
+    body: Column(
       children: [
+        // Progress indicator
         Padding(
           padding: const EdgeInsets.all(16.0),
           child: Row(
@@ -1006,6 +1100,8 @@ Widget build(BuildContext context) {
             ],
           ),
         ),
+        
+        // Main content
         Expanded(
           child: RefreshIndicator(
             onRefresh: _refreshData,
@@ -1027,14 +1123,10 @@ Widget build(BuildContext context) {
         ),
       ],
     ),
-    // Changed from _buildSideNavigation to _buildBottomNavigation
-    // if (_buildBottomNavigation() != null) _buildBottomNavigation()!,
-  ],
-),
-    
   );
-  
 }
+
+
 Widget _buildClanAndHallSelectionStep() {
   final isDark = Theme.of(context).brightness == Brightness.dark;
   
@@ -1779,56 +1871,166 @@ Widget _buildConfirmationStep() {
     );
   }
 
- Widget _buildBottomNavigation() {
+//  Widget _buildBottomNavigation() {
+//   final isDark = Theme.of(context).brightness == Brightness.dark;
+  
+//   return Positioned(
+//     left: 0,
+//     right: 0,
+//     bottom: 0,
+//     child: Container(
+//       padding: const EdgeInsets.all(0),
+//       decoration: BoxDecoration(
+//         color: isDark ? const Color.fromARGB(0, 44, 44, 44) : const Color.fromARGB(0, 255, 255, 255),
+//         // boxShadow: [
+//         //   BoxShadow(
+//         //     color: Colors.black.withOpacity(0.1),
+//         //     blurRadius: 8,
+//         //     offset: const Offset(0, -2),
+//         //   ),
+//         // ],
+//       ),
+//       child: SafeArea(
+//         child: Row(
+//           children: [
+//             // Next/Submit button (on the right for RTL)
+//             Expanded(
+//               child: ElevatedButton.icon(
+//                 onPressed: _isSubmitting ? null : _handleNextStep,
+//                 icon: _isSubmitting
+//                     ? const SizedBox(
+//                         width: 20,
+//                         height: 20,
+//                         child: CircularProgressIndicator(
+//                           strokeWidth: 2,
+//                           color: Colors.white,
+//                         ),
+//                       )
+//                     : Icon(
+//                         _currentStep == 2 
+//                             ? Icons.check_circle 
+//                             : Icons.arrow_back,
+//                       ),
+//                 label: Text(
+//                   _isSubmitting 
+//                       ? 'جاري الإرسال...'
+//                       : (_currentStep == 2 ? 'تأكيد الحجز' : 'التالي')
+//                 ),
+//                 style: ElevatedButton.styleFrom(
+//                   backgroundColor: _isSubmitting
+//                       ? (isDark ? const Color.fromARGB(111, 66, 66, 66) : const Color.fromARGB(202, 158, 158, 158))
+//                       : (isDark ? const Color.fromARGB(127, 102, 187, 106) : const Color.fromARGB(214, 46, 125, 50)),
+//                   foregroundColor: Colors.white,
+//                   padding: const EdgeInsets.symmetric(vertical: 16),
+//                   shape: RoundedRectangleBorder(
+//                     borderRadius: BorderRadius.circular(8),
+//                   ),
+//                 ),
+//               ),
+//             ),
+            
+//             // Spacing between buttons
+//             if (_currentStep > 0) const SizedBox(width: 12),
+            
+//             // Previous button (on the left for RTL)
+//             if (_currentStep > 0)
+//               Expanded(
+//                 child: ElevatedButton.icon(
+//                   onPressed: _goToPreviousStep,
+//                   icon: const Icon(Icons.arrow_forward),
+//                   label: const Text('السابق'),
+//                   style: ElevatedButton.styleFrom(
+//                     backgroundColor: isDark 
+//                         ? const Color.fromARGB(104, 44, 44, 44) 
+//                         :  Colors.white,
+//                     foregroundColor: isDark 
+//                         ? AppColors.darkPrimary 
+//                         : AppColors.primary,
+//                     side: BorderSide(
+//                       color: isDark 
+//                           ? AppColors.darkPrimary 
+//                           : AppColors.primary,
+//                     ),
+//                     padding: const EdgeInsets.symmetric(vertical: 16),
+//                     shape: RoundedRectangleBorder(
+//                       borderRadius: BorderRadius.circular(8),
+//                     ),
+//                   ),
+//                 ),
+//               ),
+//           ],
+//         ),
+//       ),
+//     ),
+//   );
+// }
+Widget _buildBottomNavigation() {
   final isDark = Theme.of(context).brightness == Brightness.dark;
   
-  return Positioned(
-    left: 0,
-    right: 0,
-    bottom: 0,
-    child: Container(
-      padding: const EdgeInsets.all(0),
-      decoration: BoxDecoration(
-        // color: isDark ? const Color.fromARGB(0, 44, 44, 44) : const Color.fromARGB(0, 255, 255, 255),
-        // boxShadow: [
-        //   BoxShadow(
-        //     color: Colors.black.withOpacity(0.1),
-        //     blurRadius: 8,
-        //     offset: const Offset(0, -2),
-        //   ),
-        // ],
-      ),
-      child: SafeArea(
-        child: Row(
-          children: [
-            // Next/Submit button (on the right for RTL)
+  return Container(  // Changed from Positioned
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: isDark ? AppColors.darkBackground : Colors.white,
+    ),
+    child: SafeArea(
+      child: Row(
+        children: [
+          // Next/Submit button (on the right for RTL)
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: _isSubmitting ? null : _handleNextStep,
+              icon: _isSubmitting
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : Icon(
+                      _currentStep == 2 
+                          ? Icons.check_circle 
+                          : Icons.arrow_back,
+                    ),
+              label: Text(
+                _isSubmitting 
+                    ? 'جاري الإرسال...'
+                    : (_currentStep == 2 ? 'تأكيد الحجز' : 'التالي')
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _isSubmitting
+                    ? (isDark ? const Color.fromARGB(111, 66, 66, 66) : const Color.fromARGB(202, 158, 158, 158))
+                    : (isDark ? const Color.fromARGB(127, 102, 187, 106) : const Color.fromARGB(214, 46, 125, 50)),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+          ),
+          
+          if (_currentStep > 0) const SizedBox(width: 12),
+          
+          if (_currentStep > 0)
             Expanded(
               child: ElevatedButton.icon(
-                onPressed: _isSubmitting ? null : _handleNextStep,
-                icon: _isSubmitting
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : Icon(
-                        _currentStep == 2 
-                            ? Icons.check_circle 
-                            : Icons.arrow_back,
-                      ),
-                label: Text(
-                  _isSubmitting 
-                      ? 'جاري الإرسال...'
-                      : (_currentStep == 2 ? 'تأكيد الحجز' : 'التالي')
-                ),
+                onPressed: _goToPreviousStep,
+                icon: const Icon(Icons.arrow_forward),
+                label: const Text('السابق'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: _isSubmitting
-                      ? (isDark ? const Color.fromARGB(111, 66, 66, 66) : const Color.fromARGB(202, 158, 158, 158))
-                      : (isDark ? const Color.fromARGB(127, 102, 187, 106) : const Color.fromARGB(214, 46, 125, 50)),
-                  foregroundColor: Colors.white,
+                  backgroundColor: isDark 
+                      ? const Color.fromARGB(104, 44, 44, 44) 
+                      : Colors.white,
+                  foregroundColor: isDark 
+                      ? AppColors.darkPrimary 
+                      : AppColors.primary,
+                  side: BorderSide(
+                    color: isDark 
+                        ? AppColors.darkPrimary 
+                        : AppColors.primary,
+                  ),
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
@@ -1836,38 +2038,7 @@ Widget _buildConfirmationStep() {
                 ),
               ),
             ),
-            
-            // Spacing between buttons
-            if (_currentStep > 0) const SizedBox(width: 12),
-            
-            // Previous button (on the left for RTL)
-            if (_currentStep > 0)
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: _goToPreviousStep,
-                  icon: const Icon(Icons.arrow_forward),
-                  label: const Text('السابق'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: isDark 
-                        ? const Color.fromARGB(104, 44, 44, 44) 
-                        :  Colors.white,
-                    foregroundColor: isDark 
-                        ? AppColors.darkPrimary 
-                        : AppColors.primary,
-                    side: BorderSide(
-                      color: isDark 
-                          ? AppColors.darkPrimary 
-                          : AppColors.primary,
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        ),
+        ],
       ),
     ),
   );

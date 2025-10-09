@@ -8,6 +8,7 @@ import 'package:wedding_reservation_app/screens/clan%20admin/food_menu_tab.dart'
 import 'package:wedding_reservation_app/screens/clan%20admin/grooms_tab.dart';
 import 'package:wedding_reservation_app/screens/clan%20admin/reservations_tab.dart';
 import 'package:wedding_reservation_app/screens/clan%20admin/home_tab.dart';
+import 'package:wedding_reservation_app/screens/clan%20admin/clan_rules_management_page.dart';
 import 'admin_otp_screen.dart';
 import '../../utils/colors.dart';
 import '../../utils/constants.dart';
@@ -29,6 +30,8 @@ class _ClanAdminHomeScreenState extends State<ClanAdminHomeScreen>
   late AnimationController _refreshAnimationController;
   late Animation<double> _refreshAnimation;
   int _lastTabIndex = 0;
+  int? _clanId;
+  String? _clanName;
 
   // Tab keys for refreshing specific tabs
   final GlobalKey<HomeTabState> _homeTabKey = GlobalKey<HomeTabState>();
@@ -38,6 +41,7 @@ class _ClanAdminHomeScreenState extends State<ClanAdminHomeScreen>
   final GlobalKey<FoodTabState> _foodTabKey = GlobalKey<FoodTabState>();
   final GlobalKey<SettingsTabState> _settingsTabKey = GlobalKey<SettingsTabState>();
   final GlobalKey<AdminOTPScreenState> _otpTabKey = GlobalKey<AdminOTPScreenState>();
+  final GlobalKey<ClanRulesPageState> _rulesTabKey = GlobalKey<ClanRulesPageState>();
 
   @override
   void initState() {
@@ -59,6 +63,24 @@ class _ClanAdminHomeScreenState extends State<ClanAdminHomeScreen>
     );
 
     _animationController.forward();
+    _loadClanInfo();
+  }
+
+  Future<void> _loadClanInfo() async {
+    try {
+      final clanInfo = await ApiService.getClanInfoByCurrentUser();
+      setState(() {
+        _clanId = clanInfo['id'];
+        _clanName = clanInfo['name'] ?? 'العشيرة';
+      });
+    } catch (e) {
+      print('Error loading clan info: $e');
+      // Set default values if loading fails
+      setState(() {
+        _clanId = 0;
+        _clanName = 'العشيرة';
+      });
+    }
   }
 
   @override
@@ -114,6 +136,9 @@ class _ClanAdminHomeScreenState extends State<ClanAdminHomeScreen>
         _otpTabKey.currentState?.refreshData();
         break;
       case 7:
+        _rulesTabKey.currentState?.refreshData();
+        break;
+      case 8:
         break;
     }
   }
@@ -199,6 +224,16 @@ class _ClanAdminHomeScreenState extends State<ClanAdminHomeScreen>
                       FoodTab(key: _foodTabKey),
                       SettingsTab(key: _settingsTabKey),
                       AdminOTPScreen(key: _otpTabKey),
+                      if (_clanId != null && _clanName != null)
+                        ClanRulesPage(
+                          key: _rulesTabKey,
+                        )
+                      else
+                        Center(
+                          child: CircularProgressIndicator(
+                            color: AppColors.primary,
+                          ),
+                        ),
                       _buildProfileTab(isDark),
                     ],
                   ),
@@ -217,7 +252,6 @@ class _ClanAdminHomeScreenState extends State<ClanAdminHomeScreen>
           ),
         ],
       ),
-      // appBar: _buildAppBar(isMobile, isDark),
     );
   }
 
@@ -312,7 +346,8 @@ class _ClanAdminHomeScreenState extends State<ClanAdminHomeScreen>
                       _buildRightNavItem(Icons.restaurant_menu_outlined, 'قوائم الطعام', 4, isDark),
                       _buildRightNavItem(Icons.settings_outlined, 'الإعدادات', 5, isDark),
                       _buildRightNavItem(Icons.lock_outline, 'رموز التحقق', 6, isDark),
-                      _buildRightNavItem(Icons.person_outline, 'الملف الشخصي', 7, isDark),
+                      _buildRightNavItem(Icons.rule_outlined, 'قوانين العشيرة', 7, isDark),
+                      _buildRightNavItem(Icons.person_outline, 'الملف الشخصي', 8, isDark),
                     ],
                   ),
                 ),
@@ -590,6 +625,7 @@ class _ClanAdminHomeScreenState extends State<ClanAdminHomeScreen>
                   _buildNavItem(Icons.restaurant_menu_outlined, 'الطعام', 4, isDark),
                   _buildNavItem(Icons.settings_outlined, 'الإعدادات', 5, isDark),
                   _buildNavItem(Icons.lock_outline, 'OTP', 6, isDark),
+                  _buildNavItem(Icons.rule_outlined, 'القوانين', 7, isDark),
                 ],
               ),
             ),
@@ -682,6 +718,8 @@ class _ClanAdminHomeScreenState extends State<ClanAdminHomeScreen>
       case 6:
         return 'رموز التحقق';
       case 7:
+        return 'قوانين العشيرة';
+      case 8:
         return 'الملف الشخصي';
       default:
         return AppConstants.appName;

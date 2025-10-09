@@ -30,8 +30,8 @@ class ThemeToggleTile extends StatelessWidget {
     final themeProvider = Provider.of<ThemeProvider>(context);
     
     return SwitchListTile(
-      title: Text('الوضع الداكن'),
-      subtitle: Text('تفعيل المظهر الليلي'),
+      title: const Text('الوضع الداكن'),
+      subtitle: const Text('تفعيل المظهر الليلي'),
       value: themeProvider.isDarkMode,
       onChanged: (_) => themeProvider.toggleTheme(),
       secondary: Icon(
@@ -51,6 +51,7 @@ class ThemeFAB extends StatelessWidget {
     
     return FloatingActionButton(
       onPressed: () => themeProvider.toggleTheme(),
+      tooltip: themeProvider.isDarkMode ? 'الوضع النهاري' : 'الوضع الليلي',
       child: Icon(
         themeProvider.isDarkMode ? Icons.light_mode : Icons.dark_mode,
       ),

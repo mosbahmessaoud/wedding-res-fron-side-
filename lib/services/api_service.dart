@@ -15,6 +15,10 @@ import 'dart:io';
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:http/http.dart' as http; 
+
+import 'package:path/path.dart' as path;
+
+
 class ApiService {
   // static const String baseUrl = 'https://f09e1a125031.ngrok-free.app'; // Replace with your actual API URL
   // static const String baseUrl = 'http://192.168.1.3:8000'; // Replace with your actual API URL
@@ -2422,293 +2426,6 @@ static Future<Map<String, dynamic>> updateGroomDetails(
 
 
 
-// ==================== CLAN RULES MANAGEMENT ENDPOINTS ====================
-
-// Create Clan Rules
-static Future<Map<String, dynamic>> createClanRules(Map<String, dynamic> rulesData) async {
-  try {
-    final response = await http.post(
-      Uri.parse('$baseUrl/clan-admin/clan-rules'),
-      headers: _headers,
-      body: json.encode(rulesData),
-    ); 
-
-    if (response.statusCode == 201 || response.statusCode == 200) {
-      return json.decode(response.body);
-    } else {
-      final error = json.decode(response.body);
-      throw Exception(error['detail'] ?? 'فشل في إنشاء قوانين العشيرة');
-    }
-  } catch (e) {
-    throw Exception('خطأ في إنشاء قوانين العشيرة: $e');
-  }
-}
-
-// Get All Clan Rules with Pagination
-static Future<List<dynamic>> getAllClanRules({
-  int skip = 0,
-  int limit = 100,
-}) async {
-  try {
-    final queryParams = {
-      'skip': skip.toString(),
-      'limit': limit.toString(),
-    };
-    
-    final uri = Uri.parse('$baseUrl/clan-admin/clan-rules').replace(
-      queryParameters: queryParams,
-    );
-    
-    final response = await http.get(
-      uri,
-      headers: _headers,
-    );
-
-    if (response.statusCode == 200) {
-      return json.decode(response.body);
-    } else {
-      final error = json.decode(response.body);
-      throw Exception(error['detail'] ?? 'فشل في تحميل قوانين العشائر');
-    }
-  } catch (e) {
-    throw Exception('خطأ في تحميل قوانين العشائر: $e');
-  }
-}
-
-// Get Clan Rules by ID
-static Future<Map<String, dynamic>> getClanRulesById(int ruleId) async {
-  try {
-    final response = await http.get(
-      Uri.parse('$baseUrl/clan-admin/clan-rules/$ruleId'),
-      headers: _headers,
-    );
-
-    if (response.statusCode == 200) {
-      return json.decode(response.body);
-    } else {
-      final error = json.decode(response.body);
-      throw Exception(error['detail'] ?? 'فشل في تحميل قوانين العشيرة');
-    }
-  } catch (e) {
-    throw Exception('خطأ في تحميل قوانين العشيرة: $e');
-  }
-}
-
-// Get Clan Rules by Clan ID
-static Future<Map<String, dynamic>> getClanRulesByClanId(int clanId) async {
-  try {
-    final response = await http.get(
-      Uri.parse('$baseUrl/clan-admin/clan-rules/clan/$clanId'),
-      headers: _headers,
-    );
-
-    if (response.statusCode == 200) {
-      return json.decode(response.body);
-    } else {
-      final error = json.decode(response.body);
-      throw Exception(error['detail'] ?? 'فشل في تحميل قوانين هذه العشيرة');
-    }
-  } catch (e) {
-    throw Exception('خطأ في تحميل قوانين العشيرة: $e');
-  }
-}
-
-// Update Clan Rules
-static Future<Map<String, dynamic>> updateClanRules(int ruleId, Map<String, dynamic> rulesData) async {
-  try {
-    final response = await http.put(
-      Uri.parse('$baseUrl/clan-admin/clan-rules/$ruleId'),
-      headers: _headers,
-      body: json.encode(rulesData),
-    );
-
-    if (response.statusCode == 200) {
-      return json.decode(response.body);
-    } else {
-      final error = json.decode(response.body);
-      throw Exception(error['detail'] ?? 'فشل في تحديث قوانين العشيرة');
-    }
-  } catch (e) {
-    throw Exception('خطأ في تحديث قوانين العشيرة: $e');
-  }
-}
-
-// Delete Clan Rules
-static Future<void> deleteClanRules(int ruleId) async {
-  try {
-    final response = await http.delete(
-      Uri.parse('$baseUrl/clan-admin/clan-rules/$ruleId'),
-      headers: _headers,
-    );
-
-    if (response.statusCode != 204 && response.statusCode != 200) {
-      final error = json.decode(response.body);
-      throw Exception(error['detail'] ?? 'فشل في حذف قوانين العشيرة');
-    }
-  } catch (e) {
-    throw Exception('خطأ في حذف قوانين العشيرة: $e');
-  }
-}
-
-// ==================== CLAN RULES CONVENIENCE METHODS ====================
-
-// Create Clan Rules with specific parameters (convenience method)
-static Future<Map<String, dynamic>> createClanRulesWithDetails({
-  required int clanId,
-  required String rulesText,
-  bool? isActive,
-  DateTime? createdAt,
-  DateTime? updatedAt,
-}) async {
-  final rulesData = {
-    'clan_id': clanId,
-    'rules_text': rulesText,
-  };
-
-  // Add optional fields if provided
-  if (isActive != null) rulesData['is_active'] = isActive;
-  if (createdAt != null) rulesData['created_at'] = createdAt.toIso8601String();
-  if (updatedAt != null) rulesData['updated_at'] = updatedAt.toIso8601String();
-
-  return await createClanRules(rulesData);
-}
-
-// Update Clan Rules with specific parameters (convenience method)
-static Future<Map<String, dynamic>> updateClanRulesDetails(
-  int ruleId, {
-  String? rulesText,
-  bool? isActive,
-  DateTime? updatedAt,
-}) async {
-  final Map<String, dynamic> rulesData = {};
-
-  // Only add non-null fields to the update request
-  if (rulesText != null) rulesData['rules_text'] = rulesText;
-  if (isActive != null) rulesData['is_active'] = isActive;
-  if (updatedAt != null) rulesData['updated_at'] = updatedAt.toIso8601String();
-
-  return await updateClanRules(ruleId, rulesData);
-}
-
-// Check if clan has rules
-static Future<bool> clanHasRules(int clanId) async {
-  try {
-    await getClanRulesByClanId(clanId);
-    return true;
-  } catch (e) {
-    // If we get a 404 error, it means no rules exist
-    if (e.toString().contains('فشل في تحميل قوانين هذه العشيرة')) {
-      return false;
-    }
-    // Re-throw other errors
-    rethrow;
-  }
-}
-
-// Get active clan rules only
-static Future<List<dynamic>> getActiveClanRules({
-  int skip = 0,
-  int limit = 100,
-}) async {
-  try {
-    final allRules = await getAllClanRules(skip: skip, limit: limit);
-    // Filter for active rules if the API doesn't provide this filtering
-    return allRules.where((rule) => rule['is_active'] == true).toList();
-  } catch (e) {
-    throw Exception('خطأ في تحميل القوانين النشطة: $e');
-  }
-}
-
-// Search clan rules by text content
-static Future<List<dynamic>> searchClanRules(
-  String searchQuery, {
-  int skip = 0,
-  int limit = 100,
-}) async {
-  try {
-    final allRules = await getAllClanRules(skip: skip, limit: limit);
-    final query = searchQuery.toLowerCase();
-    
-    return allRules.where((rule) {
-      final rulesText = rule['rules_text']?.toString().toLowerCase() ?? '';
-      return rulesText.contains(query);
-    }).toList();
-  } catch (e) {
-    throw Exception('خطأ في البحث عن القوانين: $e');
-  }
-} 
-
-// ==================== GROOM CLAN RULES ENDPOINTS (READ-ONLY) ====================
-
-// Get Clan Rules by ID (Groom read-only access)
-static Future<Map<String, dynamic>> getGroomClanRules(int ruleId) async {
-  try {
-    final response = await http.get(
-      Uri.parse('$baseUrl/groom/clan-rules/$ruleId'),
-      headers: _headers,
-    );
-
-    if (response.statusCode == 200) {
-      return json.decode(response.body);
-    } else {
-      final error = json.decode(response.body);
-      throw Exception(error['detail'] ?? 'فشل في تحميل قوانين العشيرة');
-    }
-  } catch (e) {
-    throw Exception('خطأ في تحميل قوانين العشيرة: $e');
-  }
-}
-
-// Get Clan Rules by Clan ID (Groom read-only access)
-static Future<Map<String, dynamic>> getGroomClanRulesByClan(int clanId) async {
-  try {
-    final response = await http.get(
-      Uri.parse('$baseUrl/groom/clan-rules/clan/$clanId'),
-      headers: _headers,
-    );
-
-    if (response.statusCode == 200) {
-      return json.decode(response.body);
-    } else {
-      final error = json.decode(response.body);
-      throw Exception(error['detail'] ?? 'فشل في تحميل قوانين هذه العشيرة');
-    }
-  } catch (e) {
-    throw Exception('خطأ في تحميل قوانين العشيرة: $e');
-  }
-}
-
-// ==================== GROOM CLAN RULES CONVENIENCE METHODS ====================
-
-// Check if groom's clan has rules (convenience method for grooms)
-static Future<bool> groomClanHasRules(int clanId) async {
-  try {
-    await getGroomClanRulesByClan(clanId);
-    return true;
-  } catch (e) {
-    // If we get a 404 error, it means no rules exist
-    if (e.toString().contains('فشل في تحميل قوانين هذه العشيرة')) {
-      return false;
-    }
-    // Re-throw other errors
-    rethrow;
-  }
-}
-
-// Get groom's clan rules if they exist, otherwise return null
-static Future<Map<String, dynamic>?> getGroomClanRulesOrNull(int clanId) async {
-  try {
-    return await getGroomClanRulesByClan(clanId);
-  } catch (e) {
-    // If no rules found, return null instead of throwing error
-    if (e.toString().contains('فشل في تحميل قوانين هذه العشيرة')) {
-      return null;
-    }
-    // Re-throw other errors
-    rethrow;
-  }
-}
-
 
 
 
@@ -3017,13 +2734,790 @@ static Future<bool> verifyPdfGeneration(int reservationId) async {
 
 
 
+// Add these methods to your ApiService class in lib/services/api_service.dart
 
+// ==================== CLAN RULES ENDPOINTS ====================
+
+// ==================== CLAN ADMIN - CRUD OPERATIONS ====================
+
+/// Create new clan rules (Clan Admin only)
+static Future<Map<String, dynamic>> createClanRules(Map<String, dynamic> rulesData) async {
+  try {
+    final response = await http.post(
+      Uri.parse('$baseUrl/clan-admin/clan-rules'),
+      headers: _headers,
+      body: json.encode(rulesData),
+    );
+
+    print('Create clan rules response status: ${response.statusCode}');
+    print('Create clan rules response body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل في إنشاء قوانين العشيرة');
+    }
+  } catch (e) {
+    throw Exception('خطأ في إنشاء قوانين العشيرة: $e');
+  }
+}
+
+/// Create clan rules with specific parameters (convenience method)
+static Future<Map<String, dynamic>> createClanRulesWithDetails({
+  required int clanId,
+  required String generalRule,
+  String? groomSupplies,
+  String? ruleAboutClothing,
+  String? ruleAboutKitchenware,
+  String? rulesBookOfClanPdfs,
+}) async {
+  final rulesData = {
+    'clan_id': clanId,
+    'general_rule': generalRule,
+  };
+
+  // Add optional fields if provided
+  if (groomSupplies != null && groomSupplies.isNotEmpty) {
+    rulesData['groom_supplies'] = groomSupplies;
+  }
+  if (ruleAboutClothing != null && ruleAboutClothing.isNotEmpty) {
+    rulesData['rule_about_clothing'] = ruleAboutClothing;
+  }
+  if (ruleAboutKitchenware != null && ruleAboutKitchenware.isNotEmpty) {
+    rulesData['rule_about_kitchenware'] = ruleAboutKitchenware;
+  }
+  if (rulesBookOfClanPdfs != null && rulesBookOfClanPdfs.isNotEmpty) {
+    rulesData['rules_book_of_clan_pdfs'] = rulesBookOfClanPdfs;
+  }
+
+  return await createClanRules(rulesData);
+}
+
+/// Get clan rules by rule ID (Clan Admin only)
+static Future<Map<String, dynamic>> getClanRulesById(int ruleId) async {
+  try {
+    final response = await http.get(
+      Uri.parse('$baseUrl/clan-admin/clan-rules/$ruleId'),
+      headers: _headers,
+    );
+
+    print('Get clan rules by ID response status: ${response.statusCode}');
+    print('Get clan rules by ID response body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'قوانين العشيرة غير موجودة');
+    }
+  } catch (e) {
+    throw Exception('خطأ في جلب قوانين العشيرة: $e');
+  }
+}
+
+/// Get clan rules by clan ID (Clan Admin only)
+static Future<Map<String, dynamic>> getClanRulesByClanId(int clanId) async {
+  try {
+    final response = await http.get(
+      Uri.parse('$baseUrl/clan-admin/clan-rules/clan/$clanId'),
+      headers: _headers,
+    );
+
+    print('Get clan rules by clan ID response status: ${response.statusCode}');
+    print('Get clan rules by clan ID response body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'لا توجد قوانين لهذه العشيرة');
+    }
+  } catch (e) {
+    throw Exception('خطأ في جلب قوانين العشيرة: $e');
+  }
+}
+
+/// Update clan rules (Clan Admin only)
+static Future<Map<String, dynamic>> updateClanRules(
+  int ruleId, 
+  Map<String, dynamic> rulesData
+) async {
+  try {
+    final response = await http.put(
+      Uri.parse('$baseUrl/clan-admin/clan-rules/$ruleId'),
+      headers: _headers,
+      body: json.encode(rulesData),
+    );
+
+    print('Update clan rules response status: ${response.statusCode}');
+    print('Update clan rules response body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل في تحديث قوانين العشيرة');
+    }
+  } catch (e) {
+    throw Exception('خطأ في تحديث قوانين العشيرة: $e');
+  }
+}
+
+/// Update clan rules with specific parameters (convenience method)
+static Future<Map<String, dynamic>> updateClanRulesDetails(
+  int ruleId, {
+  String? generalRule,
+  String? groomSupplies,
+  String? ruleAboutClothing,
+  String? ruleAboutKitchenware,
+  String? rulesBookOfClanPdfs,
+}) async {
+  final Map<String, dynamic> rulesData = {};
+
+  // Only add non-null fields to the update request
+  if (generalRule != null) rulesData['general_rule'] = generalRule;
+  if (groomSupplies != null) rulesData['groom_supplies'] = groomSupplies;
+  if (ruleAboutClothing != null) rulesData['rule_about_clothing'] = ruleAboutClothing;
+  if (ruleAboutKitchenware != null) rulesData['rule_about_kitchenware'] = ruleAboutKitchenware;
+  if (rulesBookOfClanPdfs != null) rulesData['rules_book_of_clan_pdfs'] = rulesBookOfClanPdfs;
+
+  if (rulesData.isEmpty) {
+    throw Exception('لا توجد بيانات للتحديث');
+  }
+
+  return await updateClanRules(ruleId, rulesData);
+}
+
+/// Delete clan rules (Clan Admin only)
+static Future<void> deleteClanRules(int ruleId) async {
+  try {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/clan-admin/clan-rules/$ruleId'),
+      headers: _headers,
+    );
+
+    print('Delete clan rules response status: ${response.statusCode}');
+    print('Delete clan rules response body: ${response.body}');
+
+    // Accept 204 No Content or 200 OK as success
+    if (response.statusCode == 204 || response.statusCode == 200) {
+      return;
+    } else {
+      String errorMessage = 'فشل في حذف قوانين العشيرة';
+      
+      if (response.body.isNotEmpty) {
+        try {
+          final error = json.decode(response.body);
+          errorMessage = error['detail'] ?? errorMessage;
+        } catch (e) {
+          // If parsing fails, use default message
+        }
+      }
+      
+      throw Exception(errorMessage);
+    }
+  } catch (e) {
+    throw Exception('خطأ في حذف قوانين العشيرة: $e');
+  }
+}
+
+// ==================== GROOM - READ ONLY ACCESS ====================
+
+/// Get clan rules for groom's clan (Read-only for grooms)
+static Future<Map<String, dynamic>> getGroomClanRules() async {
+  try {
+    final response = await http.get(
+      Uri.parse('$baseUrl/groom/clan-rules'),
+      headers: _headers,
+    );
+
+    print('Get groom clan rules response status: ${response.statusCode}');
+    print('Get groom clan rules response body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      final decoded = json.decode(response.body);
+      // Handle both single object and list responses
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      } else if (decoded is List && decoded.isNotEmpty) {
+        return decoded[0] as Map<String, dynamic>;
+      } else {
+        throw Exception('لا توجد قوانين لهذه العشيرة');
+      }
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل في تحميل قوانين العشيرة');
+    }
+  } catch (e) {
+    throw Exception('خطأ في تحميل قوانين العشيرة: $e');
+  }
+}
+
+/// Get clan rules by clan ID (Public/Groom access)
+/// Alternative method that allows grooms to view rules by clan ID
+
+
+//##################### clan rules  ###########################
+
+static Future<Map<String, dynamic>> getGroomClanRulesByClanId(int clanId) async {
+  try {
+    final response = await http.get(
+      Uri.parse('$baseUrl/groom/clan-rules/clan/$clanId'),
+      headers: _headers,
+    );
+
+    print('Get groom clan rules by clan ID response status: ${response.statusCode}');
+    print('Get groom clan rules by clan ID response body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      final decoded = json.decode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      } else if (decoded is List && decoded.isNotEmpty) {
+        return decoded[0] as Map<String, dynamic>;
+      } else {
+        throw Exception('لا توجد قوانين لهذه العشيرة');
+      }
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل في تحميل قوانين العشيرة');
+    }
+  } catch (e) {
+    throw Exception('خطأ في تحميل قوانين العشيرة: $e');
+  }
+}
+
+// ==================== CLAN INFO ====================
+
+static Future<Map<String,dynamic>> getClanInfoByCurrentUser() async {
+  try {
+    final response = await http.get(
+      Uri.parse('$baseUrl/clan-admin/clan_info'),
+      headers: _headers,
+    );
+
+    print('Get groom clan info response status: ${response.statusCode}');
+    print('Get groom clan info response body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      final decoded = json.decode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      } else if (decoded is List && decoded.isNotEmpty) {
+        return decoded[0] as Map<String, dynamic>;
+      } else {
+        throw Exception('لا توجد معلومات لهذه العشيرة');
+      }
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل في تحميل معلومات العشيرة');
+    }
+  } catch (e) {
+    throw Exception('خطأ في تحميل معلومات العشيرة: $e');
+  }
+}
+
+// ==================== UTILITY METHODS FOR CLAN RULES ====================
+
+/// Check if clan rules exist for a specific clan
+static Future<bool> clanRulesExist(int clanId) async {
+  try {
+    await getClanRulesByClanId(clanId);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+/// Get clan rules with fallback (returns null if not found instead of throwing)
+static Future<Map<String, dynamic>?> getClanRulesSafe(int clanId) async {
+  try {
+    return await getClanRulesByClanId(clanId);
+  } catch (e) {
+    print('No rules found for clan $clanId: $e');
+    return null;
+  }
+}
+
+/// Validate clan rules data before creating/updating
+static Map<String, String> validateClanRulesData({
+  required String generalRule,
+  int? clanId,
+  String? groomSupplies,
+  String? ruleAboutClothing,
+  String? ruleAboutKitchenware,
+  String? rulesBookOfClanPdfs,
+}) {
+  final errors = <String, String>{};
+
+  // Validate general rule (required)
+  if (generalRule.trim().isEmpty) {
+    errors['general_rule'] = 'القاعدة العامة مطلوبة';
+  } else if (generalRule.trim().length < 10) {
+    errors['general_rule'] = 'القاعدة العامة قصيرة جداً (الحد الأدنى 10 أحرف)';
+  } else if (generalRule.trim().length > 5000) {
+    errors['general_rule'] = 'القاعدة العامة طويلة جداً (الحد الأقصى 5000 حرف)';
+  }
+
+  // Validate optional fields (if provided)
+  if (groomSupplies != null && groomSupplies.trim().isNotEmpty) {
+    if (groomSupplies.trim().length > 3000) {
+      errors['groom_supplies'] = 'قاعدة لوازم العريس طويلة جداً (الحد الأقصى 3000 حرف)';
+    }
+  }
+
+  if (ruleAboutClothing != null && ruleAboutClothing.trim().isNotEmpty) {
+    if (ruleAboutClothing.trim().length > 3000) {
+      errors['rule_about_clothing'] = 'قاعدة الملابس طويلة جداً (الحد الأقصى 3000 حرف)';
+    }
+  }
+
+  if (ruleAboutKitchenware != null && ruleAboutKitchenware.trim().isNotEmpty) {
+    if (ruleAboutKitchenware.trim().length > 3000) {
+      errors['rule_about_kitchenware'] = 'قاعدة أدوات المطبخ طويلة جداً (الحد الأقصى 3000 حرف)';
+    }
+  }
+
+  // Validate PDF URLs if provided
+  if (rulesBookOfClanPdfs != null && rulesBookOfClanPdfs.trim().isNotEmpty) {
+    // Basic URL validation (can be enhanced based on requirements)
+    final urls = rulesBookOfClanPdfs.split(',').map((url) => url.trim()).toList();
+    for (final url in urls) {
+      if (url.isNotEmpty && !_isValidUrl(url)) {
+        errors['rules_book_of_clan_pdfs'] = 'رابط PDF غير صالح: $url';
+        break;
+      }
+    }
+  }
+
+  // Validate clan ID if provided
+  if (clanId != null && clanId <= 0) {
+    errors['clan_id'] = 'معرف العشيرة غير صحيح';
+  }
+
+  return errors;
+}
+
+/// Helper method to validate URL format
+static bool _isValidUrl(String url) {
+  try {
+    final uri = Uri.parse(url);
+    return uri.hasScheme && (uri.scheme == 'http' || uri.scheme == 'https');
+  } catch (e) {
+    return false;
+  }
+}
+
+/// Format clan rules for display
+static String formatClanRulesForDisplay(Map<String, dynamic> rules) {
+  final buffer = StringBuffer();
+  
+  buffer.writeln('قوانين العشيرة');
+  buffer.writeln('=' * 50);
+  buffer.writeln();
+  
+  // General Rule
+  if (rules.containsKey('general_rule') && rules['general_rule'] != null) {
+    buffer.writeln('القاعدة العامة:');
+    buffer.writeln(rules['general_rule']);
+    buffer.writeln();
+  }
+  
+  // Groom Supplies
+  if (rules.containsKey('groom_supplies') && 
+      rules['groom_supplies'] != null && 
+      rules['groom_supplies'].toString().isNotEmpty) {
+    buffer.writeln('لوازم العريس:');
+    buffer.writeln(rules['groom_supplies']);
+    buffer.writeln();
+  }
+  
+  // Rule about Clothing
+  if (rules.containsKey('rule_about_clothing') && 
+      rules['rule_about_clothing'] != null && 
+      rules['rule_about_clothing'].toString().isNotEmpty) {
+    buffer.writeln('قواعد الملابس:');
+    buffer.writeln(rules['rule_about_clothing']);
+    buffer.writeln();
+  }
+  
+  // Rule about Kitchenware
+  if (rules.containsKey('rule_about_kitchenware') && 
+      rules['rule_about_kitchenware'] != null && 
+      rules['rule_about_kitchenware'].toString().isNotEmpty) {
+    buffer.writeln('قواعد أدوات المطبخ:');
+    buffer.writeln(rules['rule_about_kitchenware']);
+    buffer.writeln();
+  }
+  
+  // Rules Book PDFs
+  if (rules.containsKey('rules_book_of_clan_pdfs') && 
+      rules['rules_book_of_clan_pdfs'] != null && 
+      rules['rules_book_of_clan_pdfs'].toString().isNotEmpty) {
+    buffer.writeln('كتاب قوانين العشيرة (PDFs):');
+    buffer.writeln(rules['rules_book_of_clan_pdfs']);
+    buffer.writeln();
+  }
+  
+  // Timestamps
+  if (rules.containsKey('created_at')) {
+    buffer.writeln('تاريخ الإنشاء: ${rules['created_at']}');
+  }
+  
+  if (rules.containsKey('updated_at')) {
+    buffer.writeln('آخر تحديث: ${rules['updated_at']}');
+  }
+  
+  return buffer.toString();
+}
+
+/// Extract PDF URLs from rules
+static List<String> extractPdfUrls(Map<String, dynamic> rules) {
+  if (!rules.containsKey('rules_book_of_clan_pdfs') || 
+      rules['rules_book_of_clan_pdfs'] == null) {
+    return [];
+  }
+  
+  final pdfString = rules['rules_book_of_clan_pdfs'].toString();
+  if (pdfString.isEmpty) {
+    return [];
+  }
+  
+  return pdfString
+      .split(',')
+      .map((url) => url.trim())
+      .where((url) => url.isNotEmpty)
+      .toList();
+}
+
+/// Check if clan rules have PDF attachments
+static bool hasPdfAttachments(Map<String, dynamic> rules) {
+  return extractPdfUrls(rules).isNotEmpty;
+}
+
+/// Cache key for clan rules
+static String _getClanRulesCacheKey(int clanId) {
+  return 'clan_rules_$clanId';
+}
+
+/// Get clan rules with caching
+static Future<Map<String, dynamic>> getClanRulesCached(int clanId) async {
+  final cacheKey = _getClanRulesCacheKey(clanId);
+  final cached = getCachedData<Map<String, dynamic>>(cacheKey);
+  
+  if (cached != null) {
+    return cached;
+  }
+
+  final rules = await getClanRulesByClanId(clanId);
+  setCachedData(cacheKey, rules);
+  return rules;
+}
+
+/// Clear clan rules cache
+static void clearClanRulesCache(int clanId) {
+  final cacheKey = _getClanRulesCacheKey(clanId);
+  removeCachedData(cacheKey);
+}
+
+/// Refresh clan rules cache
+static Future<Map<String, dynamic>> refreshClanRulesCache(int clanId) async {
+  clearClanRulesCache(clanId);
+  return await getClanRulesCached(clanId);
+}
+
+/// rules pdf routes  
+
+/// Upload PDF file to backend with optional clan association
+/// 
+/// [file] - The PDF file to upload
+/// [clanId] - Optional clan ID to save PDF URL to ClanRules table
+/// 
+/// Returns a map containing:
+/// - success: bool
+/// - url: String (PDF access URL)
+/// - filename: String
+/// - file_id: String
+/// - size: int
+/// - clan_id: int? (if provided)
+static Future<Map<String, dynamic>> uploadPdfFile(
+  File file, {
+  int? clanId,
+}) async {
+  try {
+    final fileName = path.basename(file.path);
+    final fileSize = await file.length();
+
+    print('=== Upload Debug ===');
+    print('Base URL: $baseUrl');
+    print('File: $fileName');
+    print('Size: $fileSize bytes');
+    if (clanId != null) print('Clan ID: $clanId');
+
+    // FIXED: Create multipart request with optional clan_id as FORM FIELD, not query parameter
+    var uri = Uri.parse('$baseUrl/pdf/api/upload/pdf/');
+    var request = http.MultipartRequest('POST', uri);
+
+    // Add auth header
+    if (_token != null) {
+      request.headers['Authorization'] = 'Bearer $_token';
+    }
+
+    // FIXED: Add clan_id as a form field if provided
+    if (clanId != null) {
+      request.fields['clan_id'] = clanId.toString();
+    }
+
+    // Add file
+    request.files.add(await http.MultipartFile.fromPath(
+      'file',
+      file.path,
+      filename: fileName,
+    ));
+
+    print('Sending request to: ${request.url}');
+    if (clanId != null) print('With clan_id field: $clanId');
+
+    // Send request with longer timeout for file upload
+    var streamedResponse = await request.send().timeout(
+      const Duration(seconds: 60), // Increased timeout
+    );
+
+    var response = await http.Response.fromStream(streamedResponse);
+
+    print('Response status: ${response.statusCode}');
+    print('Response body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      if (data['success'] == true) {
+        return {
+          'success': data['success'],
+          'url': data['url'],
+          'filename': data['filename'],
+          'file_id': data['file_id'],
+          'size': data['size'],
+          'clan_id': data['clan_id'],
+        };
+      }
+      throw Exception(data['detail'] ?? 'فشل التحميل');
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'خطأ في التحميل');
+    }
+  } catch (e) {
+    print('Upload error: $e');
+    rethrow;
+  }
+}
+
+/// Delete PDF file and optionally remove from ClanRules
+/// 
+/// [url] - The full URL of the PDF file
+/// [clanId] - Optional clan ID to remove PDF URL from ClanRules table
+static Future<void> deletePdfByUrl(String url, {int? clanId}) async {
+  try {
+    final fileId = url.split('/').last;
+
+    // Keep using query parameters for DELETE requests - this is correct
+    var uri = Uri.parse('$baseUrl/pdf/api/upload/pdf/$fileId');
+    if (clanId != null) {
+      uri = uri.replace(queryParameters: {'clan_id': clanId.toString()});
+    }
+
+    print('Delete URL: $uri');
+
+    final response = await http.delete(
+      uri,
+      headers: _headers,
+    ).timeout(const Duration(seconds: 30));
+
+    print('Delete response: ${response.statusCode}');
+    print('Delete response body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      if (data['success'] != true) {
+        throw Exception('فشل الحذف');
+      }
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل حذف الملف');
+    }
+  } catch (e) {
+    print('Delete error: $e');
+    rethrow;
+  }
+}
+
+/// Delete PDF file by file ID
+/// 
+/// [fileId] - The unique file identifier
+/// [clanId] - Optional clan ID to remove PDF URL from ClanRules table
+static Future<void> deletePdfById(String fileId, {int? clanId}) async {
+  try {
+    var uri = Uri.parse('$baseUrl/pdf/api/upload/pdf/$fileId');
+    if (clanId != null) {
+      uri = uri.replace(queryParameters: {'clan_id': clanId.toString()});
+    }
+
+    print('Delete URL: $uri');
+
+    final response = await http.delete(
+      uri,
+      headers: _headers,
+    ).timeout(const Duration(seconds: 30));
+
+    print('Delete response: ${response.statusCode}');
+    print('Delete response body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      if (data['success'] != true) {
+        throw Exception('فشل الحذف');
+      }
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل حذف الملف');
+    }
+  } catch (e) {
+    print('Delete error: $e');
+    rethrow;
+  }
+}
+
+/// Get the PDF URL for a specific clan's rules book
+/// 
+/// [clanId] - The clan ID
+/// 
+/// Returns a map containing:
+/// - success: bool
+/// - pdf_url: String
+/// - clan_id: int
+static Future<Map<String, dynamic>> getClanRulesPdf(int clanId) async {
+  try {
+    print('Fetching clan rules PDF for clan: $clanId');
+
+    final response = await http.get(
+      Uri.parse('$baseUrl/pdf/api/clan/$clanId/rules/pdf'),
+      headers: _headers,
+    ).timeout(const Duration(seconds: 30));
+
+    print('Response status: ${response.statusCode}');
+    print('Response body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      if (data['success'] == true) {
+        return {
+          'success': data['success'],
+          'pdf_url': data['pdf_url'],
+          'clan_id': data['clan_id'],
+        };
+      }
+      throw Exception('فشل في جلب ملف PDF');
+    } else if (response.statusCode == 404) {
+      throw Exception('لا يوجد ملف PDF لقواعد هذه العشيرة');
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'خطأ في جلب الملف');
+    }
+  } catch (e) {
+    print('Get clan rules PDF error: $e');
+    rethrow;
+  }
+}
+
+/// Check if a clan has a rules PDF
+/// 
+/// [clanId] - The clan ID
+/// 
+/// Returns true if clan has a PDF, false otherwise
+static Future<bool> clanHasRulesPdf(int clanId) async {
+  try {
+    await getClanRulesPdf(clanId);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+/// Download and open PDF file
+/// 
+/// [fileId] - The unique file identifier
+/// 
+/// Returns the PDF file bytes
+static Future<List<int>> downloadPdfe(String filename) async {
+  try {
+    print('Downloading PDF: $filename');
+
+    final response = await http.get(
+      Uri.parse('$baseUrl/pdf/api/upload/pdf/$filename'),
+      headers: _headers,
+    ).timeout(const Duration(seconds: 60));
+
+    print('Download response status: ${response.statusCode}');
+
+    if (response.statusCode == 200) {
+      return response.bodyBytes;
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل تحميل الملف');
+    }
+  } catch (e) {
+    print('Download error: $e');
+    rethrow;
+  }
+}
+
+/// Check storage health
+static Future<Map<String, dynamic>> checkStorageHealth() async {
+  try {
+    final response = await http.get(
+      Uri.parse('$baseUrl/pdf/api/upload/health'),
+      headers: _headers,
+    ).timeout(const Duration(seconds: 30));
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('فشل فحص حالة التخزين');
+    }
+  } catch (e) {
+    print('Health check error: $e');
+    rethrow;
+  }
+}
+
+/// Debug: Check what's saved in ClanRules table for a specific clan
+/// 
+/// [clanId] - The clan ID to check
+/// 
+/// Returns the complete ClanRules data including the PDF URL
+static Future<Map<String, dynamic>> debugClanRules(int clanId) async {
+  try {
+    print('🔍 DEBUG: Checking ClanRules for clan: $clanId');
+
+    final response = await http.get(
+      Uri.parse('$baseUrl/pdf/api/debug/clan/$clanId/rules'),
+      headers: _headers,
+    ).timeout(const Duration(seconds: 30));
+
+    print('Debug response status: ${response.statusCode}');
+    print('Debug response body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return data;
+    } else {
+      throw Exception('فشل في جلب بيانات التصحيح');
+    }
+  } catch (e) {
+    print('Debug error: $e');
+    rethrow;
+  }
 }
 
 
-
-
-
-
-
-
+}

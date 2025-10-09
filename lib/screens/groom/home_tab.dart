@@ -406,14 +406,15 @@ class HomeTabState extends State<HomeTab> with TickerProviderStateMixin {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Colors.orange.shade500,
-              Colors.orange.shade600,
+              isDark ? const Color.fromARGB(255, 135, 88, 18).withOpacity(1) : Colors.orange.shade300,
+              isDark ? const Color.fromARGB(255, 200, 100, 0).withOpacity(1) :Colors.orange.shade600,
+              
             ],
           ),
           borderRadius: BorderRadius.circular(8),
           boxShadow: [
             BoxShadow(
-              color: Colors.orange.withOpacity(0.3),
+              color: isDark ? Colors.orange.shade700.withOpacity(0.8) :Colors.orange.shade600,
               blurRadius: 15,
               offset: const Offset(0, 4),
             ),
@@ -513,15 +514,15 @@ class HomeTabState extends State<HomeTab> with TickerProviderStateMixin {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              const Color.fromARGB(153, 29, 185, 84),
-              const Color.fromARGB(142, 12, 86, 38),
+              isDark ? Colors.green.shade600 : Colors.green.shade400.withOpacity(0.7),
+              isDark ?  Colors.green.shade900 : Colors.green.shade700.withOpacity(0.7),
             ],
           ),
           borderRadius: BorderRadius.circular(8),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF1DB954).withOpacity(0.3),
-              blurRadius: 15,
+              color: isDark ? Color(0xFF1DB954).withOpacity(0.7) : Colors.green.shade700.withOpacity(0.7),
+              blurRadius: 25,
               offset: const Offset(0, 4),
             ),
           ],
@@ -610,11 +611,15 @@ class HomeTabState extends State<HomeTab> with TickerProviderStateMixin {
         borderRadius: BorderRadius.circular(8),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
+            color: isDark ? const Color.fromARGB(255, 0, 0, 0).withOpacity( 0.2 ): AppColors.darkBorderFocus.withOpacity( 0.2),
+            blurRadius: 17,
+            offset: const Offset(0, 0),
           ),
         ],
+        // border: Border.all(
+        //   color: isDark ? Colors.grey[800]! : Colors.grey[200]!,
+        //   width: 1,
+        // )
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -674,9 +679,9 @@ class HomeTabState extends State<HomeTab> with TickerProviderStateMixin {
                   borderRadius: BorderRadius.circular(8),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 2),
+                      color: AppColors.darkBorderFocus.withOpacity(isDark ? 0.15 : 0.15),
+                      blurRadius: 15,
+                      offset: const Offset(0, 0),
                     ),
                   ],
                 ),

@@ -39,7 +39,7 @@ class _MultiStepSignupScreenState extends State<MultiStepSignupScreen>
   final _lastNameController = TextEditingController();
   final _fatherNameController = TextEditingController();
   final _grandfatherNameController = TextEditingController();
-  final _birthAddressController = TextEditingController();
+  var _birthAddressController = TextEditingController();
   final _homeAddressController = TextEditingController();
   
   // Controllers for guardian info
@@ -70,6 +70,8 @@ class _MultiStepSignupScreenState extends State<MultiStepSignupScreen>
   @override
   void initState() {
     super.initState();
+      // _birthAddressController = TextEditingController(text: 'تغرداية');
+
     _animationController = AnimationController(
       duration: Duration(milliseconds: 300),
       vsync: this,
@@ -82,16 +84,16 @@ class _MultiStepSignupScreenState extends State<MultiStepSignupScreen>
     _loadClans();
   }
 
-  Future<void> _loadCounties() async {
-    try {
-      final counties = await ApiService.getCounties();
-      setState(() {
-        _counties = counties;
-      });
-    } catch (e) {
-      _showErrorSnackBar('فشل في تحميل البلديات: $e');
-    }
+Future<void> _loadCounties() async {
+  try {
+    final counties = await ApiService.getCounties();
+    setState(() {
+      _counties = counties;
+    });
+  } catch (e) {
+    _showErrorDialog('فشل في تحميل البلديات: $e');
   }
+}
 
   Future<void> _loadClans() async {
     if (_clans.isNotEmpty) return;
@@ -102,7 +104,7 @@ class _MultiStepSignupScreenState extends State<MultiStepSignupScreen>
         _clans = clans;
       });
     } catch (e) {
-      _showErrorSnackBar('فشل في تحميل العشائر: $e');
+      _showErrorDialog('فشل في تحميل العشائر: $e');
     }
   }
 
@@ -124,23 +126,50 @@ class _MultiStepSignupScreenState extends State<MultiStepSignupScreen>
     });
   }
 
-  void _showErrorSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
+  // void _showErrorDialog(String message) {
+  //   ScaffoldMessenger.of(context).showSnackBar(
+  //     SnackBar(
+  //       content: Text(message),
+  //       backgroundColor: AppColors.error,
+  //       behavior: SnackBarBehavior.floating,
+  //       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+  //     ),
+  //   );
+  // }
+  void _showErrorDialog(String message) {
+  showDialog(
+    context: context,
+    builder: (BuildContext context) {
+      return AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: Row(
+          children: [
+            Icon(Icons.error_outline, color: AppColors.error, size: 28),
+            const SizedBox(width: 12),
+            const Text('خطأ'),
+          ],
+        ),
         content: Text(message),
-        backgroundColor: AppColors.error,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    );
-  }
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('حسناً'),
+          ),
+        ],
+      );
+    },
+  );
+}
 
   Future<void> _selectDate({required bool isGuardian}) async {
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: DateTime.now().subtract(Duration(days: isGuardian ? 40 * 365 : 18 * 365)),
-      firstDate: DateTime.now().subtract(Duration(days: 80 * 365)),
-      lastDate: DateTime.now().subtract(Duration(days: isGuardian ? 18 * 365 : 16 * 365)),
+      locale: const Locale('ar', 'DZ'), 
+      initialDate: DateTime.now().subtract(Duration(days: isGuardian ? 40 * 365 : 21 * 365)),
+      firstDate: DateTime.now().subtract(Duration(days: 90 * 365)),
+      lastDate: DateTime.now().subtract(Duration(days: isGuardian ? 20 * 365 : 16 * 365)),
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
@@ -204,13 +233,13 @@ class _MultiStepSignupScreenState extends State<MultiStepSignupScreen>
   bool _validateCurrentStep() {
     switch (_currentStep) {
       case 0:
-        return _formKeys[0].currentState!.validate() && _birthDate != null;
+        return _formKeys[0].currentState!.validate() && 
+              _guardianBirthDate != null && 
+              _selectedGuardianRelation != null;
       case 1:
-        return _selectedCounty != null && _selectedClan != null;
+        return _formKeys[1].currentState!.validate() && _birthDate != null;
       case 2:
-        return _formKeys[2].currentState!.validate() && 
-               _guardianBirthDate != null && 
-               _selectedGuardianRelation != null;
+        return _selectedCounty != null && _selectedClan != null;
       case 3:
         return _formKeys[3].currentState!.validate();
       default:
@@ -219,33 +248,33 @@ class _MultiStepSignupScreenState extends State<MultiStepSignupScreen>
   }
 
   void _nextStep() {
-    if (_validateCurrentStep()) {
-      if (_currentStep < _totalSteps - 1) {
-        setState(() {
-          _currentStep++;
-        });
-        _pageController.animateToPage(
-          _currentStep,
-          duration: Duration(milliseconds: 300),
-          curve: Curves.easeInOut,
-        );
-      } else {
-        _signup();
-      }
+  if (_validateCurrentStep()) {
+    if (_currentStep < _totalSteps - 1) {
+      setState(() {
+        _currentStep++;
+      });
+      _pageController.animateToPage(
+        _currentStep,
+        duration: Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
     } else {
-      if (_currentStep == 0 && _birthDate == null) {
-        _showErrorSnackBar('يرجى اختيار تاريخ الميلاد');
-      } else if (_currentStep == 1 && (_selectedCounty == null || _selectedClan == null)) {
-        _showErrorSnackBar('يرجى اختيار القصر والعشيرة');
-      } else if (_currentStep == 2) {
-        if (_guardianBirthDate == null) {
-          _showErrorSnackBar('يرجى اختيار تاريخ ميلاد ولي العريس');
-        } else if (_selectedGuardianRelation == null) {
-          _showErrorSnackBar('يرجى اختيار صلة القرابة');
-        }
+      _signup();
+    }
+  } else {
+    if (_currentStep == 0) {
+      if (_guardianBirthDate == null) {
+        _showErrorDialog('يرجى اختيار تاريخ ميلاد ولي العريس');
+      } else if (_selectedGuardianRelation == null) {
+        _showErrorDialog('يرجى اختيار صلة القرابة');
       }
+    } else if (_currentStep == 1 && _birthDate == null) {
+      _showErrorDialog('يرجى اختيار تاريخ الميلاد');
+    } else if (_currentStep == 2 && (_selectedCounty == null || _selectedClan == null)) {
+      _showErrorDialog('يرجى اختيار القصر والعشيرة');
     }
   }
+}
 
   void _previousStep() {
     if (_currentStep > 0) {
@@ -299,7 +328,7 @@ class _MultiStepSignupScreenState extends State<MultiStepSignupScreen>
       );
 
     } catch (e) {
-      _showErrorSnackBar('فشل في التسجيل: $e');
+      _showErrorDialog('فشل في التسجيل: $e');
     } finally {
       setState(() {
         _isLoading = false;
@@ -474,15 +503,15 @@ class _MultiStepSignupScreenState extends State<MultiStepSignupScreen>
             _buildProgressIndicator(),
             Expanded(
               child: PageView(
-                controller: _pageController,
-                physics: NeverScrollableScrollPhysics(),
-                children: [
-                  _buildPersonalInfoStep(),
-                  _buildLocationStep(),
-                  _buildGuardianInfoStep(),
-                  _buildSecurityStep(),
-                ],
-              ),
+              controller: _pageController,
+              physics: NeverScrollableScrollPhysics(),
+              children: [
+                _buildGuardianInfoStep(),
+                _buildPersonalInfoStep(),
+                _buildLocationStep(),
+                _buildSecurityStep(),
+              ],
+            ),
             ),
             _buildNavigationButtons(),
           ],
@@ -495,7 +524,7 @@ class _MultiStepSignupScreenState extends State<MultiStepSignupScreen>
     return SingleChildScrollView(
       padding: EdgeInsets.all(24),
       child: Form(
-        key: _formKeys[0],
+        key: _formKeys[1],
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -564,6 +593,7 @@ class _MultiStepSignupScreenState extends State<MultiStepSignupScreen>
               label: 'مكان الميلاد',
               validator: (value) => _validateRequired(value, 'مكان الميلاد'),
               prefixIcon: Icons.location_on,
+              // hint: _birthAddressController.text,
             ),
             SizedBox(height: 20),
 
@@ -650,7 +680,7 @@ class _MultiStepSignupScreenState extends State<MultiStepSignupScreen>
     return SingleChildScrollView(
       padding: EdgeInsets.all(24),
       child: Form(
-        key: _formKeys[2],
+        key: _formKeys[0],
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -660,7 +690,7 @@ class _MultiStepSignupScreenState extends State<MultiStepSignupScreen>
             CustomTextField(
               controller: _guardianNameController,
               label: 'الاسم الكامل',
-              hint: "الاسم و اللقب , اسم الاب , اسم الجد",
+              hint: "  اللقب و الاسم, اسم الاب ,اسم الجد",
               validator: (value) => _validateRequired(value, 'الاسم الكامل'),
               prefixIcon: Icons.person_4,
             ),

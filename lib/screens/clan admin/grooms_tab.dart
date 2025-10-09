@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:wedding_reservation_app/providers/theme_provider.dart';
-import 'package:wedding_reservation_app/screens/auth/signup_screen.dart';
-import 'package:wedding_reservation_app/screens/auth/tempCodeRunnerFile.dart';
+import 'package:wedding_reservation_app/screens/auth/signup_screen%20copy%20.dart';
+import 'package:wedding_reservation_app/screens/auth/sing_up_screen.dart';
 import 'package:wedding_reservation_app/screens/super%20admin/otp_verification_screen.dart';
 import 'package:wedding_reservation_app/services/api_service.dart';
 // Add your AdminOTPScreen import here

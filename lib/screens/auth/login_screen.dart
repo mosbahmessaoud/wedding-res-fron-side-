@@ -357,7 +357,7 @@ Future<void> _login() async {
                                     child: CustomTextField(
                                       
                                       controller: _phoneController,
-                                      label: 'رقم الهاتف',
+                                      label: 'رقم هاتف العريس',
                                       labelColor: isDark ? Colors.white : Colors.black ,
                                       boxcolor:isDark ? const Color.fromARGB(255, 157, 42, 42) : Colors.black , // i Added this line 
 

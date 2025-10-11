@@ -14,71 +14,19 @@ class ProfileTab extends StatefulWidget {
 
 class ProfileTabState extends State<ProfileTab> {
   bool _isLoading = true;
-  bool _isEditing = false;
   Map<String, dynamic>? _userProfile;
   Map<String, dynamic>? _clanInfo;
   Map<String, dynamic>? _countyInfo;
-  
-  // Form controllers
-  final _formKey = GlobalKey<FormState>();
-  late TextEditingController _firstNameController;
-  late TextEditingController _lastNameController;
-  late TextEditingController _fatherNameController;
-  late TextEditingController _grandfatherNameController;
-  late TextEditingController _phoneController;
-  late TextEditingController _birthDateController;
-  late TextEditingController _birthAddressController;
-  late TextEditingController _homeAddressController;
-  late TextEditingController _guardianNameController;
-  late TextEditingController _guardianPhoneController;
-  late TextEditingController _guardianRelationController;
 
   @override
   void initState() {
     super.initState();
-    _initializeControllers();
     _loadProfile();
   }
+
   void refreshData() {
-    // Add your profile refresh logic here
-    // For example:
     _loadProfile();
-    setState(() {
-      // Trigger rebuild
-    });
-  }
-  @override
-  void dispose() {
-    _disposeControllers();
-    super.dispose();
-  }
-
-  void _initializeControllers() {
-    _firstNameController = TextEditingController();
-    _lastNameController = TextEditingController();
-    _fatherNameController = TextEditingController();
-    _grandfatherNameController = TextEditingController();
-    _phoneController = TextEditingController();
-    _birthDateController = TextEditingController();
-    _birthAddressController = TextEditingController();
-    _homeAddressController = TextEditingController();
-    _guardianNameController = TextEditingController();
-    _guardianPhoneController = TextEditingController();
-    _guardianRelationController = TextEditingController();
-  }
-
-  void _disposeControllers() {
-    _firstNameController.dispose();
-    _lastNameController.dispose();
-    _fatherNameController.dispose();
-    _grandfatherNameController.dispose();
-    _phoneController.dispose();
-    _birthDateController.dispose();
-    _birthAddressController.dispose();
-    _homeAddressController.dispose();
-    _guardianNameController.dispose();
-    _guardianPhoneController.dispose();
-    _guardianRelationController.dispose();
+    setState(() {});
   }
 
   Future<void> _loadProfile() async {
@@ -86,7 +34,6 @@ class ProfileTabState extends State<ProfileTab> {
     
     try {
       _userProfile = await ApiService.getProfile();
-      _populateControllers();
       
       // Load additional information
       if (_userProfile?['clan_id'] != null) {
@@ -128,22 +75,6 @@ class ProfileTabState extends State<ProfileTab> {
     }
   }
 
-  void _populateControllers() {
-    if (_userProfile != null) {
-      _firstNameController.text = _userProfile?['first_name'] ?? '';
-      _lastNameController.text = _userProfile?['last_name'] ?? '';
-      _fatherNameController.text = _userProfile?['father_name'] ?? '';
-      _grandfatherNameController.text = _userProfile?['grandfather_name'] ?? '';
-      _phoneController.text = _userProfile?['phone_number'] ?? '';
-      _birthDateController.text = _userProfile?['birth_date'] ?? '';
-      _birthAddressController.text = _userProfile?['birth_address'] ?? '';
-      _homeAddressController.text = _userProfile?['home_address'] ?? '';
-      _guardianNameController.text = _userProfile?['guardian_name'] ?? '';
-      _guardianPhoneController.text = _userProfile?['guardian_phone'] ?? '';
-      _guardianRelationController.text = _userProfile?['guardian_relation'] ?? '';
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -164,6 +95,8 @@ class ProfileTabState extends State<ProfileTab> {
           _buildGuardianInfoSection(),
           const SizedBox(height: 24),
           _buildActionButtons(),
+          const SizedBox(height: 60),
+
         ],
       ),
     );
@@ -211,33 +144,6 @@ class ProfileTabState extends State<ProfileTab> {
               fontSize: 16,
             ),
           ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              ElevatedButton.icon(
-                onPressed: () => setState(() => _isEditing = !_isEditing),
-                icon: Icon(_isEditing ? Icons.cancel : Icons.edit),
-                label: Text(_isEditing ? 'إلغاء' : 'تعديل'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: AppColors.primary,
-                ),
-              ),
-              if (_isEditing) ...[
-                const SizedBox(width: 8),
-                ElevatedButton.icon(
-                  onPressed: _saveProfile,
-                  icon: const Icon(Icons.save),
-                  label: const Text('حفظ'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    foregroundColor: Colors.white,
-                  ),
-                ),
-              ],
-            ],
-          ),
         ],
       ),
     );
@@ -261,7 +167,7 @@ class ProfileTabState extends State<ProfileTab> {
             const SizedBox(height: 16),
             _buildInfoRow(
               Icons.location_city,
-              'البلدية',
+              'القصر',
               _countyInfo?['name'] ?? 'غير محدد',
             ),
             const SizedBox(height: 12),
@@ -280,92 +186,74 @@ class ProfileTabState extends State<ProfileTab> {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'المعلومات الشخصية',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.primary,
-                ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'المعلومات الشخصية',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: AppColors.primary,
               ),
-              const SizedBox(height: 16),
-              
-              // First Name
-              _buildFormField(
-                controller: _firstNameController,
-                label: 'الاسم الأول',
-                icon: Icons.person,
-                validator: (value) => value?.isEmpty == true ? 'الاسم الأول مطلوب' : null,
-              ),
-              const SizedBox(height: 12),
-              
-              // Last Name
-              _buildFormField(
-                controller: _lastNameController,
-                label: 'اسم العائلة',
-                icon: Icons.person_outline,
-                validator: (value) => value?.isEmpty == true ? 'اسم العائلة مطلوب' : null,
-              ),
-              const SizedBox(height: 12),
-              
-              // Father Name
-              _buildFormField(
-                controller: _fatherNameController,
-                label: 'اسم الأب',
-                icon: Icons.person,
-              ),
-              const SizedBox(height: 12),
-              
-              // Grandfather Name
-              _buildFormField(
-                controller: _grandfatherNameController,
-                label: 'اسم الجد',
-                icon: Icons.person,
-              ),
-              const SizedBox(height: 12),
-              
-              // Phone Number
-              _buildFormField(
-                controller: _phoneController,
-                label: 'رقم الهاتف',
-                icon: Icons.phone,
-                keyboardType: TextInputType.phone,
-                validator: (value) => value?.isEmpty == true ? 'رقم الهاتف مطلوب' : null,
-              ),
-              const SizedBox(height: 12),
-              
-              // Birth Date
-              _buildFormField(
-                controller: _birthDateController,
-                label: 'تاريخ الميلاد',
-                icon: Icons.calendar_today,
-                readOnly: true,
-                onTap: _isEditing ? _selectBirthDate : null,
-              ),
-              const SizedBox(height: 12),
-              
-              // Birth Address
-              _buildFormField(
-                controller: _birthAddressController,
-                label: 'مكان الميلاد',
-                icon: Icons.location_on,
-              ),
-              const SizedBox(height: 12),
-              
-              // Home Address
-              _buildFormField(
-                controller: _homeAddressController,
-                label: 'عنوان السكن',
-                icon: Icons.home,
-                maxLines: 2,
-              ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 16),
+            
+            _buildInfoRow(
+              Icons.person,
+              'الاسم الأول',
+              _userProfile?['first_name'] ?? 'غير محدد',
+            ),
+            const SizedBox(height: 12),
+            
+            _buildInfoRow(
+              Icons.person_outline,
+              'اسم العائلة',
+              _userProfile?['last_name'] ?? 'غير محدد',
+            ),
+            const SizedBox(height: 12),
+            
+            _buildInfoRow(
+              Icons.person,
+              'اسم الأب',
+              _userProfile?['father_name'] ?? 'غير محدد',
+            ),
+            const SizedBox(height: 12),
+            
+            _buildInfoRow(
+              Icons.person,
+              'اسم الجد',
+              _userProfile?['grandfather_name'] ?? 'غير محدد',
+            ),
+            const SizedBox(height: 12),
+            
+            _buildInfoRow(
+              Icons.phone,
+              'رقم الهاتف',
+              _userProfile?['phone_number'] ?? 'غير محدد',
+            ),
+            const SizedBox(height: 12),
+            
+            _buildInfoRow(
+              Icons.calendar_today,
+              'تاريخ الميلاد',
+              _userProfile?['birth_date'] ?? 'غير محدد',
+            ),
+            const SizedBox(height: 12),
+            
+            _buildInfoRow(
+              Icons.location_on,
+              'مكان الميلاد',
+              _userProfile?['birth_address'] ?? 'غير محدد',
+            ),
+            const SizedBox(height: 12),
+            
+            _buildInfoRow(
+              Icons.home,
+              'عنوان السكن',
+              _userProfile?['home_address'] ?? 'غير محدد',
+            ),
+          ],
         ),
       ),
     );
@@ -388,28 +276,24 @@ class ProfileTabState extends State<ProfileTab> {
             ),
             const SizedBox(height: 16),
             
-            // Guardian Name
-            _buildFormField(
-              controller: _guardianNameController,
-              label: 'اسم ولي الأمر',
-              icon: Icons.person,
+            _buildInfoRow(
+              Icons.person,
+              'اسم ولي الأمر',
+              _userProfile?['guardian_name'] ?? 'غير محدد',
             ),
             const SizedBox(height: 12),
             
-            // Guardian Phone
-            _buildFormField(
-              controller: _guardianPhoneController,
-              label: 'هاتف ولي الأمر',
-              icon: Icons.phone,
-              keyboardType: TextInputType.phone,
+            _buildInfoRow(
+              Icons.phone,
+              'هاتف ولي الأمر',
+              _userProfile?['guardian_phone'] ?? 'غير محدد',
             ),
             const SizedBox(height: 12),
             
-            // Guardian Relation
-            _buildFormField(
-              controller: _guardianRelationController,
-              label: 'صلة القرابة',
-              icon: Icons.family_restroom,
+            _buildInfoRow(
+              Icons.family_restroom,
+              'صلة القرابة',
+              _userProfile?['guardian_relation'] ?? 'غير محدد',
             ),
           ],
         ),
@@ -417,53 +301,25 @@ class ProfileTabState extends State<ProfileTab> {
     );
   }
 
-  Widget _buildFormField({
-    required TextEditingController controller,
-    required String label,
-    required IconData icon,
-    String? Function(String?)? validator,
-    TextInputType? keyboardType,
-    int? maxLines,
-    bool readOnly = false,
-    VoidCallback? onTap,
-  }) {
-    return TextFormField(
-      controller: controller,
-      validator: validator,
-      keyboardType: keyboardType,
-      maxLines: maxLines ?? 1,
-      readOnly: readOnly || !_isEditing,
-      onTap: onTap,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
-        enabled: _isEditing,
-        filled: !_isEditing,
-        fillColor: !_isEditing ? Colors.grey[100] : null,
-      ),
-    );
-  }
-
   Widget _buildInfoRow(IconData icon, String label, String value) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Row(
       children: [
-        Icon(icon, size: 20, color: AppColors.textSecondary),
+        Icon(icon, size: 20, color: isDark ?AppColors.primaryLight : AppColors.primary,),
         const SizedBox(width: 12),
         Text(
           '$label: ',
-          style: const TextStyle(
+          style:  TextStyle(
             fontWeight: FontWeight.w500,
-            color: AppColors.textSecondary,
+            color: isDark ?AppColors.darkTextPrimary : AppColors.textPrimary,
           ),
         ),
         Expanded(
           child: Text(
             value,
-            style: const TextStyle(
-              color: AppColors.textPrimary,
+            style:  TextStyle(
+              color: isDark ?AppColors.darkTextHint : AppColors.darkCard,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -488,9 +344,9 @@ class ProfileTabState extends State<ProfileTab> {
               const Divider(height: 1),
               ListTile(
                 leading: const Icon(Icons.security, color: AppColors.primary),
-                title: const Text('الأمان والخصوصية'),
+                title: const Text('اخر اخبار العشيرة'),
                 trailing: const Icon(Icons.chevron_right),
-                onTap: _showSecuritySettings,
+                onTap: _showNewsClan,
               ),
               const Divider(height: 1),
               ListTile(
@@ -534,94 +390,203 @@ class ProfileTabState extends State<ProfileTab> {
     );
   }
 
-  Future<void> _selectBirthDate() async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: DateTime.now().subtract(const Duration(days: 365 * 20)),
-      firstDate: DateTime(1950),
-      lastDate: DateTime.now(),
-    );
-    
-    if (picked != null) {
-      setState(() {
-        _birthDateController.text = picked.toLocal().toString().split(' ')[0];
-      });
-    }
-  }
-
-  Future<void> _saveProfile() async {
-    if (_formKey.currentState?.validate() != true) {
-      return;
-    }
-
-    try {
-      final updatedData = {
-        'first_name': _firstNameController.text,
-        'last_name': _lastNameController.text,
-        'father_name': _fatherNameController.text,
-        'grandfather_name': _grandfatherNameController.text,
-        'phone_number': _phoneController.text,
-        'birth_date': _birthDateController.text.isNotEmpty ? _birthDateController.text : null,
-        'birth_address': _birthAddressController.text.isNotEmpty ? _birthAddressController.text : null,
-        'home_address': _homeAddressController.text.isNotEmpty ? _homeAddressController.text : null,
-        'guardian_name': _guardianNameController.text.isNotEmpty ? _guardianNameController.text : null,
-        'guardian_phone': _guardianPhoneController.text.isNotEmpty ? _guardianPhoneController.text : null,
-        'guardian_relation': _guardianRelationController.text.isNotEmpty ? _guardianRelationController.text : null,
-      };
-
-      await ApiService.updateProfile(updatedData);
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تم تحديث الملف الشخصي بنجاح')),
+void _showNotificationSettings() {
+  showDialog(
+    context: context,
+    builder: (BuildContext context) {
+      return AlertDialog(
+        title: const Text(
+          'إعدادات الإشعارات',
+          textAlign: TextAlign.right,
+        ),
+        content: const Text(
+          'هذه الميزة قيد التطوير حالياً. سيتم إضافتها قريباً.',
+          textAlign: TextAlign.right,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('حسناً'),
+          ),
+        ],
       );
-      
-      setState(() {
-        _isEditing = false;
-      });
-      
-      // Reload profile to get updated data
-      _loadProfile();
-      
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('خطأ في تحديث الملف الشخصي: ${e.toString()}')),
+    },
+  );
+}
+
+void _showNewsClan() {
+  showDialog(
+    context: context,
+    builder: (BuildContext context) {
+      return AlertDialog(
+        title: const Text(
+          'أخبار العشيرة',
+          textAlign: TextAlign.right,
+        ),
+        content: const Text(
+          'هذه الصفحة قيد التطوير حالياً. سيتم إضافتها قريباً.',
+          textAlign: TextAlign.right,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('حسناً'),
+          ),
+        ],
       );
-    }
-  }
+    },
+  );
+}
 
-  void _showNotificationSettings() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('إعدادات الإشعارات قيد التطوير')),
-    );
-  }
-
-  void _showSecuritySettings() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('إعدادات الأمان قيد التطوير')),
-    );
-  }
-
-  void _showHelpSupport() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('صفحة المساعدة قيد التطوير')),
-    );
-  }
 
   void _showAboutApp() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('حول التطبيق'),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('تطبيق حجوزات الأفراح'),
-            SizedBox(height: 8),
-            Text('الإصدار: 1.0.0'),
-            SizedBox(height: 8),
-            Text('تم تطويره لتسهيل عملية حجز قاعات الأفراح وإدارة المناسبات.'),
-          ],
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'تطبيق حجوزات الأعراس الخاص بجميع العشائر ',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              const Text('الإصدار: 1.0.1'),
+              const SizedBox(height: 16),
+              const Text(
+                'يسرّنا أن نرحب بكم في تطبيق الأعراس،\nونضع بين أيديكم وسيلة ميسرة لتنظيم و حجز العرس الخاص بكم',
+              ),
+              const SizedBox(height: 16),
+              const Divider(),
+              const SizedBox(height: 8),
+              const Text(
+                'برعاية:',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 4),
+              const Text('عشيرة آت الشيخ الحاج مسعود'),
+              const SizedBox(height: 16),
+              const Divider(),
+              const SizedBox(height: 8),
+              const Text(
+                'معلومات المطور:',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const Icon(Icons.email, size: 18),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text('mosbah47messaoud@gmail.com'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const Icon(Icons.phone, size: 18),
+                  const SizedBox(width: 8),
+                  const Text('0658890501'),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isDark ?Colors.green.shade300 : Colors.green.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: isDark ?Colors.green.shade500 : Colors.green.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.message, color: Colors.green.shade700, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '   لأي ملاحظات أو استفسارات عن التطبيق، \n يرجى التواصل عبر الواتساب (0658890501)'   ,
+                        style: TextStyle(fontSize: 13, color: isDark ?AppColors.darkTextPrimary : AppColors.darkBorder),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('موافق'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showHelpSupport() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('لدعم والمساعدة'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              
+              // const Text(
+              //   'معلومات المطور:',
+              //   style: TextStyle(fontWeight: FontWeight.bold),
+              // ),
+              // const SizedBox(height: 8),
+              Row(
+                children: [
+                  const Icon(Icons.email, size: 18),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text('mosbah47messaoud@gmail.com'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const Icon(Icons.phone, size: 18),
+                  const SizedBox(width: 8),
+                  const Text('0658890501'),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isDark ?Colors.green.shade300 : Colors.green.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: isDark ?Colors.green.shade500 : Colors.green.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.message, color: Colors.green.shade700, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '   لأي ملاحظات أو استفسارات عن التطبيق، \n يرجى التواصل عبر الواتساب (0658890501)'   ,
+                        style: TextStyle(fontSize: 13, color: isDark ?AppColors.darkTextPrimary : AppColors.darkBorder),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -678,7 +643,7 @@ class ProfileTabState extends State<ProfileTab> {
           ),
         ],
       ),
-    );
+    );  
   }
 
   Future<void> _deleteAccount() async {

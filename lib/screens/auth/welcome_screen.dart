@@ -308,9 +308,10 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                                           fontWeight: FontWeight.w600,
                                           letterSpacing: 0.5,
                                         ),
-                                      ),
+                                      ), 
                                     ),
                                   ),
+                                  
                                 ],
                               ),
                             ),
@@ -333,6 +334,26 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                                       height: 1.4,
                                     ),
                                   ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          
+                          
+                          // Footer text
+                          Transform.translate(
+                            offset: Offset(0, _slideAnimation.value * 0.3),
+                            child: Opacity(
+                              opacity: _fadeAnimation.value * 0.6,
+                              child: Center(
+                                child: Text(
+                                  ' برعاية عشيرة آت الشيخ الحاج مسعود © 2025',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: isDark ? Colors.green.shade300 : Colors.green.shade500,
+                                    height: 1.4,
+                                  ),
+                                  textAlign: TextAlign.center,
                                 ),
                               ),
                             ),

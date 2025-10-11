@@ -48,6 +48,8 @@ class _EventTypeSelectionScreenState extends State<EventTypeSelectionScreen>
     super.dispose();
   }
 
+
+
   void _navigate(String type) {
     Navigator.push(
       context,
@@ -235,7 +237,7 @@ class _EventTypeSelectionScreenState extends State<EventTypeSelectionScreen>
                           ),
                           
                           const Spacer(),
-                          
+                           
                           // Footer text
                           Transform.translate(
                             offset: Offset(0, _slideAnimation.value * 0.3),

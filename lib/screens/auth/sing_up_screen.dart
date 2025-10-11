@@ -608,36 +608,58 @@ Future<void> _loadCounties() async {
       ),
     );
   }
+Widget _buildLocationStep() {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  final isNotDarkMode = !isDark;
+  return SingleChildScrollView(
+    padding: EdgeInsets.all(24),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildStepTitle('معلومات الموقع', ' اختر القصر والعشيرة  '),
+        SizedBox(height: 32),
 
-  Widget _buildLocationStep() {
-    return SingleChildScrollView(
-      padding: EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildStepTitle('معلومات الموقع', ' اختر القصر والعشيرة  '),
-          SizedBox(height: 32),
-
-          CustomDropdown<County>(
+        Theme(
+          data: Theme.of(context).copyWith(
+            hintColor:  Colors.grey.shade600,
+            canvasColor:  Colors.white,
+          ),
+          child: CustomDropdown<County>(
             label: 'القصر',
             value: _selectedCounty,
             hint: ' اختر القصر الذي تنتمي اليه ',
             items: _counties.map((county) => DropdownMenuItem<County>(
               value: county,
-              child: Text(county.name),
+              child: Text(
+                county.name,
+                style: TextStyle(
+                  color:  Colors.black87,
+                ),
+              ),
             )).toList(),
             onChanged: _onCountyChanged,
             prefixIcon: Icons.location_city,
           ),
-          SizedBox(height: 20),
+        ),
+        SizedBox(height: 20),
 
-          CustomDropdown<Clan>(
+        Theme(
+          data: Theme.of(context).copyWith(
+            hintColor:   Colors.grey.shade600,
+            canvasColor:  Colors.white,
+          ),
+          child: CustomDropdown<Clan>(
             label: 'العشيرة',
             value: _selectedClan,
-            hint: ' اختر العشيرة التي تنتمي اليها ' ,
+            hint: ' اختر العشيرة التي تنتمي اليها ',
             items: _filteredClans.map((clan) => DropdownMenuItem<Clan>(
               value: clan,
-              child: Text(clan.name),
+              child: Text(
+                clan.name,
+                style: TextStyle(
+                  color:  Colors.black87,
+                ),
+              ),
             )).toList(),
             onChanged: (clan) {
               setState(() {
@@ -647,34 +669,49 @@ Future<void> _loadCounties() async {
             prefixIcon: Icons.groups,
             enabled: _filteredClans.isNotEmpty,
           ),
+        ),
 
-          if (_selectedCounty != null && _filteredClans.isEmpty) ...[
-            SizedBox(height: 20),
-            Container(
-              padding: EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.orange.shade50,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.orange.shade200),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.info_outline, color: Colors.orange),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'لا توجد عشائر مسجلة في هذه القصر حالياً',
-                      style: TextStyle(color: Colors.orange.shade700),
-                    ),
-                  ),
-                ],
+        if (_selectedCounty != null && _filteredClans.isEmpty) ...[
+          SizedBox(height: 20),
+          Container(
+            padding: EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: isNotDarkMode 
+                  ? Colors.grey.shade800.withOpacity(0.5)
+                  : Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isNotDarkMode 
+                    ? Colors.grey.shade700
+                    : Colors.grey.shade300,
               ),
             ),
-          ],
+            child: Row(
+              children: [
+                Icon(
+                  Icons.info_outline, 
+                  color: isNotDarkMode 
+                      ? Colors.grey.shade400
+                      : Colors.grey.shade700,
+                ),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'لا توجد عشائر مسجلة في هذه القصر حالياً',
+                    style: TextStyle(
+                      color: 
+                          Colors.grey.shade800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
-      ),
-    );
-  }
+      ],
+    ),
+  );
+}
 
   Widget _buildGuardianInfoStep() {
     return SingleChildScrollView(

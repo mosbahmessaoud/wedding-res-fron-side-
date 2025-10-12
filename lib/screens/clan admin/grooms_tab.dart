@@ -106,108 +106,53 @@ Future<Map<String, dynamic>?> _getGroomReservationStatus(int groomId) async {
   print('🔍 Starting reservation status check for groomId: $groomId');
   
   try {
-    // First check for validated reservation (highest priority)
+    // Priority 1: Validated reservation
     print('📋 Checking for validated reservations...');
     try {
       final validatedList = await ApiService.getValidatedReservations();
-      print('✅ Validated reservations data: $validatedList');
-      print('📊 Validated reservations count: ${validatedList.length}');
-      
-      if (validatedList.isNotEmpty) {
-        // Find validated reservation for this groom
-        final validatedForGroom = validatedList.where((res) => 
-          int.tryParse(res['groom_id'].toString()) == groomId
-        ).toList();
-        
-        print('🎯 Validated reservations for groomId $groomId: $validatedForGroom');
-        
-        if (validatedForGroom.isNotEmpty) {
-          print('✨ MATCH FOUND - Returning validated reservation');
-          return {
-            'status': 'validated',
-            'reservation': validatedForGroom.first,
-            'priority': 1
-          };
-        } else {
-          print('❌ No validated reservations found for this groom');
-        }
+      print('✅ Validated count: ${validatedList.length}');
+      final validatedForGroom = validatedList.where((r) => int.tryParse(r['groom_id'].toString()) == groomId).toList();
+      if (validatedForGroom.isNotEmpty) {
+        print('✨ MATCH FOUND - Returning validated reservation');
+        return {'status': 'validated', 'reservation': validatedForGroom.first, 'priority': 1};
       }
+      print('❌ No validated reservations for this groom');
     } catch (e) {
-      print('⚠️ Error fetching validated reservations: $e');
-      // No validated reservation found, continue checking
+      print('⚠️ Error fetching validated: $e');
     }
 
-    // Check for pending reservation (second priority)
+    // Priority 2: Pending reservation
     print('📋 Checking for pending reservations...');
     try {
       final pendingList = await ApiService.getPendingReservations();
-      print('⏳ Pending reservations data: $pendingList');
-      print('📊 Pending reservations count: ${pendingList.length}');
-      
-      if (pendingList.isNotEmpty) {
-        // Find pending reservation for this groom
-        final pendingForGroom = pendingList.where((res) => 
-          int.tryParse(res['groom_id'].toString()) == groomId
-        ).toList();
-        
-        print('🎯 Pending reservations for groomId $groomId: $pendingForGroom');
-        
-        if (pendingForGroom.isNotEmpty) {
-          print('✨ MATCH FOUND - Returning pending reservation');
-          return {
-            'status': 'pending_validation',
-            'reservation': pendingForGroom.first,
-            'priority': 2
-          };
-        } else {
-          print('❌ No pending reservations found for this groom');
-        }
+      print('⏳ Pending count: ${pendingList.length}');
+      final pendingForGroom = pendingList.where((r) => int.tryParse(r['groom_id'].toString()) == groomId).toList();
+      if (pendingForGroom.isNotEmpty) {
+        print('✨ MATCH FOUND - Returning pending reservation');
+        return {'status': 'pending_validation', 'reservation': pendingForGroom.first, 'priority': 2};
       }
+      print('❌ No pending reservations for this groom');
     } catch (e) {
-      print('⚠️ Error fetching pending reservations: $e');
-      // No pending reservation found, continue checking
+      print('⚠️ Error fetching pending: $e');
     }
 
-    // Check for cancelled reservations (lowest priority)
+    // Priority 3: Most recent cancelled reservation
     print('📋 Checking for cancelled reservations...');
     try {
       final cancelledList = await ApiService.getCancelledReservations();
-      print('❌ Cancelled reservations data: $cancelledList');
-      print('📊 Cancelled reservations count: ${cancelledList.length}');
-      
-      if (cancelledList.isNotEmpty) {
-        // Find cancelled reservations for this groom
-        print('🔍 Filtering cancelled reservations for groomId: $groomId');
-        final groomCancelled = cancelledList.where((res) => 
-          int.tryParse(res['groom_id'].toString()) == groomId
-        ).toList();
-        
-        print('🎯 Cancelled reservations for groomId $groomId: $groomCancelled');
-        print('📊 Filtered cancelled reservations count: ${groomCancelled.length}');
-        
-        if (groomCancelled.isNotEmpty) {
-          print('📅 Sorting cancelled reservations by date...');
-          // Sort by date and get the most recent
-          groomCancelled.sort((a, b) => 
-            DateTime.parse(b['created_at'] ?? '').compareTo(DateTime.parse(a['created_at'] ?? ''))
-          );
-          print('🏆 Most recent cancelled reservation: ${groomCancelled.first}');
-          print('✨ MATCH FOUND - Returning cancelled reservation');
-          return {
-            'status': 'cancelled',
-            'reservation': groomCancelled.first,
-            'priority': 3
-          };
-        } else {
-          print('❌ No cancelled reservations found for this groom');
-        }
+      print('❌ Cancelled count: ${cancelledList.length}');
+      final groomCancelled = cancelledList.where((r) => int.tryParse(r['groom_id'].toString()) == groomId).toList();
+      if (groomCancelled.isNotEmpty) {
+        groomCancelled.sort((a, b) => (DateTime.tryParse(b['created_at'] ?? '') ?? DateTime(0))
+            .compareTo(DateTime.tryParse(a['created_at'] ?? '') ?? DateTime(0)));
+        print('✨ MATCH FOUND - Returning cancelled reservation');
+        return {'status': 'cancelled', 'reservation': groomCancelled.first, 'priority': 3};
       }
+      print('❌ No cancelled reservations for this groom');
     } catch (e) {
-      print('⚠️ Error fetching cancelled reservations: $e');
-      // No cancelled reservations found
+      print('⚠️ Error fetching cancelled: $e');
     }
 
-    // No reservation found
     print('🚫 No reservation found for groomId: $groomId');
     return null;
   } catch (e) {
@@ -215,8 +160,6 @@ Future<Map<String, dynamic>?> _getGroomReservationStatus(int groomId) async {
     return null;
   }
 }
-
-
   Future<void> _loadGrooms() async {
     setState(() {
       isLoading = true;
@@ -325,9 +268,6 @@ Future<Map<String, dynamic>?> _getGroomReservationStatus(int groomId) async {
       ),
     );
   }
-
-// Replace your existing _buildGroomCard method and add these new methods
-
 Widget _buildGroomCard(Map<String, dynamic> groom) {
   final status = groom['status']?.toString() ?? 'inactive';
   final isActive = status == 'active';
@@ -335,44 +275,51 @@ Widget _buildGroomCard(Map<String, dynamic> groom) {
   
   return LayoutBuilder(
     builder: (context, constraints) {
-      final isSmallScreen = constraints.maxWidth < 600;
-      final isTablet = constraints.maxWidth >= 600 && constraints.maxWidth < 1024;
+      // More granular screen size detection
+      final screenWidth = MediaQuery.of(context).size.width;
+      final isSmallScreen = screenWidth < 600;
+      final isTablet = screenWidth >= 600 && screenWidth < 1024;
+      final isDesktop = screenWidth >= 1024;
+      
+      // Dynamic sizing based on screen
+      final cardMargin = isSmallScreen ? 8.0 : (isTablet ? 12.0 : 16.0);
+      final cardPadding = isSmallScreen ? 12.0 : (isTablet ? 16.0 : 20.0);
+      final avatarSize = isSmallScreen ? 45.0 : (isTablet ? 55.0 : 65.0);
+      final titleFontSize = isSmallScreen ? 16.0 : (isTablet ? 18.0 : 20.0);
       
       return Container(
         margin: EdgeInsets.symmetric(
-          horizontal: isSmallScreen ? 12 : 16, 
-          vertical: 8
+          horizontal: cardMargin, 
+          vertical: 6
         ),
         child: Material(
-          elevation: isSmallScreen ? 2 : 4,
-          borderRadius: BorderRadius.circular(16),
+          elevation: isSmallScreen ? 1 : (isTablet ? 2 : 3),
+          borderRadius: BorderRadius.circular(isSmallScreen ? 12 : 16),
           color: Colors.white,
-          shadowColor: Colors.black.withOpacity(0.1),
+          shadowColor: Colors.black.withOpacity(0.08),
           child: Container(
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(isSmallScreen ? 12 : 16),
               border: Border.all(
                 color: Colors.grey.withOpacity(0.1),
                 width: 1,
               ),
             ),
             child: Padding(
-              padding: EdgeInsets.all(isSmallScreen ? 16 : 20),
+              padding: EdgeInsets.all(cardPadding),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Header Section
-                  _buildHeaderSection(groom, isActive, groomId, isSmallScreen),
+                  _buildHeaderSection(groom, isActive, groomId, 
+                    isSmallScreen, avatarSize, titleFontSize),
                   
-                  SizedBox(height: 16),
+                  SizedBox(height: isSmallScreen ? 12 : 16),
                   
-                  // Information Grid
                   _buildInformationGrid(groom, isSmallScreen, isTablet),
                   
-                  SizedBox(height: 20),
+                  SizedBox(height: isSmallScreen ? 16 : 20),
                   
-                  // Action Buttons
-                  _buildActionButtons(groom, status, isActive, isSmallScreen),
+                  _buildActionButtons(groom, status, isActive, isSmallScreen, isTablet),
                 ],
               ),
             ),
@@ -383,14 +330,21 @@ Widget _buildGroomCard(Map<String, dynamic> groom) {
   );
 }
 
-Widget _buildHeaderSection(Map<String, dynamic> groom, bool isActive, int? groomId, bool isSmallScreen) {
+Widget _buildHeaderSection(
+  Map<String, dynamic> groom, 
+  bool isActive, 
+  int? groomId, 
+  bool isSmallScreen,
+  double avatarSize,
+  double titleFontSize
+) {
   return Row(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      // Avatar Circle
+      // Avatar Circle - responsive size
       Container(
-        width: isSmallScreen ? 50 : 60,
-        height: isSmallScreen ? 50 : 60,
+        width: avatarSize,
+        height: avatarSize,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           gradient: LinearGradient(
@@ -404,13 +358,13 @@ Widget _buildHeaderSection(Map<String, dynamic> groom, bool isActive, int? groom
         child: Icon(
           Icons.person,
           color: Colors.white,
-          size: isSmallScreen ? 24 : 30,
+          size: avatarSize * 0.5,
         ),
       ),
       
-      SizedBox(width: 12),
+      SizedBox(width: isSmallScreen ? 8 : 12),
       
-      // Name and Status
+      // Name and Status - flexible sizing
       Expanded(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -418,17 +372,18 @@ Widget _buildHeaderSection(Map<String, dynamic> groom, bool isActive, int? groom
             Text(
               '${groom['first_name'] ?? ''} ${groom['last_name'] ?? ''}',
               style: TextStyle(
-                fontSize: isSmallScreen ? 18 : 20,
+                fontSize: titleFontSize,
                 fontWeight: FontWeight.bold,
                 color: Colors.grey[800],
               ),
               overflow: TextOverflow.ellipsis,
+              maxLines: isSmallScreen ? 1 : 2,
             ),
             SizedBox(height: 4),
             Text(
               groom['phone_number']?.toString() ?? '',
               style: TextStyle(
-                fontSize: 14,
+                fontSize: isSmallScreen ? 12 : 14,
                 color: Colors.grey[600],
               ),
             ),
@@ -436,13 +391,17 @@ Widget _buildHeaderSection(Map<String, dynamic> groom, bool isActive, int? groom
         ),
       ),
       
-      // Status Badges Column
+      SizedBox(width: 8),
+      
+      // Status Badges Column - responsive sizing
       Column(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          // Active Status Badge
           Container(
-            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            padding: EdgeInsets.symmetric(
+              horizontal: isSmallScreen ? 8 : 12, 
+              vertical: isSmallScreen ? 4 : 6
+            ),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: isActive 
@@ -463,36 +422,37 @@ Widget _buildHeaderSection(Map<String, dynamic> groom, bool isActive, int? groom
               style: TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
-                fontSize: 12,
+                fontSize: isSmallScreen ? 10 : 12,
               ),
             ),
           ),
           
-          // Reservation Status
           if (groomId != null) ...[
-            SizedBox(height: 8),
-            _buildReservationStatusBadge(groomId),
+            SizedBox(height: 6),
+            _buildReservationStatusBadge(groomId, isSmallScreen),
           ],
         ],
       ),
     ],
   );
 }
-
-Widget _buildReservationStatusBadge(int groomId) {
+Widget _buildReservationStatusBadge(int groomId, bool isSmallScreen) {
   return FutureBuilder<Map<String, dynamic>?>(
     future: _getGroomReservationStatus(groomId),
     builder: (context, snapshot) {
       if (snapshot.connectionState == ConnectionState.waiting) {
         return Container(
-          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          padding: EdgeInsets.symmetric(
+            horizontal: isSmallScreen ? 6 : 8, 
+            vertical: 4
+          ),
           decoration: BoxDecoration(
             color: Colors.grey.withOpacity(0.1),
             borderRadius: BorderRadius.circular(16),
           ),
           child: SizedBox(
-            width: 12,
-            height: 12,
+            width: 10,
+            height: 10,
             child: CircularProgressIndicator(strokeWidth: 1.5),
           ),
         );
@@ -518,7 +478,7 @@ Widget _buildReservationStatusBadge(int groomId) {
             gradientColors = [Colors.red, Colors.red.shade600];
             break;
           default:
-            statusText = 'حالة غير معروفة';
+            statusText = 'غير معروف';
             gradientColors = [Colors.grey, Colors.grey.shade600];
         }
       } else {
@@ -527,7 +487,13 @@ Widget _buildReservationStatusBadge(int groomId) {
       }
       
       return Container(
-        padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        padding: EdgeInsets.symmetric(
+          horizontal: isSmallScreen ? 6 : 10, 
+          vertical: isSmallScreen ? 3 : 4
+        ),
+        constraints: BoxConstraints(
+          maxWidth: isSmallScreen ? 80 : 100,
+        ),
         decoration: BoxDecoration(
           gradient: LinearGradient(colors: gradientColors),
           borderRadius: BorderRadius.circular(16),
@@ -544,8 +510,11 @@ Widget _buildReservationStatusBadge(int groomId) {
           style: TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.bold,
-            fontSize: 10,
+            fontSize: isSmallScreen ? 9 : 10,
           ),
+          textAlign: TextAlign.center,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
       );
     },
@@ -686,13 +655,20 @@ Widget _buildCompactInfoRow(String label, String value, bool isSmallScreen) {
   );
 }
 
-Widget _buildActionButtons(Map<String, dynamic> groom, String status, bool isActive, bool isSmallScreen) {
+Widget _buildActionButtons(
+  Map<String, dynamic> groom, 
+  String status, 
+  bool isActive, 
+  bool isSmallScreen,
+  bool isTablet
+) {
   if (isSmallScreen) {
     return _buildMobileActionButtons(groom, status, isActive);
   } else {
-    return _buildDesktopActionButtons(groom, status, isActive);
+    return _buildDesktopActionButtons(groom, status, isActive, isTablet);
   }
 }
+
 
 Widget _buildMobileActionButtons(Map<String, dynamic> groom, String status, bool isActive) {
   return Column(
@@ -744,30 +720,34 @@ Widget _buildMobileActionButtons(Map<String, dynamic> groom, String status, bool
     ],
   );
 }
-
-Widget _buildDesktopActionButtons(Map<String, dynamic> groom, String status, bool isActive) {
+Widget _buildDesktopActionButtons(
+  Map<String, dynamic> groom, 
+  String status, 
+  bool isActive,
+  bool isTablet
+) {
   return Wrap(
-    spacing: 8,
-    runSpacing: 8,
+    spacing: isTablet ? 6 : 8,
+    runSpacing: isTablet ? 6 : 8,
     alignment: WrapAlignment.spaceEvenly,
     children: [
       _buildModernButton(
         icon: Icons.visibility,
-        label: 'عرض التفاصيل',
+        label: isTablet ? 'عرض' : 'عرض التفاصيل',
         colors: [Colors.purple, Colors.purple.shade700],
         onPressed: () => _showViewGroomDialog(groom),
-        isCompact: false,
+        isCompact: isTablet,
       ),
       _buildModernButton(
         icon: Icons.edit,
         label: 'تعديل',
         colors: [Colors.blue, Colors.blue.shade700],
         onPressed: () => _showEditGroomDialog(groom),
-        isCompact: false,
+        isCompact: isTablet,
       ),
       _buildModernButton(
         icon: isActive ? Icons.visibility_off : Icons.visibility,
-        label: isActive ? 'إيقاف التفعيل' : 'تفعيل',
+        label: isActive ? (isTablet ? 'إيقاف' : 'إيقاف التفعيل') : 'تفعيل',
         colors: isActive 
           ? [Colors.orange, Colors.orange.shade700]
           : [Colors.green, Colors.green.shade700],
@@ -775,14 +755,14 @@ Widget _buildDesktopActionButtons(Map<String, dynamic> groom, String status, boo
           groom['phone_number']?.toString() ?? '', 
           status
         ),
-        isCompact: false,
+        isCompact: isTablet,
       ),
       _buildModernButton(
         icon: Icons.delete,
         label: 'حذف',
         colors: [Colors.red, Colors.red.shade700],
         onPressed: () => _deleteGroom(groom['phone_number']?.toString() ?? ''),
-        isCompact: false,
+        isCompact: isTablet,
       ),
     ],
   );
@@ -912,12 +892,17 @@ PreferredSizeWidget _buildModernAppBar() {
         ),
       ),
     ),
-    title: Text(
-      'إدارة العرسان',
-      style: TextStyle(
-        fontWeight: FontWeight.bold,
-        fontSize: 20,
-      ),
+    title: LayoutBuilder(
+      builder: (context, constraints) {
+        final isSmallScreen = MediaQuery.of(context).size.width < 600;
+        return Text(
+          'إدارة العرسان',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: isSmallScreen ? 18 : 20,
+          ),
+        );
+      },
     ),
     foregroundColor: Colors.white,
     leading: IconButton(
@@ -927,44 +912,59 @@ PreferredSizeWidget _buildModernAppBar() {
       },
     ),
     actions: [
-      Container(
-        margin: EdgeInsets.only(right: 8),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.2),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: IconButton(
-          onPressed: () async {
-            final result = await Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => MultiStepSignupScreen(),
+      LayoutBuilder(
+        builder: (context, constraints) {
+          final screenWidth = MediaQuery.of(context).size.width;
+          final isSmallScreen = screenWidth < 600;
+          
+          return Row(
+            children: [
+              Container(
+                margin: EdgeInsets.only(right: isSmallScreen ? 4 : 8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: IconButton(
+                  onPressed: () async {
+                    final result = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => MultiStepSignupScreen(),
+                      ),
+                    );
+                    if (result != null) {
+                      _loadGrooms();
+                    }
+                  },
+                  icon: Icon(Icons.person_add, size: isSmallScreen ? 18 : 20),
+                  tooltip: 'إضافة عريس جديد',
+                  padding: EdgeInsets.all(isSmallScreen ? 8 : 12),
+                ),
               ),
-            );
-            if (result != null) {
-              _loadGrooms();
-            }
-          },
-          icon: Icon(Icons.person_add, size: 20),
-          tooltip: 'إضافة عريس جديد',
-        ),
-      ),
-      Container(
-        margin: EdgeInsets.only(right: 8, left: 16),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.2),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: IconButton(
-          onPressed: _loadGrooms,
-          icon: Icon(Icons.refresh, size: 20),
-          tooltip: 'تحديث القائمة',
-        ),
+              Container(
+                margin: EdgeInsets.only(
+                  right: isSmallScreen ? 4 : 8, 
+                  left: isSmallScreen ? 8 : 16
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: IconButton(
+                  onPressed: _loadGrooms,
+                  icon: Icon(Icons.refresh, size: isSmallScreen ? 18 : 20),
+                  tooltip: 'تحديث القائمة',
+                  padding: EdgeInsets.all(isSmallScreen ? 8 : 12),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     ],
   );
 }
-
 Widget _buildBody() {
   if (isLoading) {
     return _buildLoadingState();
@@ -978,10 +978,21 @@ Widget _buildBody() {
     return _buildEmptyState();
   }
   
-  return ListView.builder(
-    padding: EdgeInsets.only(top: 16, left: 2, right: 2, bottom: 75), // Added bottom padding
-    itemCount: grooms.length,
-    itemBuilder: (context, index) => _buildGroomCard(grooms[index]),
+  return LayoutBuilder(
+    builder: (context, constraints) {
+      final isSmallScreen = constraints.maxWidth < 600;
+      
+      return ListView.builder(
+        padding: EdgeInsets.only(
+          top: isSmallScreen ? 12 : 16,
+          left: 2,
+          right: 2,
+          bottom: isSmallScreen ? 60 : 75,
+        ),
+        itemCount: grooms.length,
+        itemBuilder: (context, index) => _buildGroomCard(grooms[index]),
+      );
+    },
   );
 }
 Widget _buildLoadingState() {
@@ -1752,62 +1763,38 @@ class ViewGroomDetailsDialog extends StatelessWidget {
 // Add this static method to ViewGroomDetailsDialog class
 static Future<Map<String, dynamic>?> _getGroomReservationStatus(int groomId) async {
   try {
-    // First check for validated reservation (highest priority)
+    // Priority 1: Validated reservation
     try {
       final validated = await ApiService.getMyValidatedReservation();
       if (validated.isNotEmpty && validated['groom_id'] == groomId) {
-        return {
-          'status': 'validated',
-          'reservation': validated,
-          'priority': 1
-        };
+        return {'status': 'validated', 'reservation': validated, 'priority': 1};
       }
-    } catch (e) {
-      // No validated reservation found, continue checking
-    }
+    } catch (_) {}
 
-    // Check for pending reservation (second priority)
+    // Priority 2: Pending reservation
     try {
       final pending = await ApiService.getMyPendingReservation();
       if (pending.isNotEmpty && pending['groom_id'] == groomId) {
-        return {
-          'status': 'pending_validation',
-          'reservation': pending,
-          'priority': 2
-        };
+        return {'status': 'pending_validation', 'reservation': pending, 'priority': 2};
       }
-    } catch (e) {
-      // No pending reservation found, continue checking
-    }
+    } catch (_) {}
 
-    // Check for cancelled reservations (lowest priority)
+    // Priority 3: Most recent cancelled reservation
     try {
       final cancelled = await ApiService.getMyCancelledReservations();
-      if (cancelled.isNotEmpty) {
-        // Find the most recent cancelled reservation for this groom
-        final groomCancelled = cancelled.where((res) => res['groom_id'] == groomId).toList();
-        if (groomCancelled.isNotEmpty) {
-          // Sort by date and get the most recent
-          groomCancelled.sort((a, b) => 
-            DateTime.parse(b['created_at'] ?? '').compareTo(DateTime.parse(a['created_at'] ?? ''))
-          );
-          return {
-            'status': 'cancelled',
-            'reservation': groomCancelled.first,
-            'priority': 3
-          };
-        }
+      final groomCancelled = cancelled.where((r) => r['groom_id'] == groomId).toList();
+      if (groomCancelled.isNotEmpty) {
+        groomCancelled.sort((a, b) => (DateTime.tryParse(b['created_at'] ?? '') ?? DateTime(0))
+            .compareTo(DateTime.tryParse(a['created_at'] ?? '') ?? DateTime(0)));
+        return {'status': 'cancelled', 'reservation': groomCancelled.first, 'priority': 3};
       }
-    } catch (e) {
-      // No cancelled reservations found
-    }
+    } catch (_) {}
 
-    // No reservation found
     return null;
   } catch (e) {
     print('Error getting reservation status: $e');
     return null;
-  }  
+  }
 }
   Widget _buildDetailRow(String label, String value, bool isDark) {
 

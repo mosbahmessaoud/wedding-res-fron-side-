@@ -196,10 +196,14 @@ class HomeTabState extends State<HomeTab> with TickerProviderStateMixin {
   }
 
   Widget _buildSpotifyHeader(bool isDark) {
-    final userName = _userProfile != null 
-        ? '${_userProfile!['first_name'] ?? ''} ${_userProfile!['last_name'] ?? ''}'.trim()
-        : 'العريس الكريم';
-
+    // final userName = _userProfile != null 
+    //     ? '${_userProfile!['first_name'] ?? ''} ${_userProfile!['last_name'] ?? ''}'.trim()
+    //     : 'العريس الكريم';
+  final userName = _userProfile != null 
+      ? (_userProfile!['guardian_name'] != null && _userProfile!['guardian_name'].toString().trim().isNotEmpty
+          ? '${_userProfile!['guardian_name']}'.trim()
+          : '${_userProfile!['first_name'] ?? ''} ${_userProfile!['last_name'] ?? ''}'.trim())
+      : 'العريس الكريم';
     final timeOfDay = DateTime.now().hour;
     String greeting = timeOfDay < 12 ? ' السلام عليكم صباح الخير' : timeOfDay < 18 ? 'السلام عليكم مرحبا بك' : 'السلام عليكم مساء الخير';
 

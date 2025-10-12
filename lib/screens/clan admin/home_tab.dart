@@ -34,6 +34,7 @@ class HomeTabState extends State<HomeTab> with TickerProviderStateMixin {
   };
   List<dynamic> _recentActivities = [];
   String _adminName = 'مدير العشيرة';
+  String _ClanName = '';
 
   @override
   void initState() {
@@ -140,6 +141,7 @@ void _showLogoutDialog() {
         };
         
         _adminName = _extractAdminName(userInfo);
+        _ClanName = userInfo['clan_name'] ?? '';
         _isLoading = false;
       });
 
@@ -400,7 +402,7 @@ PreferredSizeWidget _buildSliverAppBar(bool isMobile) {
           if (value == 'logout') {
             _showLogoutDialog();
           } else if (value == 'profile') {
-            _navigateToTab(7);
+            _navigateToTab(8);
           }
         },
         itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
@@ -472,7 +474,7 @@ PreferredSizeWidget _buildSliverAppBar(bool isMobile) {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'مرحباً $_adminName',
+                      'مرحباً $_adminName  \n$_ClanName',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: isMobile ? 22 : (isTablet ? 32 : 28),
@@ -482,7 +484,7 @@ PreferredSizeWidget _buildSliverAppBar(bool isMobile) {
                     ),
                     SizedBox(height: 8),
                     Text(
-                      'لوحة تحكم شاملة لإدارة القصور والعشائر',
+                      'لوحة تحكم شاملة لإدارة جميع جوانب العشيرة',
                       style: TextStyle(
                         color: Colors.white.withOpacity(0.9),
                         fontSize: isMobile ? 14 : 16,

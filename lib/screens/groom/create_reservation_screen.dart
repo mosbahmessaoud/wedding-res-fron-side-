@@ -61,6 +61,8 @@ class CreateReservationScreenState extends State<CreateReservationScreen> {
   bool _isLoading = true;
   bool _isSubmitting = false;
   int _maxCapacityPerDate = 3;
+  int _years_max_reserv_GroomFromOutClan = 1;
+  int _years_max_reserv_GrooomFromOriginClan = 3;
 
 
   bool _isLoadingInstructionSettings = false;
@@ -179,6 +181,7 @@ Future<void> _refreshData() async {
     _canSelectTwoDays = false;
     _date2Bool = false;
     _maxCapacityPerDate = 3;
+    
     
     // Clear form fields
     _date1Controller.clear();
@@ -625,12 +628,14 @@ Future<void> _submitReservation() async {
       final settings = await ApiService.getSettingsByClanId(clanId.toString());
       setState(() { 
         _clanSettings = settings;
+        print('--------------Loaded clan settings: $_clanSettings');
         _maxCapacityPerDate = settings['max_grooms_per_date'] ?? 3;
+        _years_max_reserv_GroomFromOutClan = settings['years_max_reserv_GroomFromOutClan'] ?? 1;
+        _years_max_reserv_GrooomFromOriginClan = settings['years_max_reserv_GrooomFromOriginClan'] ?? 3;
       });
     } catch (e) {
       print('Error loading clan settings: $e');
       setState(() {
-        _clanSettings = null;
         _maxCapacityPerDate = 3; 
       });
     }
@@ -844,8 +849,8 @@ Future<void> _selectDate(TextEditingController controller, String title) async {
             Navigator.of(context).pop();
           },
           isOriginClan: _isOriginClan, // or false based on your logic
-          yearsMaxReservGroomFromOriginClan: _clanSettings?['years_max_reserv_groom_from_origin_clan'] ?? 3,
-          yearsMaxReservGroomFromOutClan: _clanSettings?['years_max_reserv_groom_from_out_clan'] ?? 1,
+          yearsMaxReservGroomFromOriginClan: _years_max_reserv_GrooomFromOriginClan ,
+          yearsMaxReservGroomFromOutClan: _years_max_reserv_GroomFromOutClan ,
         ),
       );
     }
@@ -876,8 +881,8 @@ Future<void> _selectDate(TextEditingController controller, String title) async {
       _selectedClan = clan;
       _selectedHall = null;
       _halls.clear();
-      _clanSettings = null; // Reset clan settings
-      
+      _clanSettings = null;
+
       if (clan != null) {
         // Check if clan allows two days (will be updated when date is selected)
         _updateTwoDayAvailability();
@@ -886,7 +891,7 @@ Future<void> _selectDate(TextEditingController controller, String title) async {
         _loadHallsForClan(clan['id']);
         _loadSettingForClan(clan['id']);
         
-        // Load clan settings for capacity
+        // Load clan settings for capacity  
         // _loadClanSettings();
       } else {
         _canSelectTwoDays = false;

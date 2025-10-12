@@ -1,4 +1,5 @@
 // lib/screens/auth/multi_step_signup_screen.dart
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../utils/colors.dart';
@@ -66,25 +67,181 @@ class _MultiStepSignupScreenState extends State<MultiStepSignupScreen>
   List<County> _counties = [];
   List<Clan> _clans = [];
   List<Clan> _filteredClans = [];
+  // bool _hasInternet = true;
 
-  @override
-  void initState() {
-    super.initState();
-      // _birthAddressController = TextEditingController(text: 'تغرداية');
 
-    _animationController = AnimationController(
-      duration: Duration(milliseconds: 300),
-      vsync: this,
-    );
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
-    );
-    _animationController.forward();
-    _loadCounties();
-    _loadClans();
+// Also update the _checkConnectivity method to be more reliable
+Future<bool> _checkConnectivity() async {
+  try {
+    final connectivityResult = await Connectivity().checkConnectivity();
+    
+    // Check if it's a list (newer versions) or single value
+    if (connectivityResult is List) {
+      return !connectivityResult.contains(ConnectivityResult.none) && 
+             connectivityResult.isNotEmpty;
+    }
+    
+    return connectivityResult != ConnectivityResult.none;
+  } catch (e) {
+    print('Connectivity check error: $e');
+    return false;
   }
-
+}
+// Add this method to show no internet dialog
+void _showNoInternetDialog() {
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (BuildContext context) {
+      final screenWidth = MediaQuery.of(context).size.width;
+      final isSmallScreen = screenWidth < 360;
+      
+      return AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        contentPadding: EdgeInsets.symmetric(
+          horizontal: isSmallScreen ? 16 : 24,
+          vertical: 20,
+        ),
+        title: Row(
+          children: [
+            Icon(
+              Icons.wifi_off, 
+              color: AppColors.error, 
+              size: isSmallScreen ? 24 : 28,
+            ),
+            SizedBox(width: isSmallScreen ? 8 : 12),
+            Expanded(
+              child: Text(
+                'لا يوجد اتصال بالإنترنت',
+                style: TextStyle(
+                  fontSize: isSmallScreen ? 16 : 18,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'يرجى التحقق من اتصالك بالإنترنت والمحاولة مرة أخرى',
+          style: TextStyle(
+            fontSize: isSmallScreen ? 13 : 14,
+          ),
+        ),
+        actions: [
+TextButton(
+  onPressed: () async {
+    final nav = Navigator.of(context);
+    nav.pop();
+    
+showDialog(
+  context: context,
+  barrierDismissible: false,
+  builder: (_) => Dialog(
+    backgroundColor: Colors.transparent,
+    child: Container(
+      padding: EdgeInsets.all(MediaQuery.of(context).size.width < 360 ? 20 : 24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CircularProgressIndicator(color: AppColors.primary),
+          SizedBox(height: 16),
+          Text(
+            'جاري فحص الاتصال...',
+            style: TextStyle(
+              fontSize: MediaQuery.of(context).size.width < 360 ? 13 : 15,
+              fontWeight: FontWeight.w500,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    ),
+  ),
+);
+    
+    await Future.delayed(Duration(seconds: 2));
+    final hasInternet = await _checkConnectivity();
+    
+    nav.pop();
+    
+    if (hasInternet) {
+      _loadCounties();
+      _loadClans();
+    } else {
+      _showNoInternetDialog();
+    }
+  },
+  style: TextButton.styleFrom(
+    padding: EdgeInsets.symmetric(
+      horizontal: isSmallScreen ? 12 : 16,
+      vertical: 8,
+    ),
+  ),
+  child: Text(
+    'إعادة المحاولة',
+    style: TextStyle(fontSize: isSmallScreen ? 13 : 14),
+  ),
+),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              Navigator.of(context).pop(); // Go back to previous screen
+            },
+            style: TextButton.styleFrom(
+              padding: EdgeInsets.symmetric(
+                horizontal: isSmallScreen ? 12 : 16,
+                vertical: 8,
+              ),
+            ),
+            child: Text(
+              'رجوع',
+              style: TextStyle(
+                fontSize: isSmallScreen ? 13 : 14,
+              ),
+            ),
+          ),
+        ],
+      );
+    },
+  );
+}
+@override
+void initState() {
+  super.initState();
+  
+  _animationController = AnimationController(
+    duration: Duration(milliseconds: 300),
+    vsync: this,
+  );
+  _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+    CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+  );
+  _animationController.forward();
+  
+  // Check connectivity after the first frame is rendered
+  WidgetsBinding.instance.addPostFrameCallback((_) async {
+    final hasInternet = await _checkConnectivity();
+    if (!hasInternet) {
+      _showNoInternetDialog();
+    } else {
+      _loadCounties();
+      _loadClans();
+    }
+  });
+}
+// Update _loadCounties method
 Future<void> _loadCounties() async {
+  final hasInternet = await _checkConnectivity();
+  if (!hasInternet) {
+    _showNoInternetDialog();
+    return;
+  }
+  
   try {
     final counties = await ApiService.getCounties();
     setState(() {
@@ -95,18 +252,26 @@ Future<void> _loadCounties() async {
   }
 }
 
-  Future<void> _loadClans() async {
-    if (_clans.isNotEmpty) return;
-    
-    try {
-      final clans = await ApiService.getAllClans();
-      setState(() {
-        _clans = clans;
-      });
-    } catch (e) {
-      _showErrorDialog('فشل في تحميل العشائر: $e');
-    }
+// Update _loadClans method
+Future<void> _loadClans() async {
+  if (_clans.isNotEmpty) return;
+  
+  final hasInternet = await _checkConnectivity();
+  if (!hasInternet) {
+    _showNoInternetDialog();
+    return;
   }
+  
+  try {
+    final clans = await ApiService.getAllClans();
+    setState(() {
+      _clans = clans;
+    });
+  } catch (e) {
+    _showErrorDialog('فشل في تحميل العشائر: $e');
+  }
+}
+
 
   void _filterClansByCounty() {
     if (_selectedCounty != null) {
@@ -289,53 +454,59 @@ Future<void> _loadCounties() async {
     }
   }
 
-  Future<void> _signup() async {
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      final userData = {
-        'phone_number': _phoneController.text.trim(),
-        'first_name': _firstNameController.text.trim(),
-        'last_name': _lastNameController.text.trim(),
-        'father_name': _fatherNameController.text.trim(),
-        'grandfather_name': _grandfatherNameController.text.trim(),
-        'birth_date': DateFormat('yyyy-MM-dd').format(_birthDate!),
-        'birth_address': _birthAddressController.text.trim(),
-        'home_address': _homeAddressController.text.trim(),
-        'clan_id': _selectedClan!.id,
-        'county_id': _selectedCounty!.id,
-        'password': _passwordController.text,
-        'role': 'groom',
-        'guardian_name': _guardianNameController.text.trim(),
-        'guardian_phone': _guardianPhoneController.text.trim(),
-        'guardian_birth_date': DateFormat('yyyy-MM-dd').format(_guardianBirthDate!),
-        'guardian_birth_address': _guardianBirthAddressController.text.trim(),
-        'guardian_home_address': _guardianHomeAddressController.text.trim(),
-        'guardian_relation': _selectedGuardianRelation,
-      };
-
-      final response = await ApiService.registerGroom(userData);
-      
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => OTPVerificationScreen(
-            phoneNumber: _phoneController.text.trim(),
-          ),
-        ),
-      );
-
-    } catch (e) {
-      _showErrorDialog('فشل في التسجيل: $e');
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
+// Update _signup method
+Future<void> _signup() async {
+  final hasInternet = await _checkConnectivity();
+  if (!hasInternet) {
+    _showNoInternetDialog();
+    return;
   }
+  
+  setState(() {
+    _isLoading = true;
+  });
 
+  try {
+    final userData = {
+      'phone_number': _phoneController.text.trim(),
+      'first_name': _firstNameController.text.trim(),
+      'last_name': _lastNameController.text.trim(),
+      'father_name': _fatherNameController.text.trim(),
+      'grandfather_name': _grandfatherNameController.text.trim(),
+      'birth_date': DateFormat('yyyy-MM-dd').format(_birthDate!),
+      'birth_address': _birthAddressController.text.trim(),
+      'home_address': _homeAddressController.text.trim(),
+      'clan_id': _selectedClan!.id,
+      'county_id': _selectedCounty!.id,
+      'password': _passwordController.text,
+      'role': 'groom',
+      'guardian_name': _guardianNameController.text.trim(),
+      'guardian_phone': _guardianPhoneController.text.trim(),
+      'guardian_birth_date': DateFormat('yyyy-MM-dd').format(_guardianBirthDate!),
+      'guardian_birth_address': _guardianBirthAddressController.text.trim(),
+      'guardian_home_address': _guardianHomeAddressController.text.trim(),
+      'guardian_relation': _selectedGuardianRelation,
+    };
+
+    final response = await ApiService.registerGroom(userData);
+    
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => OTPVerificationScreen(
+          phoneNumber: _phoneController.text.trim(),
+        ),
+      ),
+    );
+
+  } catch (e) {
+    _showErrorDialog('فشل في التسجيل: $e');
+  } finally {
+    setState(() {
+      _isLoading = false;
+    });
+  }
+}
   Widget _buildProgressIndicator() {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 24, vertical: 20),

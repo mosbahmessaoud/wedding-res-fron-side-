@@ -1,6 +1,7 @@
 // lib/screens/home/groom_home_screen.dart
 import 'dart:ui';
 
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:wedding_reservation_app/screens/groom/food_menu_tab.dart';
@@ -73,67 +74,175 @@ class _GroomHomeScreenState extends State<GroomHomeScreen> {
     ];
   }
 
-  // Future<void> _loadClanInfo() async {
-  //   try {
-  //     final clanInfo = await ApiService.getClanInfo();
-  //     setState(() {
-  //       _clanId = clanInfo['id'];
-  //       _clanName = clanInfo['name'] ?? 'العشيرة';
-  //       // Rebuild tabs with clan info
-  //       _tabs = [
-  //         HomeTab(
-  //           key: _homeTabKey,
-  //           onTabChanged: _changeTab,
-  //         ),
-  //         CreateReservationScreen(
-  //           key: _creatResTabKey,
-  //           onReservationCreated: () {
-  //             _changeTab(2);
-  //           },
-  //         ),
-  //         ReservationsTab(key: _reservationsTabKey),
-  //         FoodMenuTabG(key: _foodMenuTabKey),
-  //         ProfileTab(key: _profileTabKey),
-  //         ClanRulesViewPage(
 
-  //         ),
-  //       ];
-  //     });
-  //   } catch (e) {
-  //     print('Error loading clan info: $e');
-  //     setState(() {
-  //       _clanId = 0;
-  //       _clanName = 'العشيرة';
-  //       _tabs = [
-  //         HomeTab(
-  //           key: _homeTabKey,
-  //           onTabChanged: _changeTab,
-  //         ),
-  //         CreateReservationScreen(
-  //           key: _creatResTabKey,
-  //           onReservationCreated: () {
-  //             _changeTab(2);
-  //           },
-  //         ),
-  //         ReservationsTab(key: _reservationsTabKey),
-  //         FoodMenuTabG(key: _foodMenuTabKey),
-  //         ProfileTab(key: _profileTabKey),
-  //         ClanRulesViewPage(
-
-  //         ),
-  //       ];
-  //     });
-  //   }
-  // }
-
-  void _changeTab(int index) {
-    setState(() {
-      _currentIndex = index;
-      _externalScreen = null;
-      _externalScreenTitle = null;
-    });
-    _refreshCurrentTab(index);
+Future<bool> _checkConnectivity() async {
+  try {
+    final connectivityResult = await Connectivity().checkConnectivity();
+    if (connectivityResult is List) {
+      return !connectivityResult.contains(ConnectivityResult.none) && 
+             connectivityResult.isNotEmpty;
+    }
+    return connectivityResult != ConnectivityResult.none;
+  } catch (e) {
+    return false;
   }
+}
+
+void _showNoInternetDialog() {
+  final isDark = Provider.of<ThemeProvider>(context, listen: false).isDarkMode;
+  final screenWidth = MediaQuery.of(context).size.width;
+  final isSmallScreen = screenWidth < 360;
+  
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (_) => Dialog(
+      backgroundColor: Colors.transparent,
+      child: Container(
+        padding: EdgeInsets.all(isSmallScreen ? 20 : 24),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.wifi_off,
+              color: AppColors.error,
+              size: isSmallScreen ? 48 : 56,
+            ),
+            SizedBox(height: 16),
+            Text(
+              'لا يوجد اتصال بالإنترنت',
+              style: TextStyle(
+                fontSize: isSmallScreen ? 16 : 18,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : Colors.black87,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: 8),
+            Text(
+              'يرجى التحقق من اتصالك بالإنترنت والمحاولة مرة أخرى',
+              style: TextStyle(
+                fontSize: isSmallScreen ? 13 : 14,
+                color: isDark ? Colors.grey[400] : Colors.grey[600],
+              ),
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                    },
+                    style: OutlinedButton.styleFrom(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      side: BorderSide(color: AppColors.primary),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Text('إلغاء'),
+                  ),
+                ),
+                SizedBox(width: 12),
+                Expanded(
+  child: ElevatedButton(
+    onPressed: () async {
+      final nav = Navigator.of(context);
+      final screenWidth = MediaQuery.of(context).size.width;
+      final isSmallScreen = screenWidth < 360;
+      
+      nav.pop();
+      
+      // Show loading dialog
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => Dialog(
+          backgroundColor: Colors.transparent,
+          child: Container(
+            padding: EdgeInsets.all(isSmallScreen ? 20 : 24),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(color: AppColors.primary),
+                SizedBox(height: 16),
+                Text(
+                  'جاري فحص الاتصال...',
+                  style: TextStyle(
+                    fontSize: isSmallScreen ? 13 : 15,
+                    fontWeight: FontWeight.w500,
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      
+      // Wait 2 seconds while checking
+      await Future.delayed(Duration(seconds: 2));
+      final hasInternet = await _checkConnectivity();
+      
+      nav.pop();
+      
+      if (!hasInternet) {
+        _showNoInternetDialog();
+      }
+    },
+    style: ElevatedButton.styleFrom(
+      backgroundColor: AppColors.primary,
+      padding: EdgeInsets.symmetric(vertical: 12),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+    ),
+    child: Text(
+      'إعادة المحاولة',
+      style: TextStyle(
+        fontSize: isSmallScreen ? 13 : 14,
+        fontWeight: FontWeight.w600,
+      ),
+    ),
+  ),
+),
+              ],
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+
+// Update the _changeTab method
+void _changeTab(int index) async {
+  final hasInternet = await _checkConnectivity();
+  if (!hasInternet) {
+    _showNoInternetDialog();
+    return;
+  }
+  
+  setState(() {
+    _currentIndex = index;
+    _externalScreen = null;
+    _externalScreenTitle = null;
+  });
+  _refreshCurrentTab(index);
+}
+
 
   void _refreshCurrentTab(int index) {
     switch (index) {
@@ -158,12 +267,19 @@ class _GroomHomeScreenState extends State<GroomHomeScreen> {
     }
   }
 
-  void _navigateToExternalScreen(Widget screen, String title) {
-    setState(() {
-      _externalScreen = screen;
-      _externalScreenTitle = title;
-    });
+// Update the _navigateToExternalScreen method
+void _navigateToExternalScreen(Widget screen, String title) async {
+  final hasInternet = await _checkConnectivity();
+  if (!hasInternet) {
+    _showNoInternetDialog();
+    return;
   }
+  
+  setState(() {
+    _externalScreen = screen;
+    _externalScreenTitle = title;
+  });
+}
 
   void _closeExternalScreen() {
     setState(() {
@@ -685,32 +801,161 @@ Widget buildNavigationWithSafeArea(bool isDark) {
                         thickness: 1,
                       ),
                     ),
-                    
-                    _buildExternalDrawerItem(
-                      Icons.settings_outlined,
-                      'الإعدادات',
-                      const Center(child: Text('شاشة الإعدادات')),
-                      isDark,
+
+                    ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
+                      leading: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.grey[800] : Colors.grey[100],
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          Icons.settings_outlined,
+                          color: isDark ? Colors.grey[400] : Colors.grey[700],
+                          size: 20,
+                        ),
+                      ),
+                      title: Text(
+                        'الإعدادات',
+                        style: TextStyle(
+                          color: isDark ? Colors.grey[300] : Colors.grey[800],
+                          fontWeight: FontWeight.w500,
+                          fontSize: 15,
+                        ),
+                      ),
+                      onTap: () {
+                        Navigator.pop(context);
+                        showDialog(
+                          context: context,
+                          builder: (BuildContext context) {
+                            return AlertDialog(
+                              title: const Text(
+                                'الإعدادات',
+                                textAlign: TextAlign.right,
+                              ),
+                              content: const Text(
+                                'هذه الصفحة قيد التطوير حالياً. سيتم إضافتها قريباً.',
+                                textAlign: TextAlign.right,
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.of(context).pop(),
+                                  child: const Text('حسناً'),
+                                ),
+                              ],
+                            );
+                          },
+                        );
+                      },
                     ),
-                    _buildExternalDrawerItem(
-                      Icons.help_outline_rounded,
-                      'المساعدة والدعم',
-                      const Center(child: Text('شاشة المساعدة والدعم')),
-                      isDark,
+
+                    // 2. Help and Support item - calls _showHelpSupport()
+                    ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
+                      leading: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.grey[800] : Colors.grey[100],
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          Icons.help_outline_rounded,
+                          color: isDark ? Colors.grey[400] : Colors.grey[700],
+                          size: 20,
+                        ),
+                      ),
+                      title: Text(
+                        'المساعدة والدعم',
+                        style: TextStyle(
+                          color: isDark ? Colors.grey[300] : Colors.grey[800],
+                          fontWeight: FontWeight.w500,
+                          fontSize: 15,
+                        ),
+                      ),
+                      onTap: () {
+                        Navigator.pop(context);
+                        _showHelpSupport();
+                      }, 
                     ),
-                    _buildExternalDrawerItem(
-                      Icons.info_outline_rounded,
-                      'حول التطبيق',
-                      const Center(child: Text('شاشة حول التطبيق')),
-                      isDark,
+
+                    // 3. About App item - calls _showAboutApp()
+                    ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
+                      leading: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.grey[800] : Colors.grey[100],
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          Icons.info_outline_rounded,
+                          color: isDark ? Colors.grey[400] : Colors.grey[700],
+                          size: 20,
+                        ),
+                      ),
+                      title: Text(
+                        'حول التطبيق',
+                        style: TextStyle(
+                          color: isDark ? Colors.grey[300] : Colors.grey[800],
+                          fontWeight: FontWeight.w500,
+                          fontSize: 15,
+                        ),
+                      ),
+                      onTap: () {
+                        Navigator.pop(context);
+                        _showAboutApp();
+                      },
                     ),
-                    _buildExternalDrawerItem(
-                      Icons.star_outline_rounded,
-                      'تقييم التطبيق',
-                      const Center(child: Text('شاشة تقييم التطبيق')),
-                      isDark,
+
+                    // 4. Rate App item - shows a "coming soon" dialog
+                    ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
+                      leading: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.grey[800] : Colors.grey[100],
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          Icons.star_outline_rounded,
+                          color: isDark ? Colors.grey[400] : Colors.grey[700],
+                          size: 20,
+                        ),
+                      ),
+                      title: Text(
+                        'تقييم التطبيق',
+                        style: TextStyle(
+                          color: isDark ? Colors.grey[300] : Colors.grey[800],
+                          fontWeight: FontWeight.w500,
+                          fontSize: 15,
+                        ),
+                      ),
+                      onTap: () {
+                        Navigator.pop(context);
+                        showDialog(
+                          context: context,
+                          builder: (BuildContext context) {
+                            return AlertDialog(
+                              title: const Text(
+                                'تقييم التطبيق',
+                                textAlign: TextAlign.right,
+                              ),
+                              content: const Text(
+                                'هذه الميزة قيد التطوير حالياً. سيتم إضافتها قريباً.',
+                                textAlign: TextAlign.right,
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.of(context).pop(),
+                                  child: const Text('حسناً'),
+                                ),
+                              ],
+                            );
+                          },
+                        );
+                      },
                     ),
-                    
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       child: Divider(
@@ -752,198 +997,248 @@ Widget buildNavigationWithSafeArea(bool isDark) {
     );
   }
 
-  Widget _buildDrawerItem(IconData icon, String title, int index, bool isDark) {
-    final isSelected = _currentIndex == index && _externalScreen == null;
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-      decoration: BoxDecoration(
-        color: isSelected ? AppColors.primary.withOpacity(0.1) : Colors.transparent,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        leading: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: isSelected ? AppColors.primary : (isDark ? Colors.grey[800] : Colors.grey[100]),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(
-            icon,
-            color: isSelected ? Colors.white : (isDark ? Colors.grey[400] : Colors.grey[700]),
-            size: 20,
+  void _showAboutApp() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('حول التطبيق'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'تطبيق حجوزات الأعراس الخاص بجميع العشائر ',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              const Text('الإصدار: 1.0.1'),
+              const SizedBox(height: 16),
+              const Text(
+                'يسرّنا أن نرحب بكم في تطبيق الأعراس،\nونضع بين أيديكم وسيلة ميسرة لتنظيم و حجز العرس الخاص بكم',
+              ),
+              const SizedBox(height: 16),
+              const Divider(),
+              const SizedBox(height: 8),
+              const Text(
+                'برعاية:',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 4),
+              const Text('عشيرة آت الشيخ الحاج مسعود'),
+              const SizedBox(height: 16),
+              const Divider(),
+              const SizedBox(height: 8),
+              const Text(
+                'معلومات المطور:',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const Icon(Icons.email, size: 18),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text('mosbah07messaoud@gmail.com'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const Icon(Icons.phone, size: 18),
+                  const SizedBox(width: 8),
+                  const Text('0658890501'),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isDark ?Colors.green.shade300 : Colors.green.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: isDark ?Colors.green.shade500 : Colors.green.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.message, color: Colors.green.shade700, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '   لأي ملاحظات أو استفسارات عن التطبيق، \n يرجى التواصل عبر الواتساب (0658890501)'   ,
+                        style: TextStyle(fontSize: 13, color: isDark ?AppColors.darkTextPrimary : AppColors.darkBorder),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
-        title: Text(
-          title,
-          style: TextStyle(
-            color: isSelected ? AppColors.primary : (isDark ? Colors.grey[300] : Colors.grey[800]),
-            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-            fontSize: 15,
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('موافق'),
           ),
-        ),
-        onTap: () {
-          Navigator.pop(context);
-          _changeTab(index);
-        },
+        ],
       ),
     );
   }
 
-  Widget _buildExternalDrawerItem(IconData icon, String title, Widget screen, bool isDark) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        leading: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: isDark ? Colors.grey[800] : Colors.grey[100],
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(
-            icon,
-            color: isDark ? Colors.grey[400] : Colors.grey[700],
-            size: 20,
+  void _showHelpSupport() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('لدعم والمساعدة'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              
+              // const Text(
+              //   'معلومات المطور:',
+              //   style: TextStyle(fontWeight: FontWeight.bold),
+              // ),
+              // const SizedBox(height: 8),
+              Row(
+                children: [
+                  const Icon(Icons.email, size: 18),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text('mosbah07messaoud@gmail.com'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const Icon(Icons.phone, size: 18),
+                  const SizedBox(width: 8),
+                  const Text('0658890501'),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isDark ?Colors.green.shade300 : Colors.green.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: isDark ?Colors.green.shade500 : Colors.green.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.message, color: Colors.green.shade700, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '   لأي ملاحظات أو استفسارات عن التطبيق، \n يرجى التواصل عبر الواتساب (0658890501)'   ,
+                        style: TextStyle(fontSize: 13, color: isDark ?AppColors.darkTextPrimary : AppColors.darkBorder),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
-        title: Text(
-          title,
-          style: TextStyle(
-            color: isDark ? Colors.grey[300] : Colors.grey[800],
-            fontWeight: FontWeight.w500,
-            fontSize: 15,
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('موافق'),
           ),
-        ),
-        onTap: () {
-          Navigator.pop(context);
-          _navigateToExternalScreen(screen, title);
-        },
+        ],
       ),
     );
   }
 
-  // Widget _buildSpotifyBottomNav(bool isDark) {
-  //   return Container(
-  //     margin: const EdgeInsets.symmetric(vertical: 0, horizontal: 0),
-  //     padding: EdgeInsets.zero,
-  //     decoration: BoxDecoration(
-  //       color: isDark 
-  //           ? const Color.fromARGB(57, 72, 72, 72)
-  //           : const Color.fromARGB(47, 79, 79, 79),
-  //       borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
-  //       boxShadow: [
-  //         BoxShadow(
-  //           color: isDark ? const Color.fromARGB(142, 102, 187, 106).withOpacity( 0.2 ) : Colors.green.shade400.withOpacity( 0.2)  ,
-  //           blurRadius: 45,
-  //           offset: const Offset(0, -0),
-  //           spreadRadius: 10,
-  //         ),
-  //         BoxShadow(
-  //           color: const Color.fromARGB(255, 21, 219, 90).withOpacity(0.1),
-  //           blurRadius: 55,
-  //           offset: const Offset(0, -0),
-  //           spreadRadius: 15,
-  //         ),
-  //       ],
-  //       border: Border.all(
-  //         color: const Color.fromARGB(255, 4, 99, 1).withOpacity(isDark ? 0.2 : 0.3),
-  //         width: 0.5,
-  //       ),
-  //     ),
-  //     child: ClipRRect(
-  //       borderRadius: BorderRadius.circular(25),
-  //       child: BackdropFilter(
-  //         filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2),
-  //         child: SafeArea(
-  //           bottom: true,
-  //           top: false,
-  //           child: Padding(
-  //             padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
-  //             child: Row(
-  //               mainAxisAlignment: MainAxisAlignment.spaceAround,
-  //               crossAxisAlignment: CrossAxisAlignment.center,
-  //               children: [
-  //                 _buildNavItem(Icons.add_circle_outline_rounded, 'انشاء حجز', 1, isDark),
-  //                 _buildNavItem(Icons.calendar_today_rounded, 'الحجوزات', 2, isDark),
-  //                 _buildNavItem(Icons.home_rounded, 'الرئيسية', 0, isDark),
-  //                 _buildNavItem(Icons.restaurant_menu_rounded, 'الوليمة', 3, isDark),
-  //                 _buildNavItem(Icons.person_outline_rounded, 'الملف الشخصي', 4, isDark),
-  //                 _buildNavItem(Icons.rule_outlined, 'القوانين', 5, isDark),
-  //               ],
-  //             ),
-  //           ),
-  //         ),
-  //       ),
-  //     ),
-  //   );
-  // }
+// Update _buildDrawerItem method - only the onTap part
+Widget _buildDrawerItem(IconData icon, String title, int index, bool isDark) {
+  final isSelected = _currentIndex == index && _externalScreen == null;
+  return Container(
+    margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+    decoration: BoxDecoration(
+      color: isSelected ? AppColors.primary.withOpacity(0.1) : Colors.transparent,
+      borderRadius: BorderRadius.circular(8),
+    ),
+    child: ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      leading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primary : (isDark ? Colors.grey[800] : Colors.grey[100]),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(
+          icon,
+          color: isSelected ? Colors.white : (isDark ? Colors.grey[400] : Colors.grey[700]),
+          size: 20,
+        ),
+      ),
+      title: Text(
+        title,
+        style: TextStyle(
+          color: isSelected ? AppColors.primary : (isDark ? Colors.grey[300] : Colors.grey[800]),
+          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+          fontSize: 15,
+        ),
+      ),
+      onTap: () async {
+        Navigator.pop(context);
+        final hasInternet = await _checkConnectivity();
+        if (!hasInternet) {
+          _showNoInternetDialog();
+          return;
+        }
+        _changeTab(index);
+      },
+    ),
+  );
+}
 
-  // Widget _buildNavItem(IconData icon, String label, int index, bool isDark) {
-  //   final isSelected = _currentIndex == index && _externalScreen == null;
-    
-  //   return GestureDetector(
-  //     onTap: () => _changeTab(index),
-  //     behavior: HitTestBehavior.opaque,
-  //     child: AnimatedContainer(
-  //       duration: const Duration(milliseconds: 300),
-  //       curve: Curves.easeOutCubic,
-  //       padding: EdgeInsets.symmetric(
-  //         horizontal: isSelected ? 16 : 12,
-  //         vertical: 8,
-  //       ),
-  //       decoration: BoxDecoration(
-  //         gradient: isSelected
-  //             ? const LinearGradient(
-  //                 colors: [
-  //                   Color.fromARGB(82, 98, 216, 139),
-  //                   Color.fromARGB(43, 2, 168, 110),
-  //                 ],
-  //                 begin: Alignment.topLeft,
-  //                 end: Alignment.bottomRight,
-  //               )
-  //             : null,
-  //         borderRadius: BorderRadius.circular(16),
-  //         boxShadow: isSelected
-  //             ? [
-  //                 BoxShadow(
-  //                   color: const Color.fromARGB(255, 0, 0, 0).withOpacity(0.3),
-  //                   blurRadius: 12,
-  //                   offset: const Offset(0, 4),
-  //                 ),
-  //               ]
-  //             : null,
-  //       ),
-  //       child: Column(
-  //         mainAxisSize: MainAxisSize.min,
-  //         mainAxisAlignment: MainAxisAlignment.center,
-  //         children: [
-  //           Icon(
-  //             icon,
-  //             color: isSelected 
-  //                 ? Colors.white 
-  //                 : (isDark ? Colors.white.withOpacity(0.6) : Colors.black.withOpacity(0.5)),
-  //             size: isSelected ? 26 : 24,
-  //           ),
-  //           if (isSelected) ...[
-  //             const SizedBox(height: 4),
-  //             Text(
-  //               label,
-  //               style: const TextStyle(
-  //                 fontSize: 11,
-  //                 fontWeight: FontWeight.w600,
-  //                 color: Colors.white,
-  //                 letterSpacing: 0.2,
-  //               ),
-  //               maxLines: 1,
-  //               overflow: TextOverflow.ellipsis,
-  //             ),
-  //           ],
-  //         ],
-  //       ),
-  //     ),
-  //   );
-  // }
+
+// Update _buildExternalDrawerItem method - only the onTap part
+Widget _buildExternalDrawerItem(IconData icon, String title, Widget screen, bool isDark) {
+  return Container(
+    margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+    child: ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      leading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: isDark ? Colors.grey[800] : Colors.grey[100],
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(
+          icon,
+          color: isDark ? Colors.grey[400] : Colors.grey[700],
+          size: 20,
+        ),
+      ),
+      title: Text(
+        title,
+        style: TextStyle(
+          color: isDark ? Colors.grey[300] : Colors.grey[800],
+          fontWeight: FontWeight.w500,
+          fontSize: 15,
+        ),
+      ),
+      onTap: () async {
+        Navigator.pop(context);
+        final hasInternet = await _checkConnectivity();
+        if (!hasInternet) {
+          _showNoInternetDialog();
+          return;
+        }
+        _navigateToExternalScreen(screen, title);
+      },
+    ),
+  );
+}
 
   String _getAppBarTitle() {
     if (_externalScreen != null) {

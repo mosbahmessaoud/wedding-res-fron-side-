@@ -624,7 +624,7 @@ class _ClanAdminHomeScreenState extends State<ClanAdminHomeScreen>
                   _buildNavItem(Icons.home_rounded, 'الرئيسية', 0, isDark),
                   _buildNavItem(Icons.restaurant_menu_outlined, 'الطعام', 4, isDark),
                   _buildNavItem(Icons.settings_outlined, 'الإعدادات', 5, isDark),
-                  _buildNavItem(Icons.lock_outline, 'OTP', 6, isDark),
+                  // _buildNavItem(Icons.lock_outline, 'OTP', 6, isDark),
                   _buildNavItem(Icons.rule_outlined, 'القوانين', 7, isDark),
                 ],
               ),
@@ -716,7 +716,7 @@ class _ClanAdminHomeScreenState extends State<ClanAdminHomeScreen>
       case 5:
         return 'الإعدادات';
       case 6:
-        return 'رموز التحقق';
+        return 'رموز التحقق'; 
       case 7:
         return 'قوانين العشيرة';
       case 8:

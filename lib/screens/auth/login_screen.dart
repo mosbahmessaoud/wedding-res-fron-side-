@@ -1,5 +1,7 @@
 // lib/screens/auth/login_screen.dart
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:wedding_reservation_app/screens/auth/forgot_password_screen.dart';
@@ -72,7 +74,6 @@ class _LoginScreenState extends State<LoginScreen>
     _formKey.currentState?.reset();
   }
 
-
   String? _validatePhone(String? value) {
     if (value == null || value.isEmpty) {
       return 'رقم الهاتف مطلوب';
@@ -87,57 +88,167 @@ class _LoginScreenState extends State<LoginScreen>
     return null;
   }
 
-Future<void> _login() async {
-  if (!_formKey.currentState!.validate()) {
-    return;
+  // Method to check internet connectivity
+  Future<bool> _checkInternetConnection() async {
+    try {
+      final result = await InternetAddress.lookup('google.com')
+          .timeout(const Duration(seconds: 5));
+      return result.isNotEmpty && result[0].rawAddress.isNotEmpty;
+    } on SocketException catch (_) {
+      return false;
+    } on TimeoutException catch (_) {
+      return false;
+    } catch (_) {
+      return false;
+    }
   }
 
-  setState(() {
-    _isLoading = true;
-  });
-
-  try {
-    final response = await ApiService.login(
-      _phoneController.text.trim(),
-      _passwordController.text,
+  // Show no internet dialog
+  void _showNoInternetDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        final screenWidth = MediaQuery.of(context).size.width;
+        final isSmallScreen = screenWidth < 360;
+        
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: screenWidth > 600 ? 400 : screenWidth * 0.85,
+            ),
+            child: Padding(
+              padding: EdgeInsets.all(isSmallScreen ? 16.0 : 20.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Title with icon
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.wifi_off,
+                        color: AppColors.error,
+                        size: isSmallScreen ? 24 : 28,
+                      ),
+                      SizedBox(width: isSmallScreen ? 8 : 12),
+                      Expanded(
+                        child: Text(
+                          'لا يوجد اتصال بالإنترنت',
+                          style: TextStyle(
+                            fontSize: isSmallScreen ? 16 : 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: isSmallScreen ? 12 : 16),
+                  
+                  // Content
+                  Text(
+                    'يرجى التحقق من اتصالك بالإنترنت والمحاولة مرة أخرى',
+                    style: TextStyle(
+                      fontSize: isSmallScreen ? 14 : 16,
+                      height: 1.5,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  SizedBox(height: isSmallScreen ? 16 : 20),
+                  
+                  // Action button
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: isDark ? Colors.green.shade700 : Colors.green.shade600,
+                        foregroundColor: Colors.white,
+                        padding: EdgeInsets.symmetric(
+                          vertical: isSmallScreen ? 10 : 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: Text(
+                        'حسناً',
+                        style: TextStyle(
+                          fontSize: isSmallScreen ? 14 : 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
+  }
 
-    // Decode JWT to get role instead of making another API call
-    final token = response['access_token'];
-    final parts = token.split('.');
-    if (parts.length != 3) {
-      throw Exception('توكن غير صالح');
+  Future<void> _login() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
     }
+
+    // Check internet connection first
+    final hasInternet = await _checkInternetConnection();
+    if (!hasInternet) {
+      _showNoInternetDialog();
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final response = await ApiService.login(
+        _phoneController.text.trim(),
+        _passwordController.text,
+      );
+
+      // Decode JWT to get role instead of making another API call
+      final token = response['access_token'];
+      final parts = token.split('.');
+      if (parts.length != 3) {
+        throw Exception('توكن غير صالح');
+      }
+      
+      final payload = json.decode(
+        utf8.decode(base64Url.decode(base64Url.normalize(parts[1])))
+      );
+      
+      final role = payload['role'];
     
-    final payload = json.decode(
-      utf8.decode(base64Url.decode(base64Url.normalize(parts[1])))
-    );
-    
-    final role = payload['role'];
-  
-    // Navigate based on role
-    if (role == 'groom') {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => GroomHomeScreen(initialTabIndex: 0),
-        ),
-      );
-    } else if (role == 'super_admin') {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => SuperAdminHomeScreen(),
-        ),
-      );
-    } else if (role == 'clan_admin') {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => ClanAdminHomeScreen(),
-        ),
-      );
-    } else {
+      // Navigate based on role
+      if (role == 'groom') {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => GroomHomeScreen(initialTabIndex: 0),
+          ),
+        );
+      } else if (role == 'super_admin') {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => SuperAdminHomeScreen(),
+          ),
+        );
+      } else if (role == 'clan_admin') {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ClanAdminHomeScreen(),
+          ),
+        );
+      } else {
         showDialog(
           context: context,
           builder: (BuildContext context) {
@@ -163,39 +274,116 @@ Future<void> _login() async {
           },
         );
       }
-
-
     } catch (e) {
       showDialog(
-        context: context,
-        builder: (BuildContext context) {
-          return AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
+  context: context,
+  builder: (BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Get screen size
+        final screenWidth = MediaQuery.of(context).size.width;
+        final screenHeight = MediaQuery.of(context).size.height;
+        
+        // Responsive sizing
+        final iconSize = screenWidth < 360 ? 24.0 : 28.0;
+        final titleFontSize = screenWidth < 360 ? 16.0 : 18.0;
+        final contentFontSize = screenWidth < 360 ? 14.0 : 16.0;
+        final horizontalPadding = screenWidth < 360 ? 16.0 : 24.0;
+        
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          contentPadding: EdgeInsets.zero,
+          insetPadding: EdgeInsets.symmetric(
+            horizontal: screenWidth * 0.08, // 8% margin from edges
+            vertical: screenHeight * 0.05,  // 5% margin from top/bottom
+          ),
+          title: Padding(
+            padding: EdgeInsets.fromLTRB(
+              horizontalPadding,
+              20,
+              horizontalPadding,
+              8,
             ),
-            title: Row(
+            child: Row(
               children: [
-                Icon(Icons.error_outline, color: AppColors.error, size: 28),
-                const SizedBox(width: 12),
-                const Text('خطأ في تسجيل الدخول'),
+                Icon(
+                  Icons.error_outline,
+                  color: AppColors.error,
+                  size: iconSize,
+                ),
+                SizedBox(width: screenWidth < 360 ? 8 : 12),
+                Expanded(
+                  child: Text(
+                    'خطأ في تسجيل الدخول',
+                    style: TextStyle(fontSize: titleFontSize),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 2,
+                  ),
+                ),
               ],
             ),
-            content: Text('$e'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('حسناً'),
+          ),
+          content: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: screenHeight * 0.5, // Max 50% of screen height
+              minWidth: screenWidth * 0.7,   // Min 70% of screen width
+            ),
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  horizontalPadding,
+                  8,
+                  horizontalPadding,
+                  16,
+                ),
+                child: Text(
+                  '$e',
+                  style: TextStyle(fontSize: contentFontSize),
+                ),
               ),
-            ],
-          );
-        },
-      );
+            ),
+          ),
+          actions: [
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                horizontalPadding,
+                0,
+                horizontalPadding,
+                16,
+              ),
+              child: SizedBox(
+                width: double.infinity,
+                child: TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: Text(
+                    'حسناً',
+                    style: TextStyle(fontSize: contentFontSize),
+                  ),
+                ),
+              ),
+            ),
+          ],
+          actionsPadding: EdgeInsets.zero,
+        );
+      },
+    );
+  },
+);
     } finally {
-    setState(() {
-      _isLoading = false;
-    });
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
-}
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -355,12 +543,10 @@ Future<void> _login() async {
                                       ],
                                     ),
                                     child: CustomTextField(
-                                      
                                       controller: _phoneController,
                                       label: 'رقم هاتف العريس',
-                                      labelColor: isDark ? Colors.white : Colors.black ,
-                                      boxcolor:isDark ? const Color.fromARGB(255, 157, 42, 42) : Colors.black , // i Added this line 
-
+                                      labelColor: isDark ? Colors.white : Colors.black,
+                                      boxcolor: isDark ? const Color.fromARGB(255, 157, 42, 42) : Colors.black,
                                       keyboardType: TextInputType.phone,
                                       validator: _validatePhone,
                                       prefixIcon: Icons.phone,
@@ -390,8 +576,7 @@ Future<void> _login() async {
                                     child: CustomTextField(
                                       controller: _passwordController,
                                       label: 'كلمة المرور',
-                                      labelColor: isDark ? Colors.white : Colors.black , // Added green color to label
-
+                                      labelColor: isDark ? Colors.white : Colors.black,
                                       obscureText: _obscurePassword,
                                       validator: _validatePassword,
                                       prefixIcon: Icons.lock,
@@ -461,9 +646,7 @@ Future<void> _login() async {
                                         ),
                                         disabledBackgroundColor: Colors.green.shade700.withOpacity(0.6),
                                         padding: EdgeInsets.symmetric(vertical: 2)
-
                                       ),
-                                      
                                       child: _isLoading
                                         ? SizedBox(
                                             height: 20,
@@ -532,29 +715,29 @@ Future<void> _login() async {
                     ),
                   ),
                   
-                  // Back button on top left - MUST be after ScrollView to be on top
-                    Positioned(
-                      top: 8,
-                      right: 16,
-                      child: Material(
-                        color: Colors.transparent,
-                        child: IconButton(
-                          onPressed: () {
-                            Navigator.pushReplacement(
-                              context,
-                              MaterialPageRoute(builder: (context) => WelcomeScreen()),
-                            );
-                          },
-                          icon: Icon(
-                            Icons.arrow_back, // Changed icon to home
-                            color: isDark ? Colors.green.shade300 : Colors.green.shade700,
-                            size: 24,
-                          ),
+                  // Back button on top left
+                  Positioned(
+                    top: 8,
+                    right: 16,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: IconButton(
+                        onPressed: () {
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(builder: (context) => WelcomeScreen()),
+                          );
+                        },
+                        icon: Icon(
+                          Icons.arrow_back,
+                          color: isDark ? Colors.green.shade300 : Colors.green.shade700,
+                          size: 24,
                         ),
                       ),
                     ),
+                  ),
                   
-                  // Theme Toggle Button on top right - MUST be after ScrollView to be on top
+                  // Theme Toggle Button on top right
                   Positioned(
                     top: 8,
                     left: 16,

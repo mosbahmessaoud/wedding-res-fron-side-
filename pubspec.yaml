@@ -65,6 +65,7 @@ dependencies:
   cupertino_icons: ^1.0.6
   share_plus: ^12.0.0
   file_picker: ^10.3.3
+  connectivity_plus: ^6.0.5
 
 dev_dependencies:
   flutter_test:
@@ -136,22 +137,22 @@ fonts:
       - asset: assets/fonts/Cairo-Bold.ttf
         weight: 700
 
-# assets\icons\logo_dark.png
+# assets\icons\logo_dark5.png
 # 3. Add configuration at the bottom of the file
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/icons/logo_dark.png"
+  image_path: "assets/icons/logo_dark5.png"
 
   # Windows configuration
   windows:
     generate: true
-    image_path: "assets/icons/logo_dark.png"
+    image_path: "assets/icons/logo_dark5.png"
     icon_size: 48 # min:48, max:256, default: 48
 
   # Android Adaptive Icon (Optional but recommended)
   adaptive_icon_background: "#ffffff" # Background color or image path
-  adaptive_icon_foreground: "assets/icons/logo_dark.png"
+  adaptive_icon_foreground: "assets/icons/logo_dark5.png"
 
   # If you want different icons for different platforms (optional)
   # android: "assets/icon/android_icon.png"
@@ -159,4 +160,3 @@ flutter_launcher_icons:
 
   # Remove old launcher icon
   remove_alpha_ios: true
-

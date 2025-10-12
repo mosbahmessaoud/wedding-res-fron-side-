@@ -483,7 +483,7 @@ void _showNewsClan() {
                   const Icon(Icons.email, size: 18),
                   const SizedBox(width: 8),
                   const Expanded(
-                    child: Text('mosbah47messaoud@gmail.com'),
+                    child: Text('mosbah07messaoud@gmail.com'),
                   ),
                 ],
               ),
@@ -552,7 +552,7 @@ void _showNewsClan() {
                   const Icon(Icons.email, size: 18),
                   const SizedBox(width: 8),
                   const Expanded(
-                    child: Text('mosbah47messaoud@gmail.com'),
+                    child: Text('mosbah07messaoud@gmail.com'),
                   ),
                 ],
               ),

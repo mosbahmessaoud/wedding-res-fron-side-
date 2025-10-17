@@ -119,28 +119,88 @@ class ReservationsTabState extends State<ReservationsTab> with SingleTickerProvi
     }
   }
 
-  Future<void> _validateReservation(int groomId, String groomName) async {
-    final confirmed = await _showConfirmationDialog(
-      'تأكيد الحجز',
-      'هل أنت متأكد من تأكيد حجز $groomName؟',
-      Colors.green,
-      Icons.check_circle,
-    );
+Future<void> _markPaymentCompleted(int groomId, String groomName) async {
+  final confirmed = await _showConfirmationDialog(
+    'تأكيد الدفع',
+    'هل أنت متأكد من تأكيد دفع $groomName؟',
+    Colors.blue,
+    Icons.payment_rounded,
+  );
 
-    if (!confirmed) return;
+  if (!confirmed) return;
 
-    try {
-      setState(() => _isLoading = true);
-      await ApiService.validateReservation(groomId);
-      await _loadAllReservations();
-      _showSnackBar('تم تأكيد الحجز بنجاح', Colors.green.shade400);
-    } catch (e) {
-      _showSnackBar('خطأ في تأكيد الحجز: $e', Colors.red.shade400);
-    } finally {
-      setState(() => _isLoading = false);
-    }
+  try {
+    setState(() => _isLoading = true);
+    await ApiService.markPaymentCompleted(groomId);
+    await _loadAllReservations();
+    _showSnackBar('تم تأكيد الدفع بنجاح', Colors.blue.shade400);
+  } catch (e) {
+    _showSnackBar('خطأ في تأكيد الدفع: $e', Colors.red.shade400);
+  } finally {
+    setState(() => _isLoading = false);
+  }
+}
+
+
+// Update _validateReservation to check payment first
+Future<void> _validateReservation(int groomId, String groomName, bool paymentValid) async {
+  // Check if payment is completed first
+  if (!paymentValid) {
+    await _showPaymentRequiredDialog();
+    return;
   }
 
+  final confirmed = await _showConfirmationDialog(
+    'تأكيد الحجز',
+    'هل أنت متأكد من تأكيد حجز $groomName؟',
+    Colors.green,
+    Icons.check_circle,
+  );
+
+  if (!confirmed) return;
+
+  try {
+    setState(() => _isLoading = true);
+    await ApiService.validateReservation(groomId);
+    await _loadAllReservations();
+    _showSnackBar('تم تأكيد الحجز بنجاح', Colors.green.shade400);
+  } catch (e) {
+    _showSnackBar('خطأ في تأكيد الحجز: $e', Colors.red.shade400);
+  } finally {
+    setState(() => _isLoading = false);
+  }
+}
+
+
+// Add payment required dialog
+Future<void> _showPaymentRequiredDialog() async {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  
+  await showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      backgroundColor: isDark ? AppColors.darkCard : Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: Row(
+        children: [
+          Icon(Icons.warning_rounded, color: Colors.orange.shade400, size: 28),
+          const SizedBox(width: 12),
+          Text('تنبيه', style: TextStyle(color: Colors.orange.shade400, fontWeight: FontWeight.w600)),
+        ],
+      ),
+      content: Text(
+        'يجب على العريس دفع المبلغ المطلوب أولاً قبل تأكيد الحجز.\n\nالرجاء الضغط على زر "تأكيد الدفع" بعد استلام الدفع.',
+        style: TextStyle(color: isDark ? Colors.white70 : Colors.grey.shade700),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text('حسناً', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600)),
+        ),
+      ],
+    ),
+  );
+}
   Future<void> _cancelReservation(int groomId, String groomName) async {
     final confirmed = await _showConfirmationDialog(
       'إلغاء الحجز',
@@ -713,44 +773,49 @@ class ReservationsTabState extends State<ReservationsTab> with SingleTickerProvi
       ),
     );
   }
+List<Widget> _buildDetailRows(Map<String, dynamic> reservation, bool isDark) {
+  final details = [
+    ['رقم الحجز:', '${reservation['id'] ?? 0}'],
+    ['اسم العريس (المستخدم):', reservation['first_name'] ?? 'غير محدد'],
+    ['لقب العريس (المستخدم):', reservation['last_name'] ?? 'غير محدد'],
+    ['اسم الولي:', reservation['guardian_name'] ?? 'غير محدد'],
+    ['اسم الأب:', reservation['father_name'] ?? 'غير محدد'],
+    ['رقم الهاتف:', reservation['phone_number'] ?? 'غير محدد'],
+    ['اليوم الأول:', _formatDate(reservation['date1'])],
+    if (reservation['date2_bool'] == true && reservation['date2'] != null)
+      ['اليوم الثاني:', _formatDate(reservation['date2'])],
+    ['حالة الدفع:', reservation['payment_valid'] == true ? '✓ مكتمل' : '✗ غير مكتمل'],  // ADDED
+    ['حفل جماعي:', reservation['join_to_mass_wedding'] == true ? 'نعم' : 'لا'],
+    ['يسمح للآخرين:', reservation['allow_others'] == true ? 'نعم' : 'لا'],
+    ['تاريخ الإنشاء:', _formatDateTime(reservation['created_at'])],
+    if (reservation['expires_at'] != null)
+      ['تاريخ الانتهاء:', _formatDateTime(reservation['expires_at'])],
+  ];
 
-  List<Widget> _buildDetailRows(Map<String, dynamic> reservation, bool isDark) {
-    final details = [
-      ['رقم الحجز:', '${reservation['id'] ?? 0}'],
-      ['اسم العريس (المستخدم):', reservation['first_name'] ?? 'غير محدد'],
-      ['لقب العريس (المستخدم):', reservation['last_name'] ?? 'غير محدد'],
-      ['اسم الولي:', reservation['guardian_name'] ?? 'غير محدد'],
-      ['اسم الأب:', reservation['father_name'] ?? 'غير محدد'],
-      ['رقم الهاتف:', reservation['phone_number'] ?? 'غير محدد'],
-      ['اليوم الأول:', _formatDate(reservation['date1'])],
-      if (reservation['date2_bool'] == true && reservation['date2'] != null)
-        ['اليوم الثاني:', _formatDate(reservation['date2'])],
-      ['حفل جماعي:', reservation['join_to_mass_wedding'] == true ? 'نعم' : 'لا'],
-      ['يسمح للآخرين:', reservation['allow_others'] == true ? 'نعم' : 'لا'],
-      ['تاريخ الإنشاء:', _formatDateTime(reservation['created_at'])],
-      if (reservation['expires_at'] != null)
-        ['تاريخ الانتهاء:', _formatDateTime(reservation['expires_at'])],
-    ];
-
-    return details.map((detail) => Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 120,
-            child: Text(detail[0], 
-              style: TextStyle(fontWeight: FontWeight.w500, 
-                color: isDark ? Colors.grey.shade400 : Colors.grey.shade700)),
-          ),
-          Expanded(
-            child: Text(detail[1], 
-              style: TextStyle(color: isDark ? Colors.white70 : Colors.grey.shade800)),
-          ),
-        ],
-      ),
-    )).toList();
-  }
+  return details.map((detail) => Padding(
+    padding: const EdgeInsets.only(bottom: 8),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 120,
+          child: Text(detail[0], 
+            style: TextStyle(fontWeight: FontWeight.w500, 
+              color: isDark ? Colors.grey.shade400 : Colors.grey.shade700)),
+        ),
+        Expanded(
+          child: Text(detail[1], 
+            style: TextStyle(
+              color: detail[0] == 'حالة الدفع:' 
+                ? (reservation['payment_valid'] == true ? Colors.green : Colors.red)
+                : (isDark ? Colors.white70 : Colors.grey.shade800),
+              fontWeight: detail[0] == 'حالة الدفع:' ? FontWeight.w600 : FontWeight.normal,
+            )),
+        ),
+      ],
+    ),
+  )).toList();
+}
 
   Widget _buildModernStatusChip(String status, bool isDark) {
     final color = _getStatusColor(status);
@@ -771,53 +836,78 @@ class ReservationsTabState extends State<ReservationsTab> with SingleTickerProvi
   }
 
   Widget _buildModernActionButtons(Map<String, dynamic> reservation, String status, int groomId, int reservationId, String groomName) {
-    List<Widget> buttons = [];
+  List<Widget> buttons = [];
+  final paymentValid = reservation['payment_valid'] ?? false;
 
-    // Download PDF button
-    buttons.add(
-      _buildActionButton(
-        onPressed: () => _downloadPdfSimple(reservationId),
-        icon: Icons.download_rounded,
-        label: 'تحميل PDF',
-        color: Colors.blue.shade400,
-      ),
-    );
+  // Download PDF button
+  buttons.add(
+    _buildActionButton(
+      onPressed: () => _downloadPdfSimple(reservationId),
+      icon: Icons.download_rounded,
+      label: 'تحميل PDF',
+      color: Colors.blue.shade400,
+    ),
+  );
 
-    // Status-specific buttons
-    if (status == 'pending_validation') {
+  // Status-specific buttons
+  if (status == 'pending_validation') {
+    // Payment button - only show if payment not completed
+    if (!paymentValid) {
       buttons.add(
         _buildActionButton(
-          onPressed: () => _validateReservation(groomId, groomName),
-          icon: Icons.check_rounded,
-          label: 'تأكيد',
-          color: Colors.green.shade400,
-        ),
-      );
-      buttons.add(
-        _buildActionButton(
-          onPressed: () => _cancelReservation(groomId, groomName),
-          icon: Icons.close_rounded,
-          label: 'إلغاء',
-          color: Colors.red.shade400,
-        ),
-      );
-    } else if (status == 'validated') {
-      buttons.add(
-        _buildActionButton(
-          onPressed: () => _cancelReservation(groomId, groomName),
-          icon: Icons.close_rounded,
-          label: 'إلغاء',
-          color: Colors.red.shade400,
+          onPressed: () => _markPaymentCompleted(groomId, groomName),
+          icon: Icons.payment_rounded,
+          label: 'تأكيد الدفع',
+          color: Colors.indigo.shade400,
         ),
       );
     }
-
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: buttons,
+    
+    buttons.add(
+      _buildActionButton(
+        onPressed: () => _validateReservation(groomId, groomName, paymentValid), // Pass paymentValid
+        icon: Icons.check_rounded,
+        label: 'تأكيد',
+        color: Colors.green.shade400,
+      ),
+    );
+    buttons.add(
+      _buildActionButton(
+        onPressed: () => _cancelReservation(groomId, groomName),
+        icon: Icons.close_rounded,
+        label: 'إلغاء',
+        color: Colors.red.shade400,
+      ),
+    );
+  } else if (status == 'validated') {
+    // Payment button - show even in validated state if payment not completed
+    if (!paymentValid) {
+      buttons.add(
+        _buildActionButton(
+          onPressed: () => _markPaymentCompleted(groomId, groomName),
+          icon: Icons.payment_rounded,
+          label: 'تأكيد الدفع',
+          color: Colors.indigo.shade400,
+        ),
+      );
+    }
+    
+    buttons.add(
+      _buildActionButton(
+        onPressed: () => _cancelReservation(groomId, groomName),
+        icon: Icons.close_rounded,
+        label: 'إلغاء',
+        color: Colors.red.shade400,
+      ),
     );
   }
+
+  return Wrap(
+    spacing: 8,
+    runSpacing: 8,
+    children: buttons,
+  );
+}
 
   Widget _buildActionButton({
     required VoidCallback onPressed,

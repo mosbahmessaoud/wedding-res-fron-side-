@@ -91,18 +91,25 @@ class _LoginScreenState extends State<LoginScreen>
   // Method to check internet connectivity
   Future<bool> _checkInternetConnection() async {
     try {
-      final result = await InternetAddress.lookup('google.com')
-          .timeout(const Duration(seconds: 5));
-      return result.isNotEmpty && result[0].rawAddress.isNotEmpty;
-    } on SocketException catch (_) {
-      return false;
-    } on TimeoutException catch (_) {
+      // Try multiple hosts for better reliability
+      final hosts = ['google.com', '1.1.1.1', '8.8.8.8' ,'0.0.0.0'];
+      
+      for (var host in hosts) {
+        try {
+          final result = await InternetAddress.lookup(host)
+              .timeout(const Duration(seconds: 10));
+          if (result.isNotEmpty && result[0].rawAddress.isNotEmpty) {
+            return true;
+          }
+        } catch (_) {
+          continue;
+        }
+      }
       return false;
     } catch (_) {
       return false;
     }
   }
-
   // Show no internet dialog
   void _showNoInternetDialog() {
     showDialog(

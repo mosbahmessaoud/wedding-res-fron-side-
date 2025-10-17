@@ -9,6 +9,7 @@ import 'package:wedding_reservation_app/screens/clan%20admin/grooms_tab.dart';
 import 'package:wedding_reservation_app/screens/clan%20admin/reservations_tab.dart';
 import 'package:wedding_reservation_app/screens/clan%20admin/home_tab.dart';
 import 'package:wedding_reservation_app/screens/clan%20admin/clan_rules_management_page.dart';
+import 'package:wedding_reservation_app/screens/clan%20admin/special_reservations_tab.dart';
 import 'admin_otp_screen.dart';
 import '../../utils/colors.dart';
 import '../../utils/constants.dart';
@@ -42,6 +43,7 @@ class _ClanAdminHomeScreenState extends State<ClanAdminHomeScreen>
   final GlobalKey<SettingsTabState> _settingsTabKey = GlobalKey<SettingsTabState>();
   final GlobalKey<AdminOTPScreenState> _otpTabKey = GlobalKey<AdminOTPScreenState>();
   final GlobalKey<ClanRulesPageState> _rulesTabKey = GlobalKey<ClanRulesPageState>();
+  final GlobalKey<SpecialReservationsTabState> _reserv_special = GlobalKey<SpecialReservationsTabState>();
 
   @override
   void initState() {
@@ -139,6 +141,9 @@ class _ClanAdminHomeScreenState extends State<ClanAdminHomeScreen>
         _rulesTabKey.currentState?.refreshData();
         break;
       case 8:
+        _reserv_special.currentState?.refreshData();
+        break;
+      case 9:
         break;
     }
   }
@@ -213,32 +218,55 @@ class _ClanAdminHomeScreenState extends State<ClanAdminHomeScreen>
             child: Stack(
               children: [
                 // Main content - FULL SCREEN
+                // Positioned.fill(
+                //   child: IndexedStack(
+                //     index: _currentIndex,
+                //     children: [
+                //       HomeTab(key: _homeTabKey, onNavigateToTab: _navigateToTab),
+                //       HallsTab(key: _hallsTabKey),
+                //       GroomManagementScreen(key: _groomsTabKey),
+                //       ReservationsTab(key: _reservationsTabKey),
+                //       FoodTab(key: _foodTabKey),
+                //       SettingsTab(key: _settingsTabKey),
+                //       AdminOTPScreen(key: _otpTabKey),
+                //       if (_clanId != null && _clanName != null)
+                //         ClanRulesPage(
+                //           key: _rulesTabKey,
+                //         )
+                //       else
+                //         Center(
+                //           child: CircularProgressIndicator(
+                //             color: AppColors.primary,
+                //           ),
+                //         ),
+                //       SpecialReservationsTab(key: _reserv_special),
+                //       _buildProfileTab(isDark),
+                //     ],
+                //   ),
+                // ),
                 Positioned.fill(
-                  child: IndexedStack(
-                    index: _currentIndex,
-                    children: [
-                      HomeTab(key: _homeTabKey, onNavigateToTab: _navigateToTab),
-                      HallsTab(key: _hallsTabKey),
-                      GroomManagementScreen(key: _groomsTabKey),
-                      ReservationsTab(key: _reservationsTabKey),
-                      FoodTab(key: _foodTabKey),
-                      SettingsTab(key: _settingsTabKey),
-                      AdminOTPScreen(key: _otpTabKey),
-                      if (_clanId != null && _clanName != null)
-                        ClanRulesPage(
-                          key: _rulesTabKey,
-                        )
-                      else
-                        Center(
-                          child: CircularProgressIndicator(
-                            color: AppColors.primary,
-                          ),
-                        ),
-                      _buildProfileTab(isDark),
-                    ],
-                  ),
-                ),
-                
+  child: HeroMode(
+    enabled: false, // Disables Hero animations within IndexedStack
+    child: IndexedStack(
+      index: _currentIndex,
+      children: [
+        HomeTab(key: _homeTabKey, onNavigateToTab: _navigateToTab),
+        HallsTab(key: _hallsTabKey),
+        GroomManagementScreen(key: _groomsTabKey),
+        ReservationsTab(key: _reservationsTabKey),
+        FoodTab(key: _foodTabKey),
+        SettingsTab(key: _settingsTabKey),
+        AdminOTPScreen(key: _otpTabKey),
+        if (_clanId != null && _clanName != null)
+          ClanRulesPage(key: _rulesTabKey)
+        else
+          Center(child: CircularProgressIndicator(color: AppColors.primary)),
+        SpecialReservationsTab(key: _reserv_special),
+        _buildProfileTab(isDark),
+      ],
+    ),
+  ),
+),
                 // Bottom Navigation Bar - Only for small/medium screens
                 if (!isLargeScreen)
                   Positioned(
@@ -347,7 +375,8 @@ class _ClanAdminHomeScreenState extends State<ClanAdminHomeScreen>
                       _buildRightNavItem(Icons.settings_outlined, 'الإعدادات', 5, isDark),
                       _buildRightNavItem(Icons.lock_outline, 'رموز التحقق', 6, isDark),
                       _buildRightNavItem(Icons.rule_outlined, 'قوانين العشيرة', 7, isDark),
-                      _buildRightNavItem(Icons.person_outline, 'الملف الشخصي', 8, isDark),
+                      _buildRightNavItem(Icons.star_border_outlined, 'الحجوزات الخاصة', 8, isDark), // Added
+                      _buildRightNavItem(Icons.person_outline, 'الملف الشخصي', 9, isDark), // Changed from 8 to 9                    
                     ],
                   ),
                 ),
@@ -621,10 +650,11 @@ class _ClanAdminHomeScreenState extends State<ClanAdminHomeScreen>
                   _buildNavItem(Icons.castle_outlined, 'القاعات', 1, isDark),
                   _buildNavItem(Icons.group_outlined, 'العرسان', 2, isDark),
                   _buildNavItem(Icons.book_outlined, 'الحجوزات', 3, isDark),
-                  _buildNavItem(Icons.home_rounded, 'الرئيسية', 0, isDark),
                   _buildNavItem(Icons.restaurant_menu_outlined, 'الطعام', 4, isDark),
+                  _buildNavItem(Icons.home_rounded, 'الرئيسية', 0, isDark),
                   _buildNavItem(Icons.settings_outlined, 'الإعدادات', 5, isDark),
-                  // _buildNavItem(Icons.lock_outline, 'OTP', 6, isDark),
+                  _buildNavItem(Icons.lock_outline, 'OTP', 6, isDark),
+                  _buildNavItem(Icons.star_border_outlined, 'حجز خاص', 8, isDark),
                   _buildNavItem(Icons.rule_outlined, 'القوانين', 7, isDark),
                 ],
               ),
@@ -700,32 +730,32 @@ class _ClanAdminHomeScreenState extends State<ClanAdminHomeScreen>
       ),
     );
   }
-
-  String _getAppBarTitle() {
-    switch (_currentIndex) {
-      case 0:
-        return AppConstants.appName;
-      case 1:
-        return 'إدارة القاعات';
-      case 2:
-        return 'إدارة العرسان';
-      case 3:
-        return 'إدارة الحجوزات';
-      case 4:
-        return 'قوائم الطعام';
-      case 5:
-        return 'الإعدادات';
-      case 6:
-        return 'رموز التحقق'; 
-      case 7:
-        return 'قوانين العشيرة';
-      case 8:
-        return 'الملف الشخصي';
-      default:
-        return AppConstants.appName;
-    }
+String _getAppBarTitle() {
+  switch (_currentIndex) {
+    case 0:
+      return AppConstants.appName;
+    case 1:
+      return 'إدارة القاعات';
+    case 2:
+      return 'إدارة العرسان';
+    case 3:
+      return 'إدارة الحجوزات';
+    case 4:
+      return 'قوائم الطعام';
+    case 5:
+      return 'الإعدادات';
+    case 6:
+      return 'رموز التحقق'; 
+    case 7:
+      return 'قوانين العشيرة';
+    case 8:
+      return 'الحجوزات الخاصة'; // Added
+    case 9:
+      return 'الملف الشخصي'; // Changed from case 8
+    default:
+      return AppConstants.appName;
   }
-
+}
   Widget _buildProfileTab(bool isDark) {
     return Container(
       width: double.infinity,

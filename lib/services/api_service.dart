@@ -1049,7 +1049,48 @@ static Future<Map<String, dynamic>> getSettingsByClanId(String clanId) async {
   //   }
   // }
 
-  // Add this method to your ApiService class
+// In api_service.dart
+
+// static Future<void> markPaymentCompleted(int groomId) async {
+//   final url = Uri.parse('$baseUrl/clan_admin/reservations/payment_update/$groomId');
+  
+//   final response = await http.patch(
+//     url,
+//     headers:_headers,
+//   );
+
+//   if (response.statusCode != 200) {
+//     throw Exception('فشل في تأكيد الدفع: ${response.body}');
+//   }
+// }
+// ==================== RESERVATION PAYMENT UPDATE ENDPOINT ====================
+
+/// Update payment status for a groom's reservation
+/// Toggles between pending_validation and validated status
+/// PUT /reservations/payment_update/{groom_id}
+static Future<Map<String, dynamic>> markPaymentCompleted(int groomId) async {
+  try {
+    final response = await http.put(
+      Uri.parse('$baseUrl/clan-admin/reservations/payment_update/$groomId'),
+      headers: _headers,
+    );
+
+    print('Update payment response status: ${response.statusCode}');
+    print('Update payment response body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else if (response.statusCode == 404) {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'العريس غير موجود أو ليس في عشيرتك');
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل في تحديث حالة الدفع');
+    }
+  } catch (e) {
+    throw Exception('خطأ في تحديث حالة الدفع: $e');
+  }
+}
 
 static Future<Map<String, dynamic>> createReservation(Map<String, dynamic> reservationData) async {
   try {
@@ -3518,6 +3559,149 @@ static Future<Map<String, dynamic>> debugClanRules(int clanId) async {
     rethrow;
   }
 }
+
+
+
+// ==================== SPECIAL RESERVATIONS ENDPOINTS ====================
+
+/// Create a special reservation (block a date for clan events)
+/// POST /clan-admin/reserv_some_dates
+static Future<Map<String, dynamic>> createSpecialReservation({
+  required String date,
+  required String reservName,
+  String? reservDescription,
+}) async {
+  try {
+    final response = await http.post(
+      Uri.parse('$baseUrl/clan-admin/reserv_some_dates'),
+      headers: _headers,
+      body: json.encode({
+        'date': date,
+        'reserv_name': reservName,
+        'reserv_desctiption': reservDescription, // Note: typo matches backend
+      }),
+    );
+
+    print('Create special reservation response: ${response.statusCode}');
+    print('Create special reservation body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل في إنشاء الحجز الخاص');
+    }
+  } catch (e) {
+    throw Exception('خطأ في إنشاء الحجز الخاص: $e');
+  }
+}
+
+/// Get all special reservations for current clan admin
+/// GET /clan-admin/special_reserv
+static Future<List<dynamic>> getAllSpecialReservations() async {
+  try {
+    final response = await http.get(
+      Uri.parse('$baseUrl/clan-admin/special_reservrations'),
+      headers: _headers,
+    );
+
+    print('Get special reservations response: ${response.statusCode}');
+    print('Get special reservations body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body) as List<dynamic>;
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل في تحميل الحجوزات الخاصة');
+    }
+  } catch (e) {
+    throw Exception('خطأ في تحميل الحجوزات الخاصة: $e');
+  }
+}
+
+/// Toggle special reservation status (validated <-> cancelled)
+/// PUT /clan-admin/update_status_special_reserv/{reserv_id}
+static Future<Map<String, dynamic>> updateSpecialReservationStatus(int reservId) async {
+  try {
+    final response = await http.put(
+      Uri.parse('$baseUrl/clan-admin/update_status_special_reserv/$reservId'),
+      headers: _headers,
+    );
+
+    print('Update special reservation status response: ${response.statusCode}');
+    print('Update special reservation status body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل في تحديث حالة الحجز الخاص');
+    }
+  } catch (e) {
+    throw Exception('خطأ في تحديث حالة الحجز الخاص: $e');
+  }
+}
+
+// ==================== SPECIAL RESERVATIONS UTILITY METHODS ====================
+
+/// Check if a date has a special reservation
+static Future<bool> hasSpecialReservation(String date) async {
+  try {
+    final specialReservations = await getAllSpecialReservations();
+    return specialReservations.any((reserv) => 
+      reserv['date'] == date && 
+      reserv['status'] == 'validated'
+    );
+  } catch (e) {
+    print('Error checking special reservation: $e');
+    return false;
+  }
+}
+
+/// Get special reservation details for a specific date
+static Future<Map<String, dynamic>?> getSpecialReservationByDate(String date) async {
+  try {
+    final specialReservations = await getAllSpecialReservations();
+    final filtered = specialReservations.where((reserv) => 
+      reserv['date'] == date && 
+      reserv['status'] == 'validated'
+    ).toList();
+    
+    return filtered.isNotEmpty ? filtered.first : null;
+  } catch (e) {
+    print('Error getting special reservation by date: $e');
+    return null;
+  }
+}
+
+/// Validate special reservation data before creating
+static Map<String, String> validateSpecialReservationData({
+  required String date,
+  required String reservName,
+}) {
+  final errors = <String, String>{};
+
+  // Validate date
+  if (date.trim().isEmpty) {
+    errors['date'] = 'التاريخ مطلوب';
+  } else if (!isValidDate(date)) {
+    errors['date'] = 'صيغة التاريخ غير صحيحة';
+  } else if (!isDateInFuture(date)) {
+    errors['date'] = 'يجب أن يكون التاريخ في المستقبل';
+  }
+
+  // Validate reservation name
+  if (reservName.trim().isEmpty) {
+    errors['reserv_name'] = 'اسم الحجز مطلوب';
+  } else if (reservName.trim().length < 3) {
+    errors['reserv_name'] = 'اسم الحجز قصير جداً (الحد الأدنى 3 أحرف)';
+  } else if (reservName.trim().length > 100) {
+    errors['reserv_name'] = 'اسم الحجز طويل جداً (الحد الأقصى 100 حرف)';
+  }
+
+  return errors;
+}
+
 
 
 }

@@ -44,11 +44,11 @@ class WeddingReservationApp extends StatelessWidget {
               GlobalCupertinoLocalizations.delegate,
             ],
             supportedLocales: const [
-              Locale('ar', 'SA'), // Arabic (Saudi Arabia)
-              Locale('ar'), // Arabic (general)
-              Locale('en'), // English fallback
+              Locale('ar', 'DZ'), 
+              Locale('ar'), 
+              Locale('en'), 
             ],
-            locale: const Locale('ar', 'SA'), // Default to Arabic
+            locale: const Locale('ar', 'DZ'), // Default to Arabic
             
             // Add route definitions
             routes: {

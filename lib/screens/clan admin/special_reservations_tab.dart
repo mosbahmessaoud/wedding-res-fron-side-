@@ -15,7 +15,7 @@ class SpecialReservationsTabState extends State<SpecialReservationsTab> {
   List<Map<String, dynamic>> _specialReservations = [];
   bool _isLoading = true;
   String _searchQuery = '';
-  String _filterStatus = 'all'; // all, validated, cancelled
+  String _filterStatus = 'all'; // all, validated, cancelled, archive
 
   @override
   void initState() {
@@ -33,7 +33,7 @@ class SpecialReservationsTabState extends State<SpecialReservationsTab> {
       });
     } catch (e) {
       setState(() => _isLoading = false);
-      _showErrorSnackBar('فشل في تحميل الحجوزات الخاصة: $e');
+      _showErrorDialog('فشل في تحميل الحجوزات الخاصة: $e');
     }
   }
 
@@ -42,15 +42,69 @@ class SpecialReservationsTabState extends State<SpecialReservationsTab> {
   }
 
   List<Map<String, dynamic>> get _filteredReservations {
-    return _specialReservations.where((reserv) {
-      final matchesSearch = reserv['reserv_name']
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    
+    var filtered = _specialReservations.where((reserv) {
+      // Search by name or date
+      final searchLower = _searchQuery.toLowerCase();
+      final matchesName = reserv['reserv_name']
           .toString()
           .toLowerCase()
-          .contains(_searchQuery.toLowerCase());
-      final matchesFilter = _filterStatus == 'all' ||
-          reserv['status'].toString().toLowerCase() == _filterStatus;
+          .contains(searchLower);
+      final matchesDate = _formatDate(reserv['date'] ?? '')
+          .toLowerCase()
+          .contains(searchLower);
+      final matchesSearch = matchesName || matchesDate;
+      
+      // Parse reservation date
+      DateTime? reservDate;
+      try {
+        reservDate = DateTime.parse(reserv['date'] ?? '');
+        reservDate = DateTime(reservDate.year, reservDate.month, reservDate.day);
+      } catch (e) {
+        reservDate = null;
+      }
+      
+      // Filter based on status and archive
+      bool matchesFilter = false;
+      
+      if (_filterStatus == 'archive') {
+        // Archive: only past reservations
+        matchesFilter = reservDate != null && reservDate.isBefore(today);
+      } else if (_filterStatus == 'all') {
+        // All: only current and future reservations
+        matchesFilter = reservDate != null && !reservDate.isBefore(today);
+      } else {
+        // Validated or Cancelled: only current and future + matching status
+        final statusMatch = reserv['status'].toString().toLowerCase() == _filterStatus;
+        matchesFilter = reservDate != null && !reservDate.isBefore(today) && statusMatch;
+      }
+      
       return matchesSearch && matchesFilter;
     }).toList();
+
+    // Sort by date - closest to current time first
+    filtered.sort((a, b) {
+      try {
+        final dateA = DateTime.parse(a['date'] ?? '');
+        final dateB = DateTime.parse(b['date'] ?? '');
+        
+        if (_filterStatus == 'archive') {
+          // For archive, show most recent past dates first
+          return dateB.compareTo(dateA);
+        } else {
+          // For current/future, show closest upcoming dates first
+          final diffA = dateA.difference(now).abs();
+          final diffB = dateB.difference(now).abs();
+          return diffA.compareTo(diffB);
+        }
+      } catch (e) {
+        return 0;
+      }
+    });
+
+    return filtered;
   }
 
   @override
@@ -58,6 +112,8 @@ class SpecialReservationsTabState extends State<SpecialReservationsTab> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final screenSize = MediaQuery.of(context).size;
     final isLargeScreen = screenSize.width > 1024;
+    final isTablet = screenSize.width > 600 && screenSize.width <= 1024;
+    final isPhone = screenSize.width <= 600;
 
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF8FAFC),
@@ -68,9 +124,10 @@ class SpecialReservationsTabState extends State<SpecialReservationsTab> {
           slivers: [
             // Custom App Bar
             SliverAppBar(
-              expandedHeight: 180,
+              expandedHeight: isPhone ? 140 : 180,
               floating: false,
               pinned: true,
+              automaticallyImplyLeading: false,
               backgroundColor: isDark
                   ? const Color(0xFF2D2D2D)
                   : Colors.white,
@@ -89,7 +146,7 @@ class SpecialReservationsTabState extends State<SpecialReservationsTab> {
                   ),
                   child: SafeArea(
                     child: Padding(
-                      padding: const EdgeInsets.all(24),
+                      padding: EdgeInsets.all(isPhone ? 16 : 24),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisAlignment: MainAxisAlignment.end,
@@ -97,15 +154,15 @@ class SpecialReservationsTabState extends State<SpecialReservationsTab> {
                           Row(
                             children: [
                               Container(
-                                padding: const EdgeInsets.all(12),
+                                padding: EdgeInsets.all(isPhone ? 8 : 12),
                                 decoration: BoxDecoration(
                                   color: Colors.white.withOpacity(0.2),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
-                                child: const Icon(
+                                child: Icon(
                                   Icons.event_busy_rounded,
                                   color: Colors.white,
-                                  size: 28,
+                                  size: isPhone ? 24 : 28,
                                 ),
                               ),
                               const SizedBox(width: 16),
@@ -113,10 +170,10 @@ class SpecialReservationsTabState extends State<SpecialReservationsTab> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Text(
+                                    Text(
                                       'الحجوزات الخاصة',
                                       style: TextStyle(
-                                        fontSize: 28,
+                                        fontSize: isPhone ? 22 : 28,
                                         fontWeight: FontWeight.w800,
                                         color: Colors.white,
                                         letterSpacing: -0.5,
@@ -126,7 +183,7 @@ class SpecialReservationsTabState extends State<SpecialReservationsTab> {
                                     Text(
                                       'إدارة التواريخ المحجوزة للعشيرة',
                                       style: TextStyle(
-                                        fontSize: 14,
+                                        fontSize: isPhone ? 12 : 14,
                                         color: Colors.white.withOpacity(0.9),
                                       ),
                                     ),
@@ -146,7 +203,7 @@ class SpecialReservationsTabState extends State<SpecialReservationsTab> {
             // Search and Filter Section
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.all(16),
+                padding: EdgeInsets.all(isPhone ? 12 : 16),
                 child: Column(
                   children: [
                     // Search Bar
@@ -166,20 +223,23 @@ class SpecialReservationsTabState extends State<SpecialReservationsTab> {
                         onChanged: (value) => setState(() => _searchQuery = value),
                         style: TextStyle(
                           color: isDark ? Colors.white : Colors.black87,
+                          fontSize: isPhone ? 14 : 16,
                         ),
                         decoration: InputDecoration(
-                          hintText: 'البحث عن حجز...',
+                          hintText: 'البحث بالاسم أو التاريخ...',
                           hintStyle: TextStyle(
                             color: isDark ? Colors.white38 : Colors.grey,
+                            fontSize: isPhone ? 14 : 16,
                           ),
                           prefixIcon: Icon(
                             Icons.search,
                             color: isDark ? Colors.white60 : Colors.grey,
+                            size: isPhone ? 20 : 24,
                           ),
                           border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 16,
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: isPhone ? 12 : 20,
+                            vertical: isPhone ? 12 : 16,
                           ),
                         ),
                       ),
@@ -191,11 +251,13 @@ class SpecialReservationsTabState extends State<SpecialReservationsTab> {
                       scrollDirection: Axis.horizontal,
                       child: Row(
                         children: [
-                          _buildFilterChip('الكل', 'all', isDark),
+                          _buildFilterChip('الحالية', 'all', isDark, isPhone),
                           const SizedBox(width: 8),
-                          _buildFilterChip('مفعّل', 'validated', isDark),
+                          _buildFilterChip('مفعّل', 'validated', isDark, isPhone),
                           const SizedBox(width: 8),
-                          _buildFilterChip('ملغي', 'cancelled', isDark),
+                          _buildFilterChip('ملغي', 'cancelled', isDark, isPhone),
+                          const SizedBox(width: 8),
+                          _buildFilterChip('الأرشيف', 'archive', isDark, isPhone),
                         ],
                       ),
                     ),
@@ -207,8 +269,8 @@ class SpecialReservationsTabState extends State<SpecialReservationsTab> {
             // Statistics Card
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: _buildStatisticsCard(isDark),
+                padding: EdgeInsets.symmetric(horizontal: isPhone ? 12 : 16),
+                child: _buildStatisticsCard(isDark, isPhone),
               ),
             ),
 
@@ -223,50 +285,75 @@ class SpecialReservationsTabState extends State<SpecialReservationsTab> {
                   )
                 : _filteredReservations.isEmpty
                     ? SliverFillRemaining(
-                        child: _buildEmptyState(isDark),
+                        child: _buildEmptyState(isDark, isPhone),
                       )
                     : SliverPadding(
-                        padding: const EdgeInsets.all(16),
-                        sliver: SliverGrid(
-                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: isLargeScreen ? 3 : (screenSize.width > 600 ? 2 : 1),
-                            childAspectRatio: isLargeScreen ? 1.5 : 1.3,
-                            crossAxisSpacing: 16,
-                            mainAxisSpacing: 16,
-                          ),
-                          delegate: SliverChildBuilderDelegate(
-                            (context, index) {
-                              final reservation = _filteredReservations[index];
-                              return _buildReservationCard(reservation, isDark);
-                            },
-                            childCount: _filteredReservations.length,
-                          ),
-                        ),
+                        padding: EdgeInsets.all(isPhone ? 12 : 16),
+                        sliver: isPhone
+                            ? SliverList(
+                                delegate: SliverChildBuilderDelegate(
+                                  (context, index) {
+                                    final reservation = _filteredReservations[index];
+                                    return Padding(
+                                      padding: const EdgeInsets.only(bottom: 12),
+                                      child: _buildReservationCard(
+                                        reservation,
+                                        isDark,
+                                        isPhone,
+                                      ),
+                                    );
+                                  },
+                                  childCount: _filteredReservations.length,
+                                ),
+                              )
+                            : SliverGrid(
+                                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: isLargeScreen ? 3 : 2,
+                                  childAspectRatio: isLargeScreen ? 1.5 : 1.3,
+                                  crossAxisSpacing: 16,
+                                  mainAxisSpacing: 16,
+                                ),
+                                delegate: SliverChildBuilderDelegate(
+                                  (context, index) {
+                                    final reservation = _filteredReservations[index];
+                                    return _buildReservationCard(
+                                      reservation,
+                                      isDark,
+                                      isPhone,
+                                    );
+                                  },
+                                  childCount: _filteredReservations.length,
+                                ),
+                              ),
                       ),
 
             // Bottom padding
             const SliverToBoxAdapter(
-              child: SizedBox(height: 100),
+              child: SizedBox(height: 120),
             ),
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showAddReservationDialog(isDark),
-        backgroundColor: AppColors.primary,
-        icon: const Icon(Icons.add, color: Colors.white),
-        label: const Text(
-          'حجز جديد',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w600,
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 50),
+        child: FloatingActionButton.extended(
+          onPressed: () => _showAddReservationDialog(isDark),
+          backgroundColor: AppColors.primary,
+          icon: Icon(Icons.add, color: Colors.white, size: isPhone ? 20 : 24),
+          label: Text(
+            'حجز جديد',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+              fontSize: isPhone ? 14 : 16,
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildFilterChip(String label, String value, bool isDark) {
+  Widget _buildFilterChip(String label, String value, bool isDark, bool isPhone) {
     final isSelected = _filterStatus == value;
     return FilterChip(
       label: Text(label),
@@ -282,17 +369,41 @@ class SpecialReservationsTabState extends State<SpecialReservationsTab> {
             ? AppColors.primary
             : (isDark ? Colors.white70 : Colors.black87),
         fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+        fontSize: isPhone ? 13 : 14,
       ),
       side: BorderSide(
         color: isSelected
             ? AppColors.primary
             : (isDark ? Colors.white12 : Colors.grey.shade300),
       ),
+      padding: EdgeInsets.symmetric(horizontal: isPhone ? 8 : 12, vertical: isPhone ? 4 : 8),
     );
   }
 
-  Widget _buildStatisticsCard(bool isDark) {
-    final totalCount = _specialReservations.length;
+  Widget _buildStatisticsCard(bool isDark, bool isPhone) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    
+    final currentCount = _specialReservations.where((r) {
+      try {
+        final date = DateTime.parse(r['date'] ?? '');
+        final reservDate = DateTime(date.year, date.month, date.day);
+        return !reservDate.isBefore(today);
+      } catch (e) {
+        return false;
+      }
+    }).length;
+    
+    final archiveCount = _specialReservations.where((r) {
+      try {
+        final date = DateTime.parse(r['date'] ?? '');
+        final reservDate = DateTime(date.year, date.month, date.day);
+        return reservDate.isBefore(today);
+      } catch (e) {
+        return false;
+      }
+    }).length;
+    
     final validatedCount = _specialReservations
         .where((r) => r['status'] == 'validated')
         .length;
@@ -302,7 +413,7 @@ class SpecialReservationsTabState extends State<SpecialReservationsTab> {
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(isPhone ? 16 : 20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
@@ -317,26 +428,42 @@ class SpecialReservationsTabState extends State<SpecialReservationsTab> {
           color: AppColors.primary.withOpacity(0.2),
         ),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
+      child: Column(
         children: [
-          _buildStatItem('المجموع', totalCount.toString(), Icons.event, isDark),
-          _buildStatItem('مفعّل', validatedCount.toString(), Icons.check_circle, isDark),
-          _buildStatItem('ملغي', cancelledCount.toString(), Icons.cancel, isDark),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildStatItem('الحالية', currentCount.toString(), Icons.event_available, isDark, isPhone),
+              _buildStatItem('الأرشيف', archiveCount.toString(), Icons.archive, isDark, isPhone),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Container(
+            height: 1,
+            color: isDark ? Colors.white12 : Colors.grey.shade200,
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildStatItem('مفعّل', validatedCount.toString(), Icons.check_circle, isDark, isPhone),
+              _buildStatItem('ملغي', cancelledCount.toString(), Icons.cancel, isDark, isPhone),
+            ],
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildStatItem(String label, String value, IconData icon, bool isDark) {
+  Widget _buildStatItem(String label, String value, IconData icon, bool isDark, bool isPhone) {
     return Column(
       children: [
-        Icon(icon, color: AppColors.primary, size: 28),
-        const SizedBox(height: 8),
+        Icon(icon, color: AppColors.primary, size: isPhone ? 24 : 28),
+        SizedBox(height: isPhone ? 6 : 8),
         Text(
           value,
           style: TextStyle(
-            fontSize: 24,
+            fontSize: isPhone ? 20 : 24,
             fontWeight: FontWeight.w700,
             color: isDark ? Colors.white : Colors.black87,
           ),
@@ -344,7 +471,7 @@ class SpecialReservationsTabState extends State<SpecialReservationsTab> {
         Text(
           label,
           style: TextStyle(
-            fontSize: 12,
+            fontSize: isPhone ? 11 : 12,
             color: isDark ? Colors.white60 : Colors.grey,
           ),
         ),
@@ -352,7 +479,11 @@ class SpecialReservationsTabState extends State<SpecialReservationsTab> {
     );
   }
 
-  Widget _buildReservationCard(Map<String, dynamic> reservation, bool isDark) {
+  Widget _buildReservationCard(
+    Map<String, dynamic> reservation,
+    bool isDark,
+    bool isPhone,
+  ) {
     final isValidated = reservation['status'] == 'validated';
     final date = reservation['date'] ?? '';
     final name = reservation['reserv_name'] ?? 'بدون اسم';
@@ -383,7 +514,10 @@ class SpecialReservationsTabState extends State<SpecialReservationsTab> {
             top: 12,
             left: 12,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              padding: EdgeInsets.symmetric(
+                horizontal: isPhone ? 10 : 12,
+                vertical: isPhone ? 5 : 6,
+              ),
               decoration: BoxDecoration(
                 color: isValidated
                     ? Colors.green.withOpacity(0.1)
@@ -400,7 +534,7 @@ class SpecialReservationsTabState extends State<SpecialReservationsTab> {
                   Icon(
                     isValidated ? Icons.check_circle : Icons.cancel,
                     color: isValidated ? Colors.green : Colors.red,
-                    size: 14,
+                    size: isPhone ? 12 : 14,
                   ),
                   const SizedBox(width: 4),
                   Text(
@@ -408,7 +542,7 @@ class SpecialReservationsTabState extends State<SpecialReservationsTab> {
                     style: TextStyle(
                       color: isValidated ? Colors.green : Colors.red,
                       fontWeight: FontWeight.w600,
-                      fontSize: 11,
+                      fontSize: isPhone ? 10 : 11,
                     ),
                   ),
                 ],
@@ -417,15 +551,16 @@ class SpecialReservationsTabState extends State<SpecialReservationsTab> {
           ),
 
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(isPhone ? 12 : 16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                const SizedBox(height: 32),
-                
+                SizedBox(height: isPhone ? 28 : 32),
+
                 // Date Section
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: EdgeInsets.all(isPhone ? 10 : 12),
                   decoration: BoxDecoration(
                     color: AppColors.primary.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
@@ -435,14 +570,14 @@ class SpecialReservationsTabState extends State<SpecialReservationsTab> {
                       Icon(
                         Icons.calendar_today,
                         color: AppColors.primary,
-                        size: 20,
+                        size: isPhone ? 18 : 20,
                       ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           _formatDate(date),
                           style: TextStyle(
-                            fontSize: 16,
+                            fontSize: isPhone ? 14 : 16,
                             fontWeight: FontWeight.w600,
                             color: isDark ? Colors.white : Colors.black87,
                           ),
@@ -451,36 +586,36 @@ class SpecialReservationsTabState extends State<SpecialReservationsTab> {
                     ],
                   ),
                 ),
-                
-                const SizedBox(height: 12),
-                
+
+                SizedBox(height: isPhone ? 10 : 12),
+
                 // Name
                 Text(
                   name,
                   style: TextStyle(
-                    fontSize: 18,
+                    fontSize: isPhone ? 16 : 18,
                     fontWeight: FontWeight.w700,
                     color: isDark ? Colors.white : Colors.black87,
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
-                
+
                 if (description.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Text(
                     description,
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: isPhone ? 12 : 13,
                       color: isDark ? Colors.white60 : Colors.grey,
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ],
-                
-                const Spacer(),
-                
+
+                SizedBox(height: isPhone ? 10 : 12),
+
                 // Actions
                 Row(
                   children: [
@@ -499,17 +634,19 @@ class SpecialReservationsTabState extends State<SpecialReservationsTab> {
                               color: isValidated ? Colors.red : Colors.green,
                             ),
                           ),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          padding: EdgeInsets.symmetric(
+                            vertical: isPhone ? 10 : 12,
+                          ),
                         ),
                         icon: Icon(
                           isValidated ? Icons.block : Icons.check_circle,
-                          size: 18,
+                          size: isPhone ? 16 : 18,
                         ),
                         label: Text(
                           isValidated ? 'إلغاء' : 'تفعيل',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontWeight: FontWeight.w600,
-                            fontSize: 13,
+                            fontSize: isPhone ? 12 : 13,
                           ),
                         ),
                       ),
@@ -524,39 +661,44 @@ class SpecialReservationsTabState extends State<SpecialReservationsTab> {
     );
   }
 
-  Widget _buildEmptyState(bool isDark) {
+  Widget _buildEmptyState(bool isDark, bool isPhone) {
+    final isArchive = _filterStatus == 'archive';
+    
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            padding: const EdgeInsets.all(32),
+            padding: EdgeInsets.all(isPhone ? 24 : 32),
             decoration: BoxDecoration(
               color: AppColors.primary.withOpacity(0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(
-              Icons.event_busy_rounded,
-              size: 64,
+              isArchive ? Icons.archive : Icons.event_busy_rounded,
+              size: isPhone ? 48 : 64,
               color: AppColors.primary.withOpacity(0.5),
             ),
           ),
-          const SizedBox(height: 24),
+          SizedBox(height: isPhone ? 16 : 24),
           Text(
-            'لا توجد حجوزات خاصة',
+            isArchive ? 'لا توجد حجوزات في الأرشيف' : 'لا توجد حجوزات حالية',
             style: TextStyle(
-              fontSize: 20,
+              fontSize: isPhone ? 18 : 20,
               fontWeight: FontWeight.w700,
               color: isDark ? Colors.white : Colors.black87,
             ),
           ),
           const SizedBox(height: 8),
           Text(
-            'قم بإضافة حجز خاص لحجب تاريخ معين',
+            isArchive
+                ? 'الحجوزات القديمة ستظهر هنا'
+                : 'قم بإضافة حجز خاص لحجب تاريخ معين',
             style: TextStyle(
-              fontSize: 14,
+              fontSize: isPhone ? 13 : 14,
               color: isDark ? Colors.white60 : Colors.grey,
             ),
+            textAlign: TextAlign.center,
           ),
         ],
       ),
@@ -568,6 +710,8 @@ class SpecialReservationsTabState extends State<SpecialReservationsTab> {
     final descriptionController = TextEditingController();
     DateTime? selectedDate;
     final formKey = GlobalKey<FormState>();
+    final screenSize = MediaQuery.of(context).size;
+    final isPhone = screenSize.width <= 600;
 
     showDialog(
       context: context,
@@ -588,14 +732,18 @@ class SpecialReservationsTabState extends State<SpecialReservationsTab> {
                 child: Icon(
                   Icons.event_busy_rounded,
                   color: AppColors.primary,
+                  size: isPhone ? 20 : 24,
                 ),
               ),
               const SizedBox(width: 12),
-              Text(
-                'حجز تاريخ خاص',
-                style: TextStyle(
-                  color: isDark ? Colors.white : Colors.black87,
-                  fontWeight: FontWeight.w700,
+              Expanded(
+                child: Text(
+                  'حجز تاريخ خاص',
+                  style: TextStyle(
+                    color: isDark ? Colors.white : Colors.black87,
+                    fontWeight: FontWeight.w700,
+                    fontSize: isPhone ? 16 : 18,
+                  ),
                 ),
               ),
             ],
@@ -615,6 +763,7 @@ class SpecialReservationsTabState extends State<SpecialReservationsTab> {
                         initialDate: DateTime.now(),
                         firstDate: DateTime.now(),
                         lastDate: DateTime.now().add(const Duration(days: 365)),
+                        locale: const Locale('ar', 'DZ'),
                         builder: (context, child) {
                           return Theme(
                             data: Theme.of(context).copyWith(
@@ -631,7 +780,7 @@ class SpecialReservationsTabState extends State<SpecialReservationsTab> {
                       }
                     },
                     child: Container(
-                      padding: const EdgeInsets.all(16),
+                      padding: EdgeInsets.all(isPhone ? 14 : 16),
                       decoration: BoxDecoration(
                         color: isDark
                             ? Colors.white.withOpacity(0.05)
@@ -646,15 +795,16 @@ class SpecialReservationsTabState extends State<SpecialReservationsTab> {
                           Icon(
                             Icons.calendar_today,
                             color: AppColors.primary,
+                            size: isPhone ? 20 : 24,
                           ),
                           const SizedBox(width: 12),
                           Text(
                             selectedDate != null
-                                ? _formatDate(selectedDate!.toString().split(' ')[0])
+                                ? DateFormat('dd/MM/yyyy').format(selectedDate!)
                                 : 'اختر التاريخ',
                             style: TextStyle(
                               color: isDark ? Colors.white : Colors.black87,
-                              fontSize: 15,
+                              fontSize: isPhone ? 14 : 15,
                             ),
                           ),
                         ],
@@ -668,19 +818,23 @@ class SpecialReservationsTabState extends State<SpecialReservationsTab> {
                     controller: nameController,
                     style: TextStyle(
                       color: isDark ? Colors.white : Colors.black87,
+                      fontSize: isPhone ? 14 : 16,
                     ),
                     decoration: InputDecoration(
                       labelText: 'اسم الحجز *',
                       labelStyle: TextStyle(
                         color: isDark ? Colors.white60 : Colors.grey,
+                        fontSize: isPhone ? 13 : 14,
                       ),
                       hintText: 'مثال: حفل عشيرة، اجتماع عام',
                       hintStyle: TextStyle(
                         color: isDark ? Colors.white38 : Colors.grey.shade400,
+                        fontSize: isPhone ? 13 : 14,
                       ),
                       prefixIcon: Icon(
                         Icons.event_note,
                         color: AppColors.primary,
+                        size: isPhone ? 20 : 24,
                       ),
                       filled: true,
                       fillColor: isDark
@@ -721,20 +875,24 @@ class SpecialReservationsTabState extends State<SpecialReservationsTab> {
                     controller: descriptionController,
                     style: TextStyle(
                       color: isDark ? Colors.white : Colors.black87,
+                      fontSize: isPhone ? 14 : 16,
                     ),
                     maxLines: 3,
                     decoration: InputDecoration(
                       labelText: 'الوصف (اختياري)',
                       labelStyle: TextStyle(
                         color: isDark ? Colors.white60 : Colors.grey,
+                        fontSize: isPhone ? 13 : 14,
                       ),
                       hintText: 'أضف تفاصيل إضافية...',
                       hintStyle: TextStyle(
                         color: isDark ? Colors.white38 : Colors.grey.shade400,
+                        fontSize: isPhone ? 13 : 14,
                       ),
                       prefixIcon: Icon(
                         Icons.description,
                         color: AppColors.primary,
+                        size: isPhone ? 20 : 24,
                       ),
                       filled: true,
                       fillColor: isDark
@@ -770,6 +928,7 @@ class SpecialReservationsTabState extends State<SpecialReservationsTab> {
                 'إلغاء',
                 style: TextStyle(
                   color: isDark ? Colors.white60 : Colors.grey,
+                  fontSize: isPhone ? 14 : 16,
                 ),
               ),
             ),
@@ -788,10 +947,11 @@ class SpecialReservationsTabState extends State<SpecialReservationsTab> {
                     _showSuccessSnackBar('تم إضافة الحجز الخاص بنجاح');
                     _loadSpecialReservations();
                   } catch (e) {
-                    _showErrorSnackBar('فشل في إضافة الحجز: $e');
+                    Navigator.pop(context);
+                    _showErrorDialog('فشل في إضافة الحجز: $e');
                   }
                 } else if (selectedDate == null) {
-                  _showErrorSnackBar('يرجى اختيار التاريخ');
+                  _showErrorDialog('يرجى اختيار التاريخ');
                 }
               },
               style: ElevatedButton.styleFrom(
@@ -799,16 +959,17 @@ class SpecialReservationsTabState extends State<SpecialReservationsTab> {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 12,
+                padding: EdgeInsets.symmetric(
+                  horizontal: isPhone ? 20 : 24,
+                  vertical: isPhone ? 10 : 12,
                 ),
               ),
-              child: const Text(
+              child: Text(
                 'إضافة',
                 style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w600,
+                  fontSize: isPhone ? 14 : 16,
                 ),
               ),
             ),
@@ -824,14 +985,14 @@ class SpecialReservationsTabState extends State<SpecialReservationsTab> {
       _showSuccessSnackBar('تم تحديث حالة الحجز بنجاح');
       _loadSpecialReservations();
     } catch (e) {
-      _showErrorSnackBar('فشل في تحديث حالة الحجز: $e');
+      _showErrorDialog('فشل في تحديث حالة الحجز: $e');
     }
   }
 
   String _formatDate(String dateStr) {
     try {
       final date = DateTime.parse(dateStr);
-      return DateFormat('yyyy/MM/dd', 'ar').format(date);
+      return DateFormat('yyyy/MM/dd', 'fr').format(date);
     } catch (e) {
       return dateStr;
     }
@@ -855,21 +1016,81 @@ class SpecialReservationsTabState extends State<SpecialReservationsTab> {
     );
   }
 
-  void _showErrorSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.error, color: Colors.white),
-            const SizedBox(width: 12),
-            Expanded(child: Text(message)),
+  void _showErrorDialog(String message) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final screenSize = MediaQuery.of(context).size;
+    final isPhone = screenSize.width <= 600;
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: isDark ? const Color(0xFF2D2D2D) : Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.error_outline,
+                  color: Colors.red,
+                  size: isPhone ? 24 : 28,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'خطأ',
+                  style: TextStyle(
+                    color: isDark ? Colors.white : Colors.black87,
+                    fontWeight: FontWeight.w700,
+                    fontSize: isPhone ? 16 : 18,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Text(
+              message,
+              style: TextStyle(
+                color: isDark ? Colors.white70 : Colors.black87,
+                fontSize: isPhone ? 14 : 16,
+                height: 1.5,
+              ),
+            ),
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: EdgeInsets.symmetric(
+                  horizontal: isPhone ? 20 : 24,
+                  vertical: isPhone ? 10 : 12,
+                ),
+              ),
+              child: Text(
+                'حسناً',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: isPhone ? 14 : 16,
+                ),
+              ),
+            ),
           ],
-        ),
-        backgroundColor: Colors.red,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        margin: const EdgeInsets.all(16),
-      ),
+        );
+      },
     );
   }
 }

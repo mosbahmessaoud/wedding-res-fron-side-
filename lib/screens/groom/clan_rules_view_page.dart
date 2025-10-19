@@ -186,82 +186,64 @@ class GroomClanRulesPageState extends State<GroomClanRulesPage> {
       _showSnackBar('خطأ في فتح الملف: $e', Colors.red);
     }
   }
-
-  Future<void> _openClanRulesPdf() async {
-    if (_clanRulesPdfUrl == null) {
-      _showSnackBar('لا يوجد رابط PDF', Colors.red);
-      return;
-    }
-
-    try {
-      // Direct open of the full URL - the URL should open the PDF directly
-      final uri = Uri.parse(_clanRulesPdfUrl!);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        _showSnackBar('لا يمكن فتح الملف', Colors.red);
-      }
-    } catch (e) {
-      _showSnackBar('خطأ في فتح الملف: $e', Colors.red);
-    }
+Future<void> _openClanRulesPdf() async {
+  if (_clanRulesPdfUrl == null) {
+    _showSnackBar('لا يوجد رابط PDF', Colors.red);
+    return;
   }
+
+  try {
+    // Open the PDF URL directly in external browser/PDF viewer
+    final uri = Uri.parse(_clanRulesPdfUrl!);
+    
+    // Use external application to open the PDF
+    final launched = await launchUrl(
+      uri, 
+      mode: LaunchMode.externalApplication
+    );
+    
+    if (!launched) {
+      // If external launch fails, try in-app browser
+      await launchUrl(uri, mode: LaunchMode.inAppWebView);
+    }
+  } catch (e) {
+    print('Error opening PDF: $e');
+    _showSnackBar('خطأ في فتح الملف: $e', Colors.red);
+  }
+}
+
+Future<void> _downloadClanRulesPdf() async {
+  if (_clanRulesPdfUrl == null) {
+    _showSnackBar('لا يوجد رابط PDF', Colors.red);
+    return;
+  }
+
+  try {
+    _showSnackBar('جاري فتح رابط التحميل...', Colors.blue.shade400);
+    
+    final uri = Uri.parse(_clanRulesPdfUrl!);
+    
+    // Open in external browser which will handle the download
+    final launched = await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+    );
+    
+    if (launched) {
+      _showSnackBar('تم فتح رابط التحميل في المتصفح', Colors.green.shade400);
+    } else {
+      throw Exception('فشل فتح المتصفح');
+    }
+  } catch (e) {
+    print('Download error: $e');
+    _showSnackBar('خطأ في فتح رابط التحميل: $e', Colors.red);
+  }
+}
 
   String _generatePdfFileName() {
     final clanName = widget.clanName ?? _clanRules?['clan_name'] ?? 'العشيرة';
     final timestamp = DateTime.now().millisecondsSinceEpoch;
     return 'قوانين_${clanName.replaceAll(' ', '_')}_$timestamp.pdf';
-  }
-
-  Future<void> _downloadClanRulesPdf() async {
-    if (_clanRulesPdfUrl == null) {
-      _showSnackBar('لا يوجد رابط PDF', Colors.red);
-      return;
-    }
-
-    setState(() {
-      _isDownloading = true;
-      _downloadProgress = 0.0;
-    });
-
-    try {
-      _showSnackBar('جاري تحميل الملف...', Colors.blue.shade400);
-
-      // Extract file ID from the full URL
-      final fileId = _extractFileIdFromUrl(_clanRulesPdfUrl!);
-      
-      if (fileId == null) {
-        throw Exception('لا يمكن استخراج معرف الملف من الرابط');
-      }
-
-      print('Downloading PDF with file ID: $fileId');
-
-      // Download the PDF using the file ID
-      final pdfBytes = await ApiService.downloadPdfe(fileId);
-
-      // Save the file
-      final savedFile = await _savePdfFile(Uint8List.fromList(pdfBytes));
-
-      if (savedFile != null) {
-        setState(() {
-          _isDownloading = false;
-          _downloadProgress = 0.0;
-        });
-
-        _showSnackBar('تم تحميل الملف بنجاح', Colors.green.shade400);
-        
-        // Show options dialog
-        _showPdfActionsDialog(savedFile.path, Uint8List.fromList(pdfBytes));
-      } else {
-        throw Exception('فشل في حفظ الملف');
-      }
-    } catch (e) {
-      print('Download error: $e');
-      setState(() {
-        _isDownloading = false;
-        _downloadProgress = 0.0;
-      });
-      _showSnackBar('فشل تنزيل الملف: $e', Colors.red);
-    }
   }
 
   Future<File?> _savePdfFile(Uint8List pdfBytes) async {

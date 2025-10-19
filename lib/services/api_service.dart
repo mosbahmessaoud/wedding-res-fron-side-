@@ -1092,6 +1092,31 @@ static Future<Map<String, dynamic>> markPaymentCompleted(int groomId) async {
   }
 }
 
+// this route can change payment status from true to false or the opposite
+static Future<Map<String, dynamic>> changePaymentStatus(int reservationId) async {
+  try {
+    final response = await http.post(
+      Uri.parse('$baseUrl/clan-admin/$reservationId/change_payment_status'),
+      headers: _headers,
+    );
+
+    print('Change payment status response: ${response.statusCode}');
+    print('Change payment status body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else if (response.statusCode == 404) {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'لا يوجد حجز معلق أو مصدق عليه');
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل في تغيير حالة الدفع');
+    }
+  } catch (e) {
+    throw Exception('خطأ في تغيير حالة الدفع: $e');
+  }
+}
+
 static Future<Map<String, dynamic>> createReservation(Map<String, dynamic> reservationData) async {
   try {
     print('Sending reservation data: $reservationData');
@@ -3282,6 +3307,77 @@ static Future<Map<String, dynamic>> refreshClanRulesCache(int clanId) async {
 /// - file_id: String
 /// - size: int
 /// - clan_id: int? (if provided)
+// static Future<Map<String, dynamic>> uploadPdfFile(
+//   File file, {
+//   int? clanId,
+// }) async {
+//   try {
+//     final fileName = path.basename(file.path);
+//     final fileSize = await file.length();
+
+//     print('=== Upload Debug ===');
+//     print('Base URL: $baseUrl');
+//     print('File: $fileName');
+//     print('Size: $fileSize bytes');
+//     if (clanId != null) print('Clan ID: $clanId');
+
+//     // FIXED: Create multipart request with optional clan_id as FORM FIELD, not query parameter
+//     var uri = Uri.parse('$baseUrl/pdf/api/upload/pdf/');
+//     var request = http.MultipartRequest('POST', uri);
+
+//     // Add auth header
+//     if (_token != null) {
+//       request.headers['Authorization'] = 'Bearer $_token';
+//     }
+
+//     // FIXED: Add clan_id as a form field if provided
+//     if (clanId != null) {
+//       request.fields['clan_id'] = clanId.toString();
+//     }
+
+//     // Add file
+//     request.files.add(await http.MultipartFile.fromPath(
+//       'file',
+//       file.path,
+//       filename: fileName,
+//     ));
+
+//     print('Sending request to: ${request.url}');
+//     if (clanId != null) print('With clan_id field: $clanId');
+
+//     // Send request with longer timeout for file upload
+//     var streamedResponse = await request.send().timeout(
+//       const Duration(seconds: 60), // Increased timeout
+//     );
+
+//     var response = await http.Response.fromStream(streamedResponse);
+
+//     print('Response status: ${response.statusCode}');
+//     print('Response body: ${response.body}');
+
+//     if (response.statusCode == 200) {
+//       final data = json.decode(response.body);
+//       if (data['success'] == true) {
+//         return {
+//           'success': data['success'],
+//           'url': data['url'],
+//           'filename': data['filename'],
+//           'file_id': data['file_id'],
+//           'size': data['size'],
+//           'clan_id': data['clan_id'],
+//         };
+//       }
+//       throw Exception(data['detail'] ?? 'فشل التحميل');
+//     } else {
+//       final error = json.decode(response.body);
+//       throw Exception(error['detail'] ?? 'خطأ في التحميل');
+//     }
+//   } catch (e) {
+//     print('Upload error: $e');
+//     rethrow;
+//   }
+// }
+
 static Future<Map<String, dynamic>> uploadPdfFile(
   File file, {
   int? clanId,
@@ -3296,7 +3392,7 @@ static Future<Map<String, dynamic>> uploadPdfFile(
     print('Size: $fileSize bytes');
     if (clanId != null) print('Clan ID: $clanId');
 
-    // FIXED: Create multipart request with optional clan_id as FORM FIELD, not query parameter
+    // Create multipart request with optional clan_id as FORM FIELD
     var uri = Uri.parse('$baseUrl/pdf/api/upload/pdf/');
     var request = http.MultipartRequest('POST', uri);
 
@@ -3305,7 +3401,7 @@ static Future<Map<String, dynamic>> uploadPdfFile(
       request.headers['Authorization'] = 'Bearer $_token';
     }
 
-    // FIXED: Add clan_id as a form field if provided
+    // Add clan_id as a form field if provided
     if (clanId != null) {
       request.fields['clan_id'] = clanId.toString();
     }
@@ -3322,7 +3418,7 @@ static Future<Map<String, dynamic>> uploadPdfFile(
 
     // Send request with longer timeout for file upload
     var streamedResponse = await request.send().timeout(
-      const Duration(seconds: 60), // Increased timeout
+      const Duration(seconds: 60),
     );
 
     var response = await http.Response.fromStream(streamedResponse);
@@ -3333,13 +3429,20 @@ static Future<Map<String, dynamic>> uploadPdfFile(
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
       if (data['success'] == true) {
+        print('✅ Upload successful!');
+        print('📄 Full URL: ${data['url']}');
+        print('💾 Saved to DB: ${data['saved_to_database']}');
+        
+        // IMPORTANT: Return the full URL exactly as provided by backend
+        // Don't modify or reconstruct it
         return {
-          'success': data['success'],
-          'url': data['url'],
+          'success': true,
+          'url': data['url'], // Use this exact URL
           'filename': data['filename'],
           'file_id': data['file_id'],
           'size': data['size'],
           'clan_id': data['clan_id'],
+          'saved_to_database': data['saved_to_database'],
         };
       }
       throw Exception(data['detail'] ?? 'فشل التحميل');
@@ -3348,7 +3451,7 @@ static Future<Map<String, dynamic>> uploadPdfFile(
       throw Exception(error['detail'] ?? 'خطأ في التحميل');
     }
   } catch (e) {
-    print('Upload error: $e');
+    print('❌ Upload error: $e');
     rethrow;
   }
 }
@@ -3702,6 +3805,36 @@ static Map<String, String> validateSpecialReservationData({
   return errors;
 }
 
+
+/// get all special reservation 
+
+// Get special reservations for the current county
+static Future<List<dynamic>> getSpecialReservations() async {
+  try {
+    final response = await http.get(
+      Uri.parse('$baseUrl/clan-admin/special_reservations'),
+      headers: _headers,
+    );
+
+    print('Get special reservations response: ${response.statusCode}');
+    print('Get special reservations body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      final List<dynamic> data = json.decode(response.body);
+      return data;
+    } else if (response.statusCode == 401) {
+      throw Exception('غير مصرح. يرجى تسجيل الدخول مرة أخرى');
+    } else if (response.statusCode == 403) {
+      throw Exception('ليس لديك صلاحية للوصول إلى هذه البيانات');
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل في تحميل الحجوزات الخاصة');
+    }
+  } catch (e) {
+    print('Error fetching special reservations: $e');
+    throw Exception('خطأ في تحميل الحجوزات الخاصة: $e');
+  }
+}
 
 
 }

@@ -118,29 +118,31 @@ class ReservationsTabState extends State<ReservationsTab> with SingleTickerProvi
       setState(() => _isLoading = false);
     }
   }
-
-Future<void> _markPaymentCompleted(int groomId, String groomName) async {
+Future<void> _togglePaymentStatus(int reservationId, String groomName, bool currentPaymentStatus) async {
+  final action = currentPaymentStatus ? 'إلغاء تأكيد' : 'تأكيد';
   final confirmed = await _showConfirmationDialog(
-    'تأكيد الدفع',
-    'هل أنت متأكد من تأكيد دفع $groomName؟',
-    Colors.blue,
-    Icons.payment_rounded,
+    '$action الدفع',
+    'هل أنت متأكد من $action دفع $groomName؟',
+    currentPaymentStatus ? Colors.orange : Colors.blue,
+    currentPaymentStatus ? Icons.money_off_rounded : Icons.payment_rounded,
   );
 
   if (!confirmed) return;
 
   try {
     setState(() => _isLoading = true);
-    await ApiService.markPaymentCompleted(groomId);
+    await ApiService.changePaymentStatus(reservationId);
     await _loadAllReservations();
-    _showSnackBar('تم تأكيد الدفع بنجاح', Colors.blue.shade400);
+    _showSnackBar(
+      currentPaymentStatus ? 'تم إلغاء تأكيد الدفع' : 'تم تأكيد الدفع بنجاح', 
+      currentPaymentStatus ? Colors.orange.shade400 : Colors.blue.shade400
+    );
   } catch (e) {
-    _showSnackBar('خطأ في تأكيد الدفع: $e', Colors.red.shade400);
+    _showSnackBar('خطأ في تغيير حالة الدفع: $e', Colors.red.shade400);
   } finally {
     setState(() => _isLoading = false);
   }
 }
-
 
 // Update _validateReservation to check payment first
 Future<void> _validateReservation(int groomId, String groomName, bool paymentValid) async {
@@ -834,8 +836,7 @@ List<Widget> _buildDetailRows(Map<String, dynamic> reservation, bool isDark) {
       ),
     );
   }
-
-  Widget _buildModernActionButtons(Map<String, dynamic> reservation, String status, int groomId, int reservationId, String groomName) {
+Widget _buildModernActionButtons(Map<String, dynamic> reservation, String status, int groomId, int reservationId, String groomName) {
   List<Widget> buttons = [];
   final paymentValid = reservation['payment_valid'] ?? false;
 
@@ -851,21 +852,19 @@ List<Widget> _buildDetailRows(Map<String, dynamic> reservation, bool isDark) {
 
   // Status-specific buttons
   if (status == 'pending_validation') {
-    // Payment button - only show if payment not completed
-    if (!paymentValid) {
-      buttons.add(
-        _buildActionButton(
-          onPressed: () => _markPaymentCompleted(groomId, groomName),
-          icon: Icons.payment_rounded,
-          label: 'تأكيد الدفع',
-          color: Colors.indigo.shade400,
-        ),
-      );
-    }
+    // Payment toggle button - shows appropriate action based on current status
+    buttons.add(
+      _buildActionButton(
+        onPressed: () => _togglePaymentStatus(reservationId, groomName, paymentValid),
+        icon: paymentValid ? Icons.money_off_rounded : Icons.payment_rounded,
+        label: paymentValid ? 'إلغاء الدفع' : 'تأكيد الدفع',
+        color: paymentValid ? Colors.orange.shade400 : Colors.indigo.shade400,
+      ),
+    );
     
     buttons.add(
       _buildActionButton(
-        onPressed: () => _validateReservation(groomId, groomName, paymentValid), // Pass paymentValid
+        onPressed: () => _validateReservation(groomId, groomName, paymentValid),
         icon: Icons.check_rounded,
         label: 'تأكيد',
         color: Colors.green.shade400,
@@ -880,17 +879,15 @@ List<Widget> _buildDetailRows(Map<String, dynamic> reservation, bool isDark) {
       ),
     );
   } else if (status == 'validated') {
-    // Payment button - show even in validated state if payment not completed
-    if (!paymentValid) {
-      buttons.add(
-        _buildActionButton(
-          onPressed: () => _markPaymentCompleted(groomId, groomName),
-          icon: Icons.payment_rounded,
-          label: 'تأكيد الدفع',
-          color: Colors.indigo.shade400,
-        ),
-      );
-    }
+    // Payment toggle button - available in validated state too
+    buttons.add(
+      _buildActionButton(
+        onPressed: () => _togglePaymentStatus(reservationId, groomName, paymentValid),
+        icon: paymentValid ? Icons.money_off_rounded : Icons.payment_rounded,
+        label: paymentValid ? 'إلغاء الدفع' : 'تأكيد الدفع',
+        color: paymentValid ? Colors.orange.shade400 : Colors.indigo.shade400,
+      ),
+    );
     
     buttons.add(
       _buildActionButton(
@@ -908,6 +905,8 @@ List<Widget> _buildDetailRows(Map<String, dynamic> reservation, bool isDark) {
     children: buttons,
   );
 }
+
+
 
   Widget _buildActionButton({
     required VoidCallback onPressed,
@@ -972,7 +971,7 @@ List<Widget> _buildDetailRows(Map<String, dynamic> reservation, bool isDark) {
     if (dateString == null || dateString.isEmpty) return 'غير محدد';
     try {
       final date = DateTime.parse(dateString);
-      return DateFormat('yyyy/MM/dd', 'ar').format(date);
+      return DateFormat('yyyy/MM/dd', 'fr').format(date);
     } catch (e) {
       return dateString;
     }
@@ -982,7 +981,7 @@ List<Widget> _buildDetailRows(Map<String, dynamic> reservation, bool isDark) {
     if (dateTimeString == null || dateTimeString.isEmpty) return 'غير محدد';
     try {
       final dateTime = DateTime.parse(dateTimeString);
-      return DateFormat('yyyy/MM/dd HH:mm', 'ar').format(dateTime);
+      return DateFormat('yyyy/MM/dd HH:mm', 'fr').format(dateTime);
     } catch (e) {
       return dateTimeString;
     }

@@ -93,6 +93,8 @@ class _BeautifulCustomCalendarPickerState extends State<BeautifulCustomCalendarP
   Map<String, String> _dateToGroomMap = {};
   Map<String, List<DateTime>> _connectedDateRanges = {};
   
+  Set<String> _specialReservationDates = {};
+
   // ADD THESE
   bool _showYearPicker = false;
   late int _maxYearsAllowed;
@@ -208,15 +210,26 @@ void initState() {
       print('Error loading clan settings: $e');
     }
   }
+Future<void> _loadMonthData() async {
+  setState(() {
+    _isLoading = true;
+  });
 
-  Future<void> _loadMonthData() async {
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      final validatedDates = await ApiService.getValidatedDates(widget.clanId);
-      final pendingDates = await ApiService.getPendingDates(widget.clanId);
+  try {
+    // ADD THIS - Fetch special reservations
+    final specialReservations = await ApiService.getSpecialReservations();
+    Set<String> specialDates = {};
+    
+    for (var reservation in specialReservations) {
+      final date1 = reservation['date1']?.toString();
+      final date2 = reservation['date2']?.toString();
+      
+      if (date1 != null) specialDates.add(date1);
+      if (date2 != null && date2 != date1) specialDates.add(date2);
+    }
+    
+    final validatedDates = await ApiService.getValidatedDates(widget.clanId);
+    final pendingDates = await ApiService.getPendingDates(widget.clanId);
 
       Map<String, DateAvailability> newAvailabilities = {};
       Map<String, List<String>> newGroomMultiDayReservations = {};
@@ -366,6 +379,8 @@ void initState() {
         _groomMultiDayReservations = newGroomMultiDayReservations;
         _dateToGroomMap = newDateToGroomMap;
         _connectedDateRanges = newConnectedDateRanges;
+        _specialReservationDates = specialDates; 
+
         _isLoading = false;
       });
     } catch (e) {
@@ -395,7 +410,6 @@ void initState() {
       return '${months[date.month]} ${date.year}';
     }
   }
-
 DateAvailability _getDateAvailability(DateTime date) {
   final key = DateFormat('yyyy-MM-dd').format(date);
   
@@ -410,6 +424,16 @@ DateAvailability _getDateAvailability(DateTime date) {
       status: DateStatus.disabled,
       maxCapacity: _maxGroomsPerDate,
       note: 'تاريخ منتهي',
+    );
+  }
+  
+  // ADD THIS - Check if date is a special reservation
+  if (_specialReservationDates.contains(key)) {
+    return DateAvailability(
+      date: date,
+      status: DateStatus.disabled,
+      maxCapacity: _maxGroomsPerDate,
+      note: 'حجز خاص - غير متاح',
     );
   }
   
@@ -431,7 +455,6 @@ DateAvailability _getDateAvailability(DateTime date) {
     maxCapacity: _maxGroomsPerDate,
   );
 }
-
   bool _isSameDay(DateTime date1, DateTime date2) {
     return date1.year == date2.year &&
         date1.month == date2.month &&
@@ -1940,6 +1963,7 @@ Widget _buildBottomSection(double screenWidth, double screenHeight, bool isDark)
               _buildCompactLegend('معلق', const Color(0xFFFFB74D), screenWidth, isDark),
               _buildCompactLegend('محجوز', const Color(0xFFEF4444), screenWidth, isDark),
               _buildCompactLegend('جماعي', const Color(0xFF00BCD4), screenWidth, isDark),
+              _buildCompactLegend('يوم غير قابل للحجز', const Color(0xFFBDBDBD), screenWidth, isDark), // ADD THIS
             ],
           ),
           

@@ -291,8 +291,8 @@ class HomeTabState extends State<HomeTab> with TickerProviderStateMixin {
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
-                      const Color(0xFF1DB954),
-                      const Color(0xFF1ED760),
+                      isDark ? const Color.fromARGB(255, 21, 152, 67) :const Color(0xFF1DB954),
+                      isDark ? const Color.fromARGB(179, 29, 185, 84) :const Color(0xFF1ED760),
                     ],
                   ),
                   borderRadius: BorderRadius.circular(8),

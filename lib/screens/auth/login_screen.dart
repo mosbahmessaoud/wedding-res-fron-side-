@@ -92,12 +92,12 @@ class _LoginScreenState extends State<LoginScreen>
   Future<bool> _checkInternetConnection() async {
     try {
       // Try multiple hosts for better reliability
-      final hosts = ['google.com', '1.1.1.1', '8.8.8.8' ,'0.0.0.0'];
+      final hosts = ['google.com', '1.1.1.1', '8.8.8.8' ];
       
       for (var host in hosts) {
         try {
           final result = await InternetAddress.lookup(host)
-              .timeout(const Duration(seconds: 10));
+              .timeout(const Duration(seconds: 5));
           if (result.isNotEmpty && result[0].rawAddress.isNotEmpty) {
             return true;
           }
@@ -197,200 +197,211 @@ class _LoginScreenState extends State<LoginScreen>
       },
     );
   }
+Future<void> _login() async {
+  if (!_formKey.currentState!.validate()) {
+    return;
+  }
 
-  Future<void> _login() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
+  // Check internet connection first
+  final hasInternet = await _checkInternetConnection();
+  if (!hasInternet) {
+    if (!mounted) return; // Check if widget is still mounted
+    _showNoInternetDialog();
+    return;
+  }
+
+  setState(() {
+    _isLoading = true;
+  });
+
+  try {
+    final response = await ApiService.login(
+      _phoneController.text.trim(),
+      _passwordController.text,
+    );
+
+    // Check if widget is still mounted before proceeding
+    if (!mounted) return;
+
+    // Decode JWT to get role instead of making another API call
+    final token = response['access_token'];
+    final parts = token.split('.');
+    if (parts.length != 3) {
+      throw Exception('توكن غير صالح');
     }
-
-    // Check internet connection first
-    final hasInternet = await _checkInternetConnection();
-    if (!hasInternet) {
-      _showNoInternetDialog();
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      final response = await ApiService.login(
-        _phoneController.text.trim(),
-        _passwordController.text,
-      );
-
-      // Decode JWT to get role instead of making another API call
-      final token = response['access_token'];
-      final parts = token.split('.');
-      if (parts.length != 3) {
-        throw Exception('توكن غير صالح');
-      }
-      
-      final payload = json.decode(
-        utf8.decode(base64Url.decode(base64Url.normalize(parts[1])))
-      );
-      
-      final role = payload['role'];
     
-      // Navigate based on role
-      if (role == 'groom') {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => GroomHomeScreen(initialTabIndex: 0),
-          ),
-        );
-      } else if (role == 'super_admin') {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => SuperAdminHomeScreen(),
-          ),
-        );
-      } else if (role == 'clan_admin') {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ClanAdminHomeScreen(),
-          ),
-        );
-      } else {
-        showDialog(
-          context: context,
-          builder: (BuildContext context) {
+    final payload = json.decode(
+      utf8.decode(base64Url.decode(base64Url.normalize(parts[1])))
+    );
+    
+    final role = payload['role'];
+  
+    // Navigate based on role
+    if (role == 'groom') {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => GroomHomeScreen(initialTabIndex: 0),
+        ),
+      );
+    } else if (role == 'super_admin') {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => SuperAdminHomeScreen(),
+        ),
+      );
+    } else if (role == 'clan_admin') {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ClanAdminHomeScreen(),
+        ),
+      );
+    } else {
+      // Check if widget is still mounted before showing dialog
+      if (!mounted) return;
+      
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: Row(
+              children: [
+                Icon(Icons.error_outline, color: AppColors.error, size: 28),
+                const SizedBox(width: 12),
+                const Text('خطأ'),
+              ],
+            ),
+            content: const Text('دور المستخدم غير معروف'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('حسناً'),
+              ),
+            ],
+          );
+        },
+      );
+    }
+  } catch (e) {
+    // Check if widget is still mounted before showing dialog
+    if (!mounted) return;
+    
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            // Get screen size
+            final screenWidth = MediaQuery.of(context).size.width;
+            final screenHeight = MediaQuery.of(context).size.height;
+            
+            // Responsive sizing
+            final iconSize = screenWidth < 360 ? 24.0 : 28.0;
+            final titleFontSize = screenWidth < 360 ? 16.0 : 18.0;
+            final contentFontSize = screenWidth < 360 ? 14.0 : 16.0;
+            final horizontalPadding = screenWidth < 360 ? 16.0 : 24.0;
+            
             return AlertDialog(
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
-              title: Row(
-                children: [
-                  Icon(Icons.error_outline, color: AppColors.error, size: 28),
-                  const SizedBox(width: 12),
-                  const Text('خطأ'),
-                ],
+              contentPadding: EdgeInsets.zero,
+              insetPadding: EdgeInsets.symmetric(
+                horizontal: screenWidth * 0.08,
+                vertical: screenHeight * 0.05,
               ),
-              content: const Text('دور المستخدم غير معروف'),
+              title: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  horizontalPadding,
+                  20,
+                  horizontalPadding,
+                  8,
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.error_outline,
+                      color: AppColors.error,
+                      size: iconSize,
+                    ),
+                    SizedBox(width: screenWidth < 360 ? 8 : 12),
+                    Expanded(
+                      child: Text(
+                        'خطأ في تسجيل الدخول',
+                        style: TextStyle(fontSize: titleFontSize),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              content: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: screenHeight * 0.5,
+                  minWidth: screenWidth * 0.7,
+                ),
+                child: SingleChildScrollView(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      horizontalPadding,
+                      8,
+                      horizontalPadding,
+                      16,
+                    ),
+                    child: Text(
+                      '$e',
+                      style: TextStyle(fontSize: contentFontSize),
+                    ),
+                  ),
+                ),
+              ),
               actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('حسناً'),
+                Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    horizontalPadding,
+                    0,
+                    horizontalPadding,
+                    16,
+                  ),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: Text(
+                        'حسناً',
+                        style: TextStyle(fontSize: contentFontSize),
+                      ),
+                    ),
+                  ),
                 ),
               ],
+              actionsPadding: EdgeInsets.zero,
             );
           },
         );
-      }
-    } catch (e) {
-      showDialog(
-  context: context,
-  builder: (BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        // Get screen size
-        final screenWidth = MediaQuery.of(context).size.width;
-        final screenHeight = MediaQuery.of(context).size.height;
-        
-        // Responsive sizing
-        final iconSize = screenWidth < 360 ? 24.0 : 28.0;
-        final titleFontSize = screenWidth < 360 ? 16.0 : 18.0;
-        final contentFontSize = screenWidth < 360 ? 14.0 : 16.0;
-        final horizontalPadding = screenWidth < 360 ? 16.0 : 24.0;
-        
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          contentPadding: EdgeInsets.zero,
-          insetPadding: EdgeInsets.symmetric(
-            horizontal: screenWidth * 0.08, // 8% margin from edges
-            vertical: screenHeight * 0.05,  // 5% margin from top/bottom
-          ),
-          title: Padding(
-            padding: EdgeInsets.fromLTRB(
-              horizontalPadding,
-              20,
-              horizontalPadding,
-              8,
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.error_outline,
-                  color: AppColors.error,
-                  size: iconSize,
-                ),
-                SizedBox(width: screenWidth < 360 ? 8 : 12),
-                Expanded(
-                  child: Text(
-                    'خطأ في تسجيل الدخول',
-                    style: TextStyle(fontSize: titleFontSize),
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 2,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          content: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxHeight: screenHeight * 0.5, // Max 50% of screen height
-              minWidth: screenWidth * 0.7,   // Min 70% of screen width
-            ),
-            child: SingleChildScrollView(
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(
-                  horizontalPadding,
-                  8,
-                  horizontalPadding,
-                  16,
-                ),
-                child: Text(
-                  '$e',
-                  style: TextStyle(fontSize: contentFontSize),
-                ),
-              ),
-            ),
-          ),
-          actions: [
-            Padding(
-              padding: EdgeInsets.fromLTRB(
-                horizontalPadding,
-                0,
-                horizontalPadding,
-                16,
-              ),
-              child: SizedBox(
-                width: double.infinity,
-                child: TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  child: Text(
-                    'حسناً',
-                    style: TextStyle(fontSize: contentFontSize),
-                  ),
-                ),
-              ),
-            ),
-          ],
-          actionsPadding: EdgeInsets.zero,
-        );
       },
     );
-  },
-);
-    } finally {
+  } finally {
+    // Check if widget is still mounted before calling setState
+    if (mounted) {
       setState(() {
         _isLoading = false;
       });
     }
   }
-
+}
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;

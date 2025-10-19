@@ -27,6 +27,8 @@ class ClanRulesPageState extends State<ClanRulesPage> {
   final _clothingController = TextEditingController();
   final _kitchenwareController = TextEditingController();
   String? _pdfUrl; // Changed from List to single URL
+  File? _pendingPdfFile; // Store the file temporarily until save
+  String? _pendingPdfFileName; // Store filename for display
   
   @override
   void initState() {
@@ -83,30 +85,64 @@ class ClanRulesPageState extends State<ClanRulesPage> {
     setState(() => _isLoading = true);
     try {
       Map<String, dynamic> result;
+      
+      // Step 1: Create/Update clan rules WITHOUT PDF first
       if (_rules == null) {
+        print('🔵 Step 1: Creating clan rules...');
         result = await ApiService.createClanRulesWithDetails(
           clanId: _clanId!,
           generalRule: _generalRuleController.text.trim(),
           groomSupplies: _groomSuppliesController.text.trim().isEmpty ? null : _groomSuppliesController.text.trim(),
           ruleAboutClothing: _clothingController.text.trim().isEmpty ? null : _clothingController.text.trim(),
           ruleAboutKitchenware: _kitchenwareController.text.trim().isEmpty ? null : _kitchenwareController.text.trim(),
-          rulesBookOfClanPdfs: _pdfUrl, // Changed parameter name
+          rulesBookOfClanPdfs: _pdfUrl, // Keep existing PDF if any
         );
+        print('✅ Clan rules created successfully');
       } else {
+        print('🔵 Step 1: Updating clan rules...');
         result = await ApiService.updateClanRulesDetails(
           _rules!['id'],
           generalRule: _generalRuleController.text.trim(),
           groomSupplies: _groomSuppliesController.text.trim().isEmpty ? null : _groomSuppliesController.text.trim(),
           ruleAboutClothing: _clothingController.text.trim().isEmpty ? null : _clothingController.text.trim(),
           ruleAboutKitchenware: _kitchenwareController.text.trim().isEmpty ? null : _kitchenwareController.text.trim(),
-          rulesBookOfClanPdfs: _pdfUrl, // Changed parameter name
+          rulesBookOfClanPdfs: _pdfUrl, // Keep existing PDF if any
         );
+        print('✅ Clan rules updated successfully');
       }
+      
+      // Step 2: Upload PDF AFTER clan rules are created (if there's a pending file)
+      if (_pendingPdfFile != null) {
+        print('🔵 Step 2: Uploading PDF file...');
+        final uploadResult = await ApiService.uploadPdfFile(
+          _pendingPdfFile!,
+          clanId: _clanId!,
+        );
+        final uploadedPdfUrl = uploadResult['url'];
+        print('✅ PDF uploaded: $uploadedPdfUrl');
+        
+        // Step 3: Update the clan rules with the new PDF URL
+        print('🔵 Step 3: Updating clan rules with PDF URL...');
+        result = await ApiService.updateClanRulesDetails(
+          result['id'],
+          generalRule: _generalRuleController.text.trim(),
+          groomSupplies: _groomSuppliesController.text.trim().isEmpty ? null : _groomSuppliesController.text.trim(),
+          ruleAboutClothing: _clothingController.text.trim().isEmpty ? null : _clothingController.text.trim(),
+          ruleAboutKitchenware: _kitchenwareController.text.trim().isEmpty ? null : _kitchenwareController.text.trim(),
+          rulesBookOfClanPdfs: uploadedPdfUrl,
+        );
+        print('✅ Clan rules updated with PDF URL');
+      }
+      
+      // Clear pending file after successful save
+      _pendingPdfFile = null;
+      _pendingPdfFileName = null;
       
       _populateFields(result);
       setState(() => _isEditing = false);
       _showSuccess(_rules == null ? 'تم الإنشاء بنجاح' : 'تم التحديث بنجاح');
     } catch (e) {
+      print('❌ Save error: $e');
       _showError('فشل الحفظ: ${_cleanError(e)}');
     } finally {
       setState(() => _isLoading = false);
@@ -147,37 +183,31 @@ class ClanRulesPageState extends State<ClanRulesPage> {
       
       final file = File(result.files.single.path!);
       
-      setState(() => _isLoading = true);
-      
-      print('🔵 Starting PDF upload for clan: $_clanId');
-      
-      // Upload with clan_id to automatically save to ClanRules table
-      final uploadResult = await ApiService.uploadPdfFile(
-        file,
-        clanId: _clanId!,
-      );
-      
-      print('✅ Upload successful!');
-      print('📄 File URL: ${uploadResult['url']}');
-      print('💾 Saved to DB: ${uploadResult['saved_to_database']}');
-      
-      // Debug: Check what's actually in the database
-      final debugInfo = await ApiService.debugClanRules(_clanId!);
-      print('🔍 Database check: $debugInfo');
-      
+      // Store the file temporarily, don't upload yet
       setState(() {
-        _pdfUrl = uploadResult['url'];
-        _isLoading = false;
+        _pendingPdfFile = file;
+        _pendingPdfFileName = result.files.single.name;
       });
-      _showSuccess('تم رفع الملف بنجاح وحفظه في قاعدة البيانات');
+      
+      _showSuccess('تم اختيار الملف. سيتم رفعه عند الحفظ');
     } catch (e) {
-      print('❌ Upload error: $e');
-      setState(() => _isLoading = false);
-      _showError('فشل رفع الملف: ${_cleanError(e)}');
+      print('❌ File picker error: $e');
+      _showError('فشل اختيار الملف: ${_cleanError(e)}');
     }
   }
   
   Future<void> _deletePdf() async {
+    // If it's a pending file (not yet uploaded), just clear it
+    if (_pendingPdfFile != null) {
+      setState(() {
+        _pendingPdfFile = null;
+        _pendingPdfFileName = null;
+      });
+      _showSuccess('تم إلغاء اختيار الملف');
+      return;
+    }
+    
+    // If it's an uploaded file, delete from server
     if (_pdfUrl == null || _clanId == null) return;
 
     final confirm = await _showConfirmDialog('هل تريد حذف هذا الملف؟');
@@ -185,7 +215,6 @@ class ClanRulesPageState extends State<ClanRulesPage> {
     
     setState(() => _isLoading = true);
     try {
-      // Delete with clan_id to remove from ClanRules table
       await ApiService.deletePdfByUrl(_pdfUrl!, clanId: _clanId!);
       setState(() {
         _pdfUrl = null;
@@ -232,6 +261,8 @@ class ClanRulesPageState extends State<ClanRulesPage> {
       _clothingController.clear();
       _kitchenwareController.clear();
       _pdfUrl = null;
+      _pendingPdfFile = null;
+      _pendingPdfFileName = null;
     });
   }
   
@@ -275,6 +306,7 @@ class ClanRulesPageState extends State<ClanRulesPage> {
     
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         title: const Text('قوانين العشيرة'),
         actions: [
           const ThemeToggleButton(),
@@ -299,6 +331,7 @@ class ClanRulesPageState extends State<ClanRulesPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    // Show edit/create mode when: rules is null OR editing is true
                     if (_rules == null || _isEditing) ...[
                       _buildTextField(
                         controller: _generalRuleController,
@@ -358,8 +391,12 @@ class ClanRulesPageState extends State<ClanRulesPage> {
                           ],
                         ],
                       ),
-                    ] else
+                    ] 
+                    // Show view mode only when rules exist AND not editing
+                    else if (_rules != null && !_isEditing)
                       _buildViewMode(isDark),
+
+                      const SizedBox(height: 80),
                   ],
                 ),
               ),
@@ -388,6 +425,9 @@ class ClanRulesPageState extends State<ClanRulesPage> {
   }
   
   Widget _buildPdfSection(bool isDark, {bool isEditing = false}) {
+    // Check if there's a PDF (either uploaded or pending)
+    final hasPdf = _pdfUrl != null || _pendingPdfFile != null;
+    
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -400,7 +440,7 @@ class ClanRulesPageState extends State<ClanRulesPage> {
                 const SizedBox(width: 8),
                 const Text('كتاب القوانين (PDF)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 const Spacer(),
-                if (isEditing && _pdfUrl == null)
+                if (isEditing && !hasPdf)
                   ElevatedButton.icon(
                     onPressed: _pickPdf,
                     icon: const Icon(Icons.upload_file, size: 20),
@@ -413,7 +453,7 @@ class ClanRulesPageState extends State<ClanRulesPage> {
               ],
             ),
             const SizedBox(height: 12),
-            if (_pdfUrl == null)
+            if (!hasPdf)
               Center(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -438,23 +478,37 @@ class ClanRulesPageState extends State<ClanRulesPage> {
               Card(
                 margin: const EdgeInsets.only(top: 8),
                 elevation: 2,
+                color: _pendingPdfFile != null ? Colors.orange.withOpacity(0.1) : null,
                 child: ListTile(
                   leading: const Icon(Icons.picture_as_pdf, color: AppColors.error, size: 32),
-                  title: Text(_getFileName(_pdfUrl!), maxLines: 1, overflow: TextOverflow.ellipsis),
-                  subtitle: const Text('كتاب قوانين العشيرة'),
+                  title: Text(
+                    _pendingPdfFile != null 
+                        ? _pendingPdfFileName ?? 'ملف محدد'
+                        : _getFileName(_pdfUrl!), 
+                    maxLines: 1, 
+                    overflow: TextOverflow.ellipsis
+                  ),
+                  subtitle: Text(
+                    _pendingPdfFile != null 
+                        ? 'سيتم رفع الملف عند الحفظ'
+                        : 'كتاب قوانين العشيرة'
+                  ),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      IconButton(
-                        icon: const Icon(Icons.open_in_new, color: AppColors.primary),
-                        onPressed: () => _openPdf(_pdfUrl!),
-                        tooltip: 'فتح الملف',
-                      ),
+                      // Show open button only for uploaded PDFs
+                      if (_pdfUrl != null)
+                        IconButton(
+                          icon: const Icon(Icons.open_in_new, color: AppColors.primary),
+                          onPressed: () => _openPdf(_pdfUrl!),
+                          tooltip: 'فتح الملف',
+                        ),
+                      // Only show delete button in edit mode
                       if (isEditing)
                         IconButton(
                           icon: const Icon(Icons.delete, color: AppColors.error),
                           onPressed: _deletePdf,
-                          tooltip: 'حذف الملف',
+                          tooltip: _pendingPdfFile != null ? 'إلغاء الاختيار' : 'حذف الملف',
                         ),
                     ],
                   ),

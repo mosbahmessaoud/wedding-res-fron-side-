@@ -85,42 +85,47 @@ Color _getSecondaryTextColor(BuildContext context) {
   return Theme.of(context).textTheme.bodyMedium?.color ?? AppColors.textSecondary;
 }
 
-  Future<void> _loadReservations() async {
-    setState(() => _isLoading = true);
+Future<void> _loadReservations() async {
+  setState(() => _isLoading = true);
+  
+  try {
+    // Load all reservation types
+    final allReservationsRaw = await ApiService.getMyAllReservations();
+    
+    // Filter out cancelled reservations from the "all" list
+    _allReservations = allReservationsRaw
+        .where((reservation) => reservation['status']?.toLowerCase() != 'cancelled')
+        .toList();
+    
+    // Sort by closest date to current time
+    _sortReservationsByDateProximity(_allReservations);
     
     try {
-      // Load all reservation types
-      _allReservations = await ApiService.getMyAllReservations();
-      
-      try {
-        _pendingReservation = await ApiService.getMyPendingReservation();
-      } catch (e) {
-        _pendingReservation = null;
-      }
-      
-      try {
-        _validatedReservation = await ApiService.getMyValidatedReservation();
-      } catch (e) {
-        _validatedReservation = null;
-      }
-      
-      _cancelledReservations = await ApiService.getMyCancelledReservations();
-      
+      _pendingReservation = await ApiService.getMyPendingReservation();
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطأ في تحميل الحجوزات: ${e.toString()}')),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      _pendingReservation = null;
+    }
+    
+    try {
+      _validatedReservation = await ApiService.getMyValidatedReservation();
+    } catch (e) {
+      _validatedReservation = null;
+    }
+    
+    _cancelledReservations = await ApiService.getMyCancelledReservations();
+    
+  } catch (e) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('خطأ في تحميل الحجوزات: ${e.toString()}')),
+      );
+    }
+  } finally {
+    if (mounted) {
+      setState(() => _isLoading = false);
     }
   }
-
-  // Enhanced refresh method with better UX
-
+}
 
 Future<void> _refreshReservations() async {
   if (_isRefreshing) return;
@@ -136,7 +141,15 @@ Future<void> _refreshReservations() async {
     _selectedClan = null;
     
     // Load all reservations first
-    _allReservations = await ApiService.getMyAllReservations();
+    final allReservationsRaw = await ApiService.getMyAllReservations();
+    
+    // Filter out cancelled reservations from the "all" list
+    _allReservations = allReservationsRaw
+        .where((reservation) => reservation['status']?.toLowerCase() != 'cancelled')
+        .toList();
+    
+    // Sort by closest date to current time
+    _sortReservationsByDateProximity(_allReservations);
     
     // Load pending reservation with proper error handling
     try {
@@ -165,10 +178,44 @@ Future<void> _refreshReservations() async {
     }
   }
 }
+void _sortReservationsByDateProximity(List<dynamic> reservations) {
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  
+  reservations.sort((a, b) {
+    DateTime? dateA = _getReservationDate(a);
+    DateTime? dateB = _getReservationDate(b);
+    
+    // If one has no date, put it at the end
+    if (dateA == null && dateB == null) return 0;
+    if (dateA == null) return 1;
+    if (dateB == null) return -1;
+    
+    // Calculate absolute difference from today
+    int diffA = dateA.difference(today).inDays.abs();
+    int diffB = dateB.difference(today).inDays.abs();
+    
+    // Sort by closest to today
+    return diffA.compareTo(diffB);
+  });
+}
 
-
-
-
+DateTime? _getReservationDate(Map<String, dynamic> reservation) {
+  try {
+    final date1 = reservation['date1'];
+    if (date1 == null) return null;
+    
+    // Try to parse the date
+    if (date1 is String) {
+      return DateTime.parse(date1);
+    } else if (date1 is DateTime) {
+      return date1;
+    }
+  } catch (e) {
+    print('Error parsing date for reservation ${reservation['id']}: $e');
+  }
+  return null;
+}
 
 
 // Updated _loadClanSettings method
@@ -833,7 +880,7 @@ Widget _buildReservationCard(Map<String, dynamic> reservation, {bool showStatus 
           const SizedBox(height: 8),
           _buildInfoRow(Icons.family_restroom, 'العشيرة', _getClanName(reservation)),
           const SizedBox(height: 8),
-          _buildInfoRow(Icons.location_city, 'المحافظة', _getCountyName(reservation)),
+          _buildInfoRow(Icons.location_city, 'القصر', _getCountyName(reservation)),
           const SizedBox(height: 8),
           _buildInfoRow(Icons.home, 'القاعة', _getHallName(reservation)),
           const SizedBox(height: 8),
@@ -938,7 +985,7 @@ Widget _buildReservationCard(Map<String, dynamic> reservation, {bool showStatus 
               if (reservation['date2_bool'] == true && reservation['date2'] != null)
                 _buildInfoRow(Icons.event_available, 'التاريخ الثاني', reservation['date2']),
               _buildInfoRow(Icons.family_restroom, 'العشيرة', _getClanName(reservation)),
-              _buildInfoRow(Icons.location_city, 'المحافظة', _getCountyName(reservation)),
+              _buildInfoRow(Icons.location_city, 'القصر', _getCountyName(reservation)),
               _buildInfoRow(Icons.access_time, 'تاريخ الإنشاء', _formatDateTime(reservation['created_at'])),
               if (reservation['expires_at'] != null)
                 _buildInfoRow(Icons.schedule, 'تاريخ الانتهاء', _formatDateTime(reservation['expires_at'])),
@@ -956,7 +1003,7 @@ Widget _buildReservationCard(Map<String, dynamic> reservation, {bool showStatus 
             const SizedBox(height: 16),
             
             // Personal Information
-            _buildDetailSection('المعلومات الشخصية', [
+            _buildDetailSection('المعلومات الشخصية للعريس', [
               _buildInfoRow(Icons.person, 'الاسم الكامل', _getFullName(reservation)),
               _buildInfoRow(Icons.cake, 'تاريخ الميلاد', reservation['birth_date'] ?? 'غير محدد'),
               _buildInfoRow(Icons.location_on, 'مكان الميلاد', reservation['birth_address'] ?? 'غير محدد'),
@@ -968,12 +1015,12 @@ Widget _buildReservationCard(Map<String, dynamic> reservation, {bool showStatus 
             
             // Guardian Information
             if (_hasGuardianInfo(reservation))
-              _buildDetailSection('معلومات ولي الأمر', [
-                _buildInfoRow(Icons.person_outline, 'اسم ولي الأمر', reservation['guardian_name'] ?? 'غير محدد'),
-                _buildInfoRow(Icons.phone_android, 'هاتف ولي الأمر', reservation['guardian_phone'] ?? 'غير محدد'),
-                _buildInfoRow(Icons.home_work, 'عنوان ولي الأمر', reservation['guardian_home_address'] ?? 'غير محدد'),
-                _buildInfoRow(Icons.location_searching, 'مكان ولادة ولي الأمر', reservation['guardian_birth_address'] ?? 'غير محدد'),
-                _buildInfoRow(Icons.calendar_today, 'تاريخ ولادة ولي الأمر', reservation['guardian_birth_date'] ?? 'غير محدد'),
+              _buildDetailSection('المعلومات الشخصية لولي الأمر', [
+                _buildInfoRow(Icons.person_outline, 'الاسم الكامل', reservation['guardian_name'] ?? 'غير محدد'),
+                _buildInfoRow(Icons.phone_android, 'رقم الهاتف', reservation['guardian_phone'] ?? 'غير محدد'),
+                _buildInfoRow(Icons.home_work, 'عنوان السكن', reservation['guardian_home_address'] ?? 'غير محدد'),
+                _buildInfoRow(Icons.location_searching, 'مكان الميلاد', reservation['guardian_birth_address'] ?? 'غير محدد'),
+                _buildInfoRow(Icons.calendar_today, 'تاريخ الميلاد', reservation['guardian_birth_date'] ?? 'غير محدد'),
               ]),
             
             const SizedBox(height: 16),

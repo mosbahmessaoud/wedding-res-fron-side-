@@ -173,41 +173,80 @@ class GroomClanRulesPageState extends State<GroomClanRulesPage> {
       return null;
     }
   }
-
-  Future<void> _openPdf(String pdfUrl) async {
-    try {
-      final uri = Uri.parse(pdfUrl);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        _showSnackBar('لا يمكن فتح الملف', Colors.red);
-      }
-    } catch (e) {
-      _showSnackBar('خطأ في فتح الملف: $e', Colors.red);
+Future<void> _openPdf(String pdfUrl) async {
+  try {
+    _showSnackBar('جاري فتح الملف...', Colors.blue.shade400);
+    
+    // Download and open the PDF
+    final pdfBytes = await ApiService.downloadPdfFromUrl(pdfUrl);
+    
+    if (pdfBytes == null || pdfBytes.isEmpty) {
+      throw Exception('فشل تحميل الملف');
     }
+
+    // Save to temporary directory
+    final tempDir = await getTemporaryDirectory();
+    final fileName = pdfUrl.split('/').last;
+    final tempFile = File('${tempDir.path}/$fileName');
+    
+    await tempFile.writeAsBytes(pdfBytes);
+
+    // Open the file
+    final result = await OpenFile.open(tempFile.path);
+    
+    if (result.type != ResultType.done) {
+      _showSnackBar('لا يوجد تطبيق لفتح ملفات PDF', Colors.orange);
+    }
+  } catch (e) {
+    print('Error opening PDF: $e');
+    _showSnackBar('خطأ في فتح الملف: $e', Colors.red);
   }
-Future<void> _openClanRulesPdf() async {
+}
+
+
+  Future<void> _openClanRulesPdf() async {
   if (_clanRulesPdfUrl == null) {
     _showSnackBar('لا يوجد رابط PDF', Colors.red);
     return;
   }
 
+  setState(() {
+    _isDownloading = true;
+    _downloadProgress = 0.0;
+  });
+
   try {
-    // Open the PDF URL directly in external browser/PDF viewer
-    final uri = Uri.parse(_clanRulesPdfUrl!);
+    // Download the PDF first
+    final pdfBytes = await ApiService.downloadPdfFromUrl(_clanRulesPdfUrl!);
     
-    // Use external application to open the PDF
-    final launched = await launchUrl(
-      uri, 
-      mode: LaunchMode.externalApplication
-    );
+    if (pdfBytes == null || pdfBytes.isEmpty) {
+      throw Exception('فشل تحميل البيانات');
+    }
+
+    // Save to temporary directory
+    final tempDir = await getTemporaryDirectory();
+    final fileName = _generatePdfFileName();
+    final tempFile = File('${tempDir.path}/$fileName');
     
-    if (!launched) {
-      // If external launch fails, try in-app browser
-      await launchUrl(uri, mode: LaunchMode.inAppWebView);
+    await tempFile.writeAsBytes(pdfBytes);
+    
+    setState(() {
+      _isDownloading = false;
+      _downloadProgress = 0.0;
+    });
+
+    // Open the file using the system's default PDF viewer
+    final result = await OpenFile.open(tempFile.path);
+    
+    if (result.type != ResultType.done) {
+      _showSnackBar('لا يوجد تطبيق لفتح ملفات PDF', Colors.orange);
     }
   } catch (e) {
     print('Error opening PDF: $e');
+    setState(() {
+      _isDownloading = false;
+      _downloadProgress = 0.0;
+    });
     _showSnackBar('خطأ في فتح الملف: $e', Colors.red);
   }
 }
@@ -218,25 +257,61 @@ Future<void> _downloadClanRulesPdf() async {
     return;
   }
 
+  // Request storage permission first
+  if (Platform.isAndroid) {
+    var status = await Permission.storage.status;
+    if (!status.isGranted) {
+      status = await Permission.storage.request();
+      if (!status.isGranted) {
+        // Try manage external storage for Android 11+
+        status = await Permission.manageExternalStorage.request();
+        if (!status.isGranted) {
+          _showSnackBar('يجب منح صلاحية الوصول للتخزين', Colors.red);
+          return;
+        }
+      }
+    }
+  }
+
+  setState(() {
+    _isDownloading = true;
+    _downloadProgress = 0.0;
+  });
+
   try {
-    _showSnackBar('جاري فتح رابط التحميل...', Colors.blue.shade400);
+    _showSnackBar('جاري التحميل...', Colors.blue.shade400);
     
-    final uri = Uri.parse(_clanRulesPdfUrl!);
+    // Download the PDF
+    final pdfBytes = await ApiService.downloadPdfFromUrl(_clanRulesPdfUrl!);
     
-    // Open in external browser which will handle the download
-    final launched = await launchUrl(
-      uri,
-      mode: LaunchMode.externalApplication,
-    );
+    if (pdfBytes == null || pdfBytes.isEmpty) {
+      throw Exception('فشل تحميل البيانات');
+    }
+
+    setState(() {
+      _downloadProgress = 0.5;
+    });
+
+    // Save to device storage
+    final savedFile = await _savePdfFile(pdfBytes);
     
-    if (launched) {
-      _showSnackBar('تم فتح رابط التحميل في المتصفح', Colors.green.shade400);
+    setState(() {
+      _isDownloading = false;
+      _downloadProgress = 0.0;
+    });
+
+    if (savedFile != null) {
+      _showPdfActionsDialog(savedFile.path, pdfBytes);
     } else {
-      throw Exception('فشل فتح المتصفح');
+      throw Exception('فشل حفظ الملف');
     }
   } catch (e) {
     print('Download error: $e');
-    _showSnackBar('خطأ في فتح رابط التحميل: $e', Colors.red);
+    setState(() {
+      _isDownloading = false;
+      _downloadProgress = 0.0;
+    });
+    _showSnackBar('خطأ في التحميل: $e', Colors.red);
   }
 }
 
@@ -543,22 +618,22 @@ Future<void> _downloadClanRulesPdf() async {
               else
                 Row(
                   children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: _openClanRulesPdf,
-                        icon: const Icon(Icons.open_in_new, size: 20),
-                        label: const Text('فتح الملف'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: Colors.red[700],
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
+                    // Expanded(
+                    //   child: ElevatedButton.icon(
+                    //     onPressed: _openClanRulesPdf,
+                    //     icon: const Icon(Icons.open_in_new, size: 20),
+                    //     label: const Text('فتح الملف'),
+                    //     style: ElevatedButton.styleFrom(
+                    //       backgroundColor: Colors.white,
+                    //       foregroundColor: Colors.red[700],
+                    //       padding: const EdgeInsets.symmetric(vertical: 12),
+                    //       shape: RoundedRectangleBorder(
+                    //         borderRadius: BorderRadius.circular(8),
+                    //       ),
+                    //     ),
+                    //   ),
+                    // ),
+                    // const SizedBox(width: 12),
                     Expanded(
                       child: ElevatedButton.icon(
                         onPressed: _downloadClanRulesPdf,
@@ -690,6 +765,7 @@ Future<void> _downloadClanRulesPdf() async {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
+
           CircularProgressIndicator(),
           SizedBox(height: 16),
           Text(
@@ -894,11 +970,13 @@ Future<void> _downloadClanRulesPdf() async {
                   ),
                 ),
               ),
-            const SizedBox(height: 55),
+            const SizedBox(height: 150),
           ],
         ),
       ),
+      
     );
+    
   }
 
   String _formatDate(dynamic dateString) {
@@ -909,34 +987,31 @@ Future<void> _downloadClanRulesPdf() async {
       return dateString.toString();
     }
   }
-
-  @override
-  Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('قوانين العشيرة'),
-          centerTitle: true,
-          elevation: 0,
-          actions: [
-            if (!_isLoading && !_hasError)
-              IconButton(
-                icon: const Icon(Icons.refresh),
-                tooltip: 'تحديث',
+@override
+Widget build(BuildContext context) {
+  return Directionality(
+    textDirection: TextDirection.rtl,
+    child: Scaffold(
+      body: _isLoading
+          ? _buildLoadingState()
+          : _hasError
+              ? _buildErrorState()
+              : _buildContent(),
+      floatingActionButton: (!_isLoading && !_hasError)
+          ? Padding(
+              padding: const EdgeInsets.only(bottom: 70),
+              child: FloatingActionButton(
                 onPressed: () async {
                   await _loadClanRules();
                   await _checkForClanRulesPdf();
                 },
+                tooltip: 'تحديث',
+                child: const Icon(Icons.refresh),
               ),
-          ],
-        ),
-        body: _isLoading
-            ? _buildLoadingState()
-            : _hasError
-                ? _buildErrorState()
-                : _buildContent(),
-      ),
-    );
-  }
+            )
+          : null,
+    
+    ),
+  );
+}
 }

@@ -68,7 +68,7 @@ class ApiService {
   }
 
   // Delete User
-  static Future<void> deleteUser(int phoneNumber) async {
+  static Future<void> deleteUser(String phoneNumber) async {
     try {
       final response = await http.delete(
         Uri.parse('$baseUrl/auth/delet_user/$phoneNumber'),
@@ -1856,8 +1856,7 @@ static Future<List<int>> getUniqueVisitorCounts() async {
   static Future<void> deletUserr(String phone) async {
     // Convert string phone to int and call the new method
     try {
-      int phoneNumber = int.parse(phone);
-      await deleteUser(phoneNumber);
+      await deleteUser(phone);
     } catch (e) {
       throw Exception('رقم الهاتف غير صحيح: $e');
     }
@@ -3672,6 +3671,9 @@ static Future<Map<String, dynamic>> debugClanRules(int clanId) async {
 static Future<Map<String, dynamic>> createSpecialReservation({
   required String date,
   required String reservName,
+  String? fullName,
+  String? phoneNumber,
+  String? homeAddress,
   String? reservDescription,
 }) async {
   try {
@@ -3681,6 +3683,9 @@ static Future<Map<String, dynamic>> createSpecialReservation({
       body: json.encode({
         'date': date,
         'reserv_name': reservName,
+        'full_name': fullName,
+        'phone_number': phoneNumber,
+        'home_address': homeAddress,
         'reserv_desctiption': reservDescription, // Note: typo matches backend
       }),
     );
@@ -3833,6 +3838,26 @@ static Future<List<dynamic>> getSpecialReservations() async {
   } catch (e) {
     print('Error fetching special reservations: $e');
     throw Exception('خطأ في تحميل الحجوزات الخاصة: $e');
+  }
+}
+
+// Add this to your ApiService class
+static Future<Uint8List?> downloadPdfFromUrl(String pdfUrl) async {
+  try {
+    final response = await http.get(
+      Uri.parse(pdfUrl),
+      headers: _headers,
+    );
+
+    if (response.statusCode == 200) {
+      return response.bodyBytes;
+    } else {
+      print('Failed to download PDF: ${response.statusCode}');
+      return null;
+    }
+  } catch (e) {
+    print('Error downloading PDF: $e');
+    return null;
   }
 }
 

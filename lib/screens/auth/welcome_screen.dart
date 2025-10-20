@@ -68,7 +68,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                 : Color.fromARGB(121, 228, 255, 242),
               BlendMode.overlay,
             ),
-          ) : null,
+          ) : null,  
         ),
         child: Container(
           decoration: BoxDecoration(
@@ -202,6 +202,8 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                                       height: 1.2,
                                     ),
                                   ),
+                                  const SizedBox(height: 16),
+
                                   Text(
                                     'تطبيق الأعراس',
                                     style: TextStyle(
@@ -216,19 +218,19 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                             ),
                           ),
                           
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 18),
                           
                           // Subtitle
                           Transform.translate(
                             offset: Offset(0, _slideAnimation.value),
                             child: Opacity(
-                              opacity: _fadeAnimation.value * 0.8,
+                              opacity: _fadeAnimation.value * 0.9,
                               child: Text(
-                                'يسرّنا أن نرحب بكم في تطبيق الأعراس،\nونضع بين أيديكم وسيلة ميسرة لتنظيم و حجز العرس الخاص بكم',
+                                'يسرنا أن نرحب بكم في تطبيق الأعراس \nوسيلتكم الميسرة لتنطيم و حجز عرسكم',
                                 style: TextStyle(
-                                  fontSize: 16,
+                                  fontSize: 15,
                                   color: isDark ? const Color.fromARGB(255, 217, 255, 218) : const Color.fromARGB(255, 0, 93, 5),
-                                  height: 1.5,
+                                  height: 1.9,
                                   fontWeight: FontWeight.w400,
                                 ),
                               ),
@@ -349,8 +351,8 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                                 child: Text(
                                   ' برعاية عشيرة آت الشيخ الحاج مسعود © 2025',
                                   style: TextStyle(
-                                    fontSize: 13,
-                                    color: isDark ? Colors.green.shade300 : Colors.green.shade500,
+                                    fontSize: 14,
+                                    color: isDark ? Colors.green.shade300 : Colors.green.shade800,
                                     height: 1.4,
                                   ),
                                   textAlign: TextAlign.center,

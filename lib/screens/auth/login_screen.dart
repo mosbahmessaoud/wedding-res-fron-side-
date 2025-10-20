@@ -97,7 +97,7 @@ class _LoginScreenState extends State<LoginScreen>
       for (var host in hosts) {
         try {
           final result = await InternetAddress.lookup(host)
-              .timeout(const Duration(seconds: 5));
+              .timeout(const Duration(seconds: 3));
           if (result.isNotEmpty && result[0].rawAddress.isNotEmpty) {
             return true;
           }
@@ -110,6 +110,7 @@ class _LoginScreenState extends State<LoginScreen>
       return false;
     }
   }
+  
   // Show no internet dialog
   void _showNoInternetDialog() {
     showDialog(
@@ -210,6 +211,7 @@ Future<void> _login() async {
     return;
   }
 
+  if (!mounted) return; // Check before setState
   setState(() {
     _isLoading = true;
   });
@@ -236,6 +238,9 @@ Future<void> _login() async {
     
     final role = payload['role'];
   
+    // Check mounted before navigation
+    if (!mounted) return;
+    
     // Navigate based on role
     if (role == 'groom') {
       Navigator.pushReplacement(
@@ -394,7 +399,7 @@ Future<void> _login() async {
       },
     );
   } finally {
-    // Check if widget is still mounted before calling setState
+    // CRITICAL: Check if widget is still mounted before calling setState
     if (mounted) {
       setState(() {
         _isLoading = false;
@@ -402,16 +407,25 @@ Future<void> _login() async {
     }
   }
 }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    final isLargeScreen = screenWidth >= 600;
     
     return Scaffold(
       body: SizedBox.expand(
         child: Container(
           decoration: BoxDecoration(
             image: DecorationImage(
-              image: AssetImage('assets/images/IMG_2838.JPG'),
+              image: AssetImage(
+                isLargeScreen 
+                  ? 'assets/images/FB_IMG_1760946209045.jpg'
+                  // ? 'assets/images/FB_IMG_1760946166345.jpg'
+                  : 'assets/images/IMG_2838.JPG'
+              ),
               fit: BoxFit.cover,
               colorFilter: ColorFilter.mode(
                 isDark 
@@ -427,16 +441,28 @@ Future<void> _login() async {
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: isDark
-                  ? [
-                      Colors.black.withOpacity(0.7),
-                      Colors.green.shade900.withOpacity(0.4),
-                      Colors.black.withOpacity(0.8),
-                    ]
-                  : [
-                    Colors.white.withOpacity(0.85),
-                    Colors.white.withOpacity(0.65),
-                    Colors.white,
-                    ],
+                  ? isLargeScreen
+                        ? [
+                            Colors.black.withOpacity(0.7),
+                            Colors.green.shade900.withOpacity(0.1),
+                            Colors.black.withOpacity(0.8),
+                          ] : [
+                            Colors.black.withOpacity(0.7),
+                            Colors.green.shade900.withOpacity(0.4),
+                            Colors.black.withOpacity(0.8),
+                          ]
+                   
+                  :  isLargeScreen 
+                      ? [
+                          Colors.white.withOpacity(0),
+                          Colors.green.shade900.withOpacity(0.2),
+                          Colors.white.withOpacity(0.4),
+                        ]
+                        :[
+                          Colors.white.withOpacity(0.8),
+                          Colors.green.shade900.withOpacity(0.1),
+                          Colors.white,
+                        ],
                 stops: const [0.0, 0.5, 1.0],
               ),
             ),
@@ -446,273 +472,196 @@ Future<void> _login() async {
                   // Scrollable content
                   SingleChildScrollView(
                     padding: const EdgeInsets.symmetric(horizontal: 32.0),
-                    child: AnimatedBuilder(
-                      animation: _animationController,
-                      builder: (context, child) {
-                        return Form(
-                          key: _formKey,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const SizedBox(height: 60),
-                              
-                              // App Icon
-                              Transform.translate(
-                                offset: Offset(0, _slideAnimation.value),
-                                child: Opacity(
-                                  opacity: _fadeAnimation.value,
-                                  child: Container(
-                                    width: 64,
-                                    height: 64,
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                        colors: [
-                                          Colors.green.shade600,
-                                          Colors.green.shade800,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minHeight: screenHeight - MediaQuery.of(context).padding.top - MediaQuery.of(context).padding.bottom,
+                      ),
+                      child: AnimatedBuilder(
+                        animation: _animationController,
+                        builder: (context, child) {
+                          return Form(
+                            key: _formKey,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const SizedBox(height: 60),
+                                
+                                // App Icon
+                                Transform.translate(
+                                  offset: Offset(0, _slideAnimation.value),
+                                  child: Opacity(
+                                    opacity: _fadeAnimation.value,
+                                    child: Container(
+                                      width: 64,
+                                      height: 64,
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                          colors: [
+                                            Colors.green.shade600,
+                                            Colors.green.shade800,
+                                          ],
+                                        ),
+                                        borderRadius: BorderRadius.circular(16),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.green.shade300.withOpacity(0.4),
+                                            blurRadius: 12,
+                                            offset: const Offset(0, 6),
+                                          ),
                                         ],
                                       ),
-                                      borderRadius: BorderRadius.circular(16),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.green.shade300.withOpacity(0.4),
-                                          blurRadius: 12,
-                                          offset: const Offset(0, 6),
-                                        ),
-                                      ],
-                                    ),
-                                    child: const Icon(
-                                      Icons.login,
-                                      color: Colors.white,
-                                      size: 32,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              
-                              const SizedBox(height: 48),
-                              
-                              // Main Heading
-                              Transform.translate(
-                                offset: Offset(0, _slideAnimation.value),
-                                child: Opacity(
-                                  opacity: _fadeAnimation.value,
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'مرحباً',
-                                        style: TextStyle(
-                                          fontSize: 28,
-                                          fontWeight: FontWeight.w300,
-                                          color: isDark ? Colors.white70 : Colors.black87,
-                                          height: 1.2,
-                                        ),
-                                      ),
-                                      Text(
-                                        'بعودتك',
-                                        style: TextStyle(
-                                          fontSize: 34,
-                                          fontWeight: FontWeight.bold,
-                                          color: isDark ? Colors.green.shade300 : Colors.green.shade800,
-                                          height: 1.1,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              
-                              const SizedBox(height: 16),
-                              
-                              // Subtitle
-                              Transform.translate(
-                                offset: Offset(0, _slideAnimation.value),
-                                child: Opacity(
-                                  opacity: _fadeAnimation.value * 0.8,
-                                  child: Text(
-                                    'سجل دخولك للمتابعة',
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      color: isDark ? const Color.fromARGB(255, 217, 255, 218) : const Color.fromARGB(255, 0, 122, 6),
-                                      height: 1.5,
-                                      fontWeight: FontWeight.w400,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              
-                              const SizedBox(height: 40),
-
-                              // Phone Number
-                              Transform.translate(
-                                offset: Offset(0, _slideAnimation.value * 0.5),
-                                child: Opacity(
-                                  opacity: _fadeAnimation.value,
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.green.shade300.withOpacity(0.2),
-                                          blurRadius: 25,
-                                          offset: const Offset(0, 14),
-                                        ),
-                                      ],
-                                    ),
-                                    child: CustomTextField(
-                                      controller: _phoneController,
-                                      label: 'رقم هاتف العريس',
-                                      labelColor: isDark ? Colors.white : Colors.black,
-                                      boxcolor: isDark ? const Color.fromARGB(255, 157, 42, 42) : Colors.black,
-                                      keyboardType: TextInputType.phone,
-                                      validator: _validatePhone,
-                                      prefixIcon: Icons.phone,
-                                      hint: '0xxxxxxxx',
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              
-                              const SizedBox(height: 20),
-
-                              // Password
-                              Transform.translate(
-                                offset: Offset(0, _slideAnimation.value * 0.5),
-                                child: Opacity(
-                                  opacity: _fadeAnimation.value,
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.green.shade300.withOpacity(0.2),
-                                          blurRadius: 25,
-                                          offset: const Offset(0, 14),
-                                        ),
-                                      ],
-                                    ),
-                                    child: CustomTextField(
-                                      controller: _passwordController,
-                                      label: 'كلمة المرور',
-                                      labelColor: isDark ? Colors.white : Colors.black,
-                                      obscureText: _obscurePassword,
-                                      validator: _validatePassword,
-                                      prefixIcon: Icons.lock,
-                                      suffixIcon: IconButton(
-                                        icon: Icon(
-                                          _obscurePassword ? Icons.visibility : Icons.visibility_off,
-                                        ),
-                                        onPressed: () {
-                                          setState(() {
-                                            _obscurePassword = !_obscurePassword;
-                                          });
-                                        },
+                                      child: const Icon(
+                                        Icons.login,
+                                        color: Colors.white,
+                                        size: 32,
                                       ),
                                     ),
                                   ),
                                 ),
-                              ),
-                              
-                              const SizedBox(height: 16),
-
-                              // Forgot Password Link
-                              Transform.translate(
-                                offset: Offset(0, _slideAnimation.value * 0.3),
-                                child: Opacity(
-                                  opacity: _fadeAnimation.value,
-                                  child: Align(
-                                    alignment: Alignment.centerRight,
-                                    child: GestureDetector(
-                                      onTap: () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(builder: (context) => ForgotPasswordScreen()),
-                                        );
-                                      },
-                                      child: Text(
-                                        'نسيت كلمة المرور؟',
-                                        style: TextStyle(
-                                          color: isDark ? Colors.green.shade300 : Colors.green.shade700,
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 14,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-
-                              const SizedBox(height: 40),
-
-                              // Login Button
-                              Transform.translate(
-                                offset: Offset(0, _slideAnimation.value * 0.5),
-                                child: Opacity(
-                                  opacity: _fadeAnimation.value,
-                                  child: SizedBox(
-                                    height: 48,
-                                    width: double.infinity,
-                                    child: ElevatedButton(
-                                      onPressed: _isLoading ? null : _login,
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.green.shade700,
-                                        foregroundColor: Colors.white,
-                                        elevation: 4,
-                                        shadowColor: Colors.green.shade300,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(24),
-                                        ),
-                                        disabledBackgroundColor: Colors.green.shade700.withOpacity(0.6),
-                                        padding: EdgeInsets.symmetric(vertical: 2)
-                                      ),
-                                      child: _isLoading
-                                        ? SizedBox(
-                                            height: 20,
-                                            width: 20,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                            ),
-                                          )
-                                        : const Text(
-                                            'تسجيل الدخول',
-                                            style: TextStyle(
-                                              fontSize: 16,  
-                                              fontWeight: FontWeight.w600,
-                                              letterSpacing: 0.5,
-                                            ),
+                                
+                                const SizedBox(height: 48),
+                                
+                                // Main Heading
+                                Transform.translate(
+                                  offset: Offset(0, _slideAnimation.value),
+                                  child: Opacity(
+                                    opacity: _fadeAnimation.value,
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'مرحباً',
+                                          style: TextStyle(
+                                            fontSize: 28,
+                                            fontWeight: FontWeight.w300,
+                                            color: isDark ? Colors.white70 : Colors.black87,
+                                            height: 1.2,
                                           ),
+                                        ),
+                                        Text(
+                                          'بعودتك',
+                                          style: TextStyle(
+                                            fontSize: 34,
+                                            fontWeight: FontWeight.bold,
+                                            color: isDark ? Colors.green.shade300 : Colors.green.shade800,
+                                            height: 1.1,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ),
-                              ),
-                              
-                              const SizedBox(height: 24),
+                                
+                                const SizedBox(height: 16),
+                                
+                                // Subtitle
+                                Transform.translate(
+                                  offset: Offset(0, _slideAnimation.value),
+                                  child: Opacity(
+                                    opacity: _fadeAnimation.value * 0.8,
+                                    child: Text(
+                                      'سجل دخولك للمتابعة',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        color: isDark ? const Color.fromARGB(255, 217, 255, 218) : const Color.fromARGB(255, 0, 93, 5),
+                                        height: 1.5,
+                                        fontWeight: FontWeight.w400,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                
+                                // This spacer pushes everything below to the bottom
+                                if (isLargeScreen) SizedBox(height: screenHeight * 0.15) else SizedBox(height: screenHeight * 0.05),                                
 
-                              // Signup Link
-                              Transform.translate(
-                                offset: Offset(0, _slideAnimation.value * 0.3),
-                                child: Opacity(
-                                  opacity: _fadeAnimation.value * 0.8,
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        'ليس لديك حساب؟ ',
-                                        style: TextStyle(
-                                          color: isDark ? Colors.white70 : Colors.black87,
-                                          fontSize: 14,
+                                // Phone Number
+                                Transform.translate(
+                                  offset: Offset(0, _slideAnimation.value * 0.5),
+                                  child: Opacity(
+                                    opacity: _fadeAnimation.value,
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.green.shade300.withOpacity(0.2),
+                                            blurRadius: 25,
+                                            offset: const Offset(0, 14),
+                                          ),
+                                        ],
+                                      ),
+                                      child: CustomTextField(
+                                        controller: _phoneController,
+                                        label: 'رقم هاتف العريس',
+                                        labelColor: isDark ? Colors.white : Colors.black,
+                                        boxcolor: isDark ? const Color.fromARGB(255, 157, 42, 42) : Colors.black,
+                                        keyboardType: TextInputType.phone,
+                                        validator: _validatePhone,
+                                        prefixIcon: Icons.phone,
+                                        hint: '0xxxxxxxx',
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                
+                                const SizedBox(height: 20),
+
+                                // Password
+                                Transform.translate(
+                                  offset: Offset(0, _slideAnimation.value * 0.5),
+                                  child: Opacity(
+                                    opacity: _fadeAnimation.value,
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.green.shade300.withOpacity(0.2),
+                                            blurRadius: 25,
+                                            offset: const Offset(0, 14),
+                                          ),
+                                        ],
+                                      ),
+                                      child: CustomTextField(
+                                        controller: _passwordController,
+                                        label: 'كلمة المرور',
+                                        labelColor: isDark ? Colors.white : Colors.black,
+                                        obscureText: _obscurePassword,
+                                        validator: _validatePassword,
+                                        prefixIcon: Icons.lock,
+                                        suffixIcon: IconButton(
+                                          icon: Icon(
+                                            _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                                          ),
+                                          onPressed: () {
+                                            setState(() {
+                                              _obscurePassword = !_obscurePassword;
+                                            });
+                                          },
                                         ),
                                       ),
-                                      GestureDetector(
+                                    ),
+                                  ),
+                                ),
+                                
+                                const SizedBox(height: 16),
+
+                                // Forgot Password Link
+                                Transform.translate(
+                                  offset: Offset(0, _slideAnimation.value * 0.3),
+                                  child: Opacity(
+                                    opacity: _fadeAnimation.value,
+                                    child: Align(
+                                      alignment: Alignment.centerRight,
+                                      child: GestureDetector(
                                         onTap: () {
                                           Navigator.push(
                                             context,
-                                            MaterialPageRoute(builder: (context) => MultiStepSignupScreen()),
+                                            MaterialPageRoute(builder: (context) => ForgotPasswordScreen()),
                                           );
                                         },
                                         child: Text(
-                                          'إنشاء حساب جديد',
+                                          'نسيت كلمة المرور؟',
                                           style: TextStyle(
                                             color: isDark ? Colors.green.shade300 : Colors.green.shade700,
                                             fontWeight: FontWeight.w600,
@@ -720,16 +669,106 @@ Future<void> _login() async {
                                           ),
                                         ),
                                       ),
-                                    ],
+                                    ),
                                   ),
                                 ),
-                              ),
-                              
-                              const SizedBox(height: 40),
-                            ],
-                          ),
-                        );
-                      },
+
+                                const SizedBox(height: 40),
+
+                                // Login Button
+                                Transform.translate(
+                                  offset: Offset(0, _slideAnimation.value * 0.5),
+                                  child: Opacity(
+                                    opacity: _fadeAnimation.value,
+                                    child: SizedBox(
+                                      height: 48,
+                                      width: double.infinity,
+                                      child: ElevatedButton(
+                                        onPressed: _isLoading ? null : _login,
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.green.shade700,
+                                          foregroundColor: Colors.white,
+                                          elevation: 4,
+                                          shadowColor: Colors.green.shade300,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(24),
+                                          ),
+                                          disabledBackgroundColor: Colors.green.shade700.withOpacity(0.6),
+                                          padding: EdgeInsets.symmetric(vertical: 2)
+                                        ),
+                                        child: _isLoading
+                                          ? SizedBox(
+                                              height: 20,
+                                              width: 20,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                              ),
+                                            )
+                                          : const Text(
+                                              'تسجيل الدخول',
+                                              style: TextStyle(
+                                                fontSize: 16,  
+                                                fontWeight: FontWeight.w600,
+                                                letterSpacing: 0.5,
+                                              ),
+                                            ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                
+                                const SizedBox(height: 24),
+
+                                // Signup Link
+                                Transform.translate(
+                                  offset: Offset(0, _slideAnimation.value * 0.3),
+                                  child: Opacity(
+                                    opacity: _fadeAnimation.value * 0.8,
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          'ليس لديك حساب؟ ',
+                                          style: TextStyle(
+                                            color: isDark 
+                                            ? isLargeScreen 
+                                              ? Colors.white70  
+                                              : Colors.white70 
+                                            : isLargeScreen 
+                                              ? Colors.green.shade900
+                                              : Colors.black87,
+                                            fontWeight: isLargeScreen ?FontWeight.w800 : FontWeight.w600,
+                                            fontSize: isLargeScreen ? 18 : 14,
+                                          ),
+                                        ),
+                                        GestureDetector(
+                                          onTap: () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(builder: (context) => MultiStepSignupScreen()),
+                                            );
+                                          },
+                                          child: Text(
+                                            'إنشاء حساب جديد',
+                                            style: TextStyle(
+                                              color: isDark ? Colors.green.shade300 : Colors.green.shade700,
+                                              fontWeight: FontWeight.w800,
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                
+                                const SizedBox(height: 40),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
                     ),
                   ),
                   

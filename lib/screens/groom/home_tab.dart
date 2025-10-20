@@ -555,7 +555,7 @@ class HomeTabState extends State<HomeTab> with TickerProviderStateMixin {
                     ),
                   ),
                   Text(
-                    'احجز موعد العرس الآن',
+                    'احجز تاريخ العرس الآن',
                     style: TextStyle(
                       fontSize: 13,
                       color: Colors.white,

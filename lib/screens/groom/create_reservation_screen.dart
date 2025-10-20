@@ -1176,96 +1176,105 @@ Widget _buildClanAndHallSelectionStep() {
         // (Keep all existing content in this method)
         
         // Clan Selection
-        DropdownButtonFormField<Map<String, dynamic>>(
-          value: _selectedClan,
-          decoration: InputDecoration(
-            labelText: 'العشيرة *',
-            prefixIcon: const Icon(Icons.group),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-            helperText: 'العشائر المتاحة في قصرك',
-          ),
-          items: _clans.map((clan) {
-            return DropdownMenuItem<Map<String, dynamic>>(
-              value: clan,
+DropdownButtonFormField<Map<String, dynamic>>(
+  value: _selectedClan,
+  isExpanded: true, // Added to prevent overflow
+  decoration: InputDecoration(
+    labelText: 'العشيرة *',
+    prefixIcon: const Icon(Icons.group),
+    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+    helperText: 'العشائر المتاحة في قصرك',
+  ),
+  items: _clans.map((clan) {
+    return DropdownMenuItem<Map<String, dynamic>>(
+      value: clan,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return SizedBox(
+            width: constraints.maxWidth,
+            child: Text(
+              clan['name']?.toString() ?? 'عشيرة غير مسماة',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+            ),
+          );
+        },
+      ),
+    );
+  }).toList(),
+  onChanged: _onClanSelected,
+  validator: (value) => value == null ? 'العشيرة مطلوبة' : null,
+),
+
+const SizedBox(height: 24),
+// Hall Selection
+if (_selectedClan != null) ...[
+  DropdownButtonFormField<Map<String, dynamic>>(
+    value: _selectedHall,
+    isExpanded: true,
+    decoration: InputDecoration(
+      labelText: 'القاعة *',
+      prefixIcon: const Icon(Icons.business),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+      helperText: _halls.isEmpty ? 'لا توجد قاعات متاحة لهذه العشيرة' : 'القاعات المتاحة للعشيرة المختارة',
+    ),
+    // This shows when dropdown is closed (selected value)
+    selectedItemBuilder: (BuildContext context) {
+      return _halls.map<Widget>((hall) {
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            return SizedBox(
+              width: constraints.maxWidth,
+              child: Text(
+                hall['name']?.toString() ?? 'قاعة غير مسماة',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+              ),
+            );
+          },
+        );
+      }).toList();
+    },
+    // This shows when dropdown is open (menu items)
+    items: _halls.map((hall) {
+      return DropdownMenuItem<Map<String, dynamic>>(
+        value: hall,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SizedBox(
+              width: constraints.maxWidth,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    clan['name']?.toString() ?? 'عشيرة غير مسماة',
+                    hall['name']?.toString() ?? 'قاعة غير مسماة',
                     style: const TextStyle(fontWeight: FontWeight.bold),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                  Text(
+                    'السعة: ${hall['capacity']} شخص',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
                   ),
                 ],
               ),
             );
-          }).toList(),
-          onChanged: _onClanSelected,
-          validator: (value) => value == null ? 'العشيرة مطلوبة' : null,
+          },
         ),
-        
-        const SizedBox(height: 24),
-        
-        // Hall Selection
-        if (_selectedClan != null) ...[
-          DropdownButtonFormField<Map<String, dynamic>>(
-            value: _selectedHall,
-            decoration: InputDecoration(
-              labelText: 'القاعة *',
-              prefixIcon: const Icon(Icons.business),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-              helperText: _halls.isEmpty ? 'لا توجد قاعات متاحة لهذه العشيرة' : 'القاعات المتاحة للعشيرة المختارة',
-            ),
-            items: _halls.map((hall) {
-              return DropdownMenuItem<Map<String, dynamic>>(
-                value: hall,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      hall['name']?.toString() ?? 'قاعة غير مسماة',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    Text(
-                      'السعة: ${hall['capacity']} شخص',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }).toList(),
-            onChanged: (value) => setState(() => _selectedHall = value),
-            validator: (value) => value == null ? 'القاعة مطلوبة' : null,
-          ),
-        ] else ...[
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: isDark ? AppColors.darkCard.withOpacity(0.5) : Colors.grey[100],
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: isDark ? AppColors.darkBorder : Colors.grey[300]!,
-            ),
-          ),
-          child: Row(
-            children: [
-              Icon(Icons.info, color: isDark ? AppColors.darkTextSecondary : Colors.grey[600]),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'اختر العشيرة أولاً لعرض القاعات المتاحة',
-                  style: TextStyle(
-                    color: isDark ? AppColors.darkTextSecondary : Colors.grey[600],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        ],
+      );
+    }).toList(),
+    onChanged: (value) => setState(() => _selectedHall = value),
+    validator: (value) => value == null ? 'القاعة مطلوبة' : null,
+  ),
+],
         
         const SizedBox(height: 24),
         
@@ -1355,7 +1364,7 @@ Widget _buildReservationDetailsStep() {
             prefixIcon: const Icon(Icons.calendar_today),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
             suffixIcon: const Icon(Icons.arrow_drop_down),
-            helperText: 'اختر تاريخ الحفل',
+            helperText: 'اختر تاريخ حفل التتويج',
           ),
           validator: (value) => value?.isEmpty == true ? 'التاريخ مطلوب' : null,
         ),
@@ -1481,7 +1490,7 @@ Widget _buildReservationDetailsStep() {
             labelText: ' الهيئة *',
             prefixIcon: const Icon(Icons.group),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-            helperText: 'اختر  الهيئة المناسبة',
+            helperText: 'اختر الهيئة الدينية',
           ),
           items: _haiaCommittees.map((committee) {
             return DropdownMenuItem<Map<String, dynamic>>(
@@ -1517,10 +1526,10 @@ Widget _buildReservationDetailsStep() {
         DropdownButtonFormField<Map<String, dynamic>>(
           value: _selectedMadaehCommittee,
           decoration: InputDecoration(
-            labelText: 'لجنة المدائح *',
-            prefixIcon: const Icon(Icons.music_note),
+            labelText: ' اللجنة *',
+            prefixIcon: const Icon(Icons.group_outlined),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-            helperText: 'اختر لجنة المدائح المناسبة',
+            helperText: 'اختر لجنة المدائح و الانشاد و الانشاد',
           ),
           items: _madaehCommittees.map((committee) {
             return DropdownMenuItem<Map<String, dynamic>>(
@@ -1548,7 +1557,7 @@ Widget _buildReservationDetailsStep() {
             );
           }).toList(),
           onChanged: (value) => setState(() => _selectedMadaehCommittee = value),
-          validator: (value) => value == null ? 'لجنة المدائح مطلوبة' : null,
+          validator: (value) => value == null ? 'لجنة المدائح و الانشاد مطلوبة' : null,
         ),
         
         const SizedBox(height: 24),
@@ -1571,16 +1580,18 @@ Widget _buildReservationDetailsStep() {
                 const SizedBox(height: 12),
                 
                 SwitchListTile(
-                  title: const Text('السماح للآخرين بالانضمام'),
-                  subtitle: const Text('هل تسمح لآخرين بالانضمام لعرسك؟'),
+                  // title: const Text('السماح للآخرين بالانضمام'),
+                  title: const Text('هل تسمح للآخرين بالانضمام الى الغرس؟'),
+                  // subtitle: const Text('هل تسمح للآخرين بالانضمام الى الغرس ؟'),
                   value: _allowOthers,
                   onChanged: (value) => setState(() => _allowOthers = value),
                   contentPadding: EdgeInsets.zero,
                 ),
                 
                 SwitchListTile(
-                  title: const Text('الانضمام لعرس جماعي'),
-                  subtitle: const Text('هل تريد الانضمام لعرس جماعي؟'),
+                  // title: const Text('الانضمام لعرس جماعي'),
+                  title: const Text('هل تريد الانضمام الى العرس الجماعي؟'),
+                  // subtitle: const Text('هل تريد الانضمام الى العرس الجماعي ؟'),
                   value: _joinToMassWedding,
                   onChanged: (value) => setState(() => _joinToMassWedding = value),
                   contentPadding: EdgeInsets.zero,
@@ -1666,9 +1677,9 @@ Widget _buildConfirmationStep() {
           if (_selectedHall != null)
             _buildSummaryItem('القاعة', _selectedHall!['name']?.toString() ?? ''),
           if (_selectedHaiaCommittee != null)
-            _buildSummaryItem('لجنة الهيئة', _selectedHaiaCommittee!['name']?.toString() ?? ''),
+            _buildSummaryItem('الهيئة الدينية', _selectedHaiaCommittee!['name']?.toString() ?? ''),
           if (_selectedMadaehCommittee != null)
-            _buildSummaryItem('لجنة المدائح', _selectedMadaehCommittee!['name']?.toString() ?? ''),
+            _buildSummaryItem('لجنة المدائح و الانشاد', _selectedMadaehCommittee!['name']?.toString() ?? ''),
         ]),
 
         const SizedBox(height: 16),
@@ -2104,8 +2115,8 @@ bool _validateCurrentStep() {
       }
       if (_selectedHaiaCommittee == null) {
         _showMessageDialog(
-          title: 'لجنة الهيئة مطلوبة',
-          message: 'يرجى اختيار لجنة الهيئة قبل المتابعة.',
+          title: 'الهيئة الدينية مطلوبة',
+          message: 'يرجى اختيار الهيئة الدينية قبل المتابعة.',
           icon: Icons.group,
           titleColor: Colors.orange,
         );
@@ -2113,8 +2124,8 @@ bool _validateCurrentStep() {
       }
       if (_selectedMadaehCommittee == null) {
         _showMessageDialog(
-          title: 'لجنة المدائح مطلوبة',
-          message: 'يرجى اختيار لجنة المدائح قبل المتابعة.',
+          title: 'لجنة المدائح و الانشاد مطلوبة',
+          message: 'يرجى اختيار لجنة المدائح و الانشاد قبل المتابعة.',
           icon: Icons.music_note,
           titleColor: Colors.orange,
         );

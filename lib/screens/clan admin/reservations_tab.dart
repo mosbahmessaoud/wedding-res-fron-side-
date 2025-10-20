@@ -32,13 +32,14 @@ class ReservationsTabState extends State<ReservationsTab> with SingleTickerProvi
   List<dynamic> _pendingReservations = [];
   List<dynamic> _validatedReservations = [];
   List<dynamic> _cancelledReservations = [];
+  List<dynamic> _archivedReservations = [];
   bool _isLoading = false;
   String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
     _loadAllReservations();
   }
   
@@ -63,6 +64,33 @@ class ReservationsTabState extends State<ReservationsTab> with SingleTickerProvi
     super.dispose();
   }
 
+  bool _isReservationArchived(Map<String, dynamic> reservation) {
+    final date2 = reservation['date2'];
+    final date2Bool = reservation['date2_bool'] ?? false;
+    final date1 = reservation['date1'];
+    
+    try {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      
+      // Use date2 if it exists and date2_bool is true, otherwise use date1
+      final relevantDateStr = (date2Bool && date2 != null) ? date2 : date1;
+      
+      if (relevantDateStr == null || relevantDateStr.isEmpty) {
+        return false;
+      }
+      
+      final reservationDate = DateTime.parse(relevantDateStr);
+      final reservationDateOnly = DateTime(reservationDate.year, reservationDate.month, reservationDate.day);
+      
+      // Archived if reservation date is before today
+      return reservationDateOnly.isBefore(today);
+    } catch (e) {
+      print('Error checking if reservation is archived: $e');
+      return false;
+    }
+  }
+
   Future<void> _loadAllReservations() async {
     setState(() => _isLoading = true);
     
@@ -71,6 +99,7 @@ class ReservationsTabState extends State<ReservationsTab> with SingleTickerProvi
       List<dynamic> cancelledRes = [];
       List<dynamic> pendingRes = [];
       List<dynamic> allRes = [];
+      List<dynamic> archivedRes = [];
       
       try {
         validatedRes = await ApiService.getValidatedReservations();
@@ -94,14 +123,57 @@ class ReservationsTabState extends State<ReservationsTab> with SingleTickerProvi
         pendingRes = [];
       }
       
-      allRes = [...validatedRes, ...cancelledRes, ...pendingRes];
+      // Filter archived reservations from all categories
+      List<dynamic> validatedActive = [];
+      List<dynamic> validatedArchived = [];
+      
+      for (var res in validatedRes) {
+        if (_isReservationArchived(res)) {
+          validatedArchived.add(res);
+        } else {
+          validatedActive.add(res);
+        }
+      }
+      
+      List<dynamic> pendingActive = [];
+      List<dynamic> pendingArchived = [];
+      
+      for (var res in pendingRes) {
+        if (_isReservationArchived(res)) {
+          pendingArchived.add(res);
+        } else {
+          pendingActive.add(res);
+        }
+      }
+      
+      List<dynamic> cancelledArchived = [];
+      
+      for (var res in cancelledRes) {
+        if (_isReservationArchived(res)) {
+          cancelledArchived.add(res);
+        }
+      }
+      
+      // Combine all archived reservations
+      archivedRes = [...validatedArchived, ...pendingArchived, ...cancelledArchived];
+      
+      // "All" tab excludes cancelled reservations and shows only active (non-archived) reservations
+      allRes = [...validatedActive, ...pendingActive];
       
       setState(() {
-        _validatedReservations = validatedRes;
-        _cancelledReservations = cancelledRes;
-        _pendingReservations = pendingRes;
+        _validatedReservations = validatedActive;
+        _cancelledReservations = cancelledRes; // Keep all cancelled for cancelled tab
+        _pendingReservations = pendingActive;
         _allReservations = allRes;
+        _archivedReservations = archivedRes;
       });
+      
+      print('📊 إحصائيات الحجوزات:');
+      print('  - الكل (نشط): ${allRes.length}');
+      print('  - معلقة (نشطة): ${pendingActive.length}');
+      print('  - مؤكدة (نشطة): ${validatedActive.length}');
+      print('  - ملغاة: ${cancelledRes.length}');
+      print('  - أرشيف: ${archivedRes.length}');
       
     } catch (e) {
       print('خطأ عام في تحميل الحجوزات: $e');
@@ -111,6 +183,7 @@ class ReservationsTabState extends State<ReservationsTab> with SingleTickerProvi
         _pendingReservations = [];
         _validatedReservations = [];
         _cancelledReservations = [];
+        _archivedReservations = [];
       });
       
       _showSnackBar('فشل في تحميل الحجوزات', Colors.red.shade400);
@@ -118,91 +191,89 @@ class ReservationsTabState extends State<ReservationsTab> with SingleTickerProvi
       setState(() => _isLoading = false);
     }
   }
-Future<void> _togglePaymentStatus(int reservationId, String groomName, bool currentPaymentStatus) async {
-  final action = currentPaymentStatus ? 'إلغاء تأكيد' : 'تأكيد';
-  final confirmed = await _showConfirmationDialog(
-    '$action الدفع',
-    'هل أنت متأكد من $action دفع $groomName؟',
-    currentPaymentStatus ? Colors.orange : Colors.blue,
-    currentPaymentStatus ? Icons.money_off_rounded : Icons.payment_rounded,
-  );
 
-  if (!confirmed) return;
-
-  try {
-    setState(() => _isLoading = true);
-    await ApiService.changePaymentStatus(reservationId);
-    await _loadAllReservations();
-    _showSnackBar(
-      currentPaymentStatus ? 'تم إلغاء تأكيد الدفع' : 'تم تأكيد الدفع بنجاح', 
-      currentPaymentStatus ? Colors.orange.shade400 : Colors.blue.shade400
+  Future<void> _togglePaymentStatus(int reservationId, String groomName, bool currentPaymentStatus) async {
+    final action = currentPaymentStatus ? 'إلغاء تأكيد' : 'تأكيد';
+    final confirmed = await _showConfirmationDialog(
+      '$action الدفع',
+      'هل أنت متأكد من $action دفع $groomName؟',
+      currentPaymentStatus ? Colors.orange : Colors.blue,
+      currentPaymentStatus ? Icons.money_off_rounded : Icons.payment_rounded,
     );
-  } catch (e) {
-    _showSnackBar('خطأ في تغيير حالة الدفع: $e', Colors.red.shade400);
-  } finally {
-    setState(() => _isLoading = false);
+
+    if (!confirmed) return;
+
+    try {
+      setState(() => _isLoading = true);
+      await ApiService.changePaymentStatus(reservationId);
+      await _loadAllReservations();
+      _showSnackBar(
+        currentPaymentStatus ? 'تم إلغاء تأكيد الدفع' : 'تم تأكيد الدفع بنجاح', 
+        currentPaymentStatus ? Colors.orange.shade400 : Colors.blue.shade400
+      );
+    } catch (e) {
+      _showSnackBar('خطأ في تغيير حالة الدفع: $e', Colors.red.shade400);
+    } finally {
+      setState(() => _isLoading = false);
+    }
   }
-}
 
-// Update _validateReservation to check payment first
-Future<void> _validateReservation(int groomId, String groomName, bool paymentValid) async {
-  // Check if payment is completed first
-  if (!paymentValid) {
-    await _showPaymentRequiredDialog();
-    return;
+  Future<void> _validateReservation(int groomId, String groomName, bool paymentValid) async {
+    if (!paymentValid) {
+      await _showPaymentRequiredDialog();
+      return;
+    }
+
+    final confirmed = await _showConfirmationDialog(
+      'تأكيد الحجز',
+      'هل أنت متأكد من تأكيد حجز $groomName؟',
+      Colors.green,
+      Icons.check_circle,
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setState(() => _isLoading = true);
+      await ApiService.validateReservation(groomId);
+      await _loadAllReservations();
+      _showSnackBar('تم تأكيد الحجز بنجاح', Colors.green.shade400);
+    } catch (e) {
+      _showSnackBar('خطأ في تأكيد الحجز: $e', Colors.red.shade400);
+    } finally {
+      setState(() => _isLoading = false);
+    }
   }
 
-  final confirmed = await _showConfirmationDialog(
-    'تأكيد الحجز',
-    'هل أنت متأكد من تأكيد حجز $groomName؟',
-    Colors.green,
-    Icons.check_circle,
-  );
-
-  if (!confirmed) return;
-
-  try {
-    setState(() => _isLoading = true);
-    await ApiService.validateReservation(groomId);
-    await _loadAllReservations();
-    _showSnackBar('تم تأكيد الحجز بنجاح', Colors.green.shade400);
-  } catch (e) {
-    _showSnackBar('خطأ في تأكيد الحجز: $e', Colors.red.shade400);
-  } finally {
-    setState(() => _isLoading = false);
-  }
-}
-
-
-// Add payment required dialog
-Future<void> _showPaymentRequiredDialog() async {
-  final isDark = Theme.of(context).brightness == Brightness.dark;
-  
-  await showDialog(
-    context: context,
-    builder: (context) => AlertDialog(
-      backgroundColor: isDark ? AppColors.darkCard : Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: Row(
-        children: [
-          Icon(Icons.warning_rounded, color: Colors.orange.shade400, size: 28),
-          const SizedBox(width: 12),
-          Text('تنبيه', style: TextStyle(color: Colors.orange.shade400, fontWeight: FontWeight.w600)),
+  Future<void> _showPaymentRequiredDialog() async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: isDark ? AppColors.darkCard : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Icon(Icons.warning_rounded, color: Colors.orange.shade400, size: 28),
+            const SizedBox(width: 12),
+            Text('تنبيه', style: TextStyle(color: Colors.orange.shade400, fontWeight: FontWeight.w600)),
+          ],
+        ),
+        content: Text(
+          'يجب على العريس دفع المبلغ المطلوب أولاً قبل تأكيد الحجز.\n\nالرجاء الضغط على زر "تأكيد الدفع" بعد استلام الدفع.',
+          style: TextStyle(color: isDark ? Colors.white70 : Colors.grey.shade700),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text('حسناً', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600)),
+          ),
         ],
       ),
-      content: Text(
-        'يجب على العريس دفع المبلغ المطلوب أولاً قبل تأكيد الحجز.\n\nالرجاء الضغط على زر "تأكيد الدفع" بعد استلام الدفع.',
-        style: TextStyle(color: isDark ? Colors.white70 : Colors.grey.shade700),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text('حسناً', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600)),
-        ),
-      ],
-    ),
-  );
-}
+    );
+  }
+
   Future<void> _cancelReservation(int groomId, String groomName) async {
     final confirmed = await _showConfirmationDialog(
       'إلغاء الحجز',
@@ -463,7 +534,12 @@ Future<void> _showPaymentRequiredDialog() async {
         children: [
           // Modern Header with Search
           Container(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+            padding: EdgeInsets.fromLTRB(
+              MediaQuery.of(context).size.width < 600 ? 16 : 20,
+              MediaQuery.of(context).size.width < 600 ? 16 : 20,
+              MediaQuery.of(context).size.width < 600 ? 16 : 20,
+              MediaQuery.of(context).size.width < 600 ? 12 : 16,
+            ),
             decoration: BoxDecoration(
               color: isDark ? AppColors.darkCard : Colors.white,
               borderRadius: const BorderRadius.vertical(bottom: Radius.circular(24)),
@@ -512,26 +588,39 @@ Future<void> _showPaymentRequiredDialog() async {
             ),
           ),
           
-          // Tab Bar
-          Container(
-            color: isDark ? AppColors.darkCard : Colors.white,
-            child: TabBar(
-              controller: _tabController,
-              isScrollable: true,
-              indicatorColor: AppColors.primary,
-              indicatorWeight: 3,
-              labelColor: AppColors.primary,
-              unselectedLabelColor: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
-              labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-              tabs: [
-                Tab(text: 'الكل (${_allReservations.length})'),
-                Tab(text: 'معلقة (${_pendingReservations.length})'),
-                Tab(text: 'مؤكدة (${_validatedReservations.length})'),
-                Tab(text: 'ملغاة (${_cancelledReservations.length})'),
-              ],
-            ),
-          ),
-          
+Container(
+  color: isDark ? AppColors.darkCard : Colors.white,
+  child: TabBar(
+    controller: _tabController,
+    isScrollable: true,
+    tabAlignment: TabAlignment.start, // Ensures tabs start from the right (RTL)
+    indicatorColor: AppColors.primary,
+    indicatorWeight: 3,
+    labelColor: AppColors.primary,
+    unselectedLabelColor: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+    labelStyle: TextStyle(
+      fontWeight: FontWeight.w600, 
+      fontSize: MediaQuery.of(context).size.width < 600 ? 12 : 14
+    ),
+    unselectedLabelStyle: TextStyle(
+      fontWeight: FontWeight.w500,
+      fontSize: MediaQuery.of(context).size.width < 600 ? 12 : 14
+    ),
+    labelPadding: EdgeInsets.symmetric(
+      horizontal: MediaQuery.of(context).size.width < 600 ? 12 : 16
+    ),
+    padding: EdgeInsets.symmetric(
+      horizontal: MediaQuery.of(context).size.width < 600 ? 8 : 12
+    ),
+    tabs: [
+      Tab(text: 'الكل (${_allReservations.length})'),
+      Tab(text: 'معلقة (${_pendingReservations.length})'),
+      Tab(text: 'مؤكدة (${_validatedReservations.length})'),
+      Tab(text: 'ملغاة (${_cancelledReservations.length})'),
+      Tab(text: 'أرشيف (${_archivedReservations.length})'),
+    ],
+  ),
+),
           // Tab Views
           Expanded(
             child: _isLoading
@@ -553,6 +642,7 @@ Future<void> _showPaymentRequiredDialog() async {
                       _buildReservationsList(_getFilteredReservations(_pendingReservations), 'pending', isDark),
                       _buildReservationsList(_getFilteredReservations(_validatedReservations), 'validated', isDark),
                       _buildReservationsList(_getFilteredReservations(_cancelledReservations), 'cancelled', isDark),
+                      _buildReservationsList(_getFilteredReservations(_archivedReservations), 'archived', isDark),
                     ],
                   ),
           ),
@@ -561,61 +651,70 @@ Future<void> _showPaymentRequiredDialog() async {
       ),
     );
   }
+Widget _buildModernStatistics(bool isDark) {
+  final stats = [
+    {'title': 'الإجمالي', 'count': _allReservations.length, 'color': Colors.blue.shade400, 'icon': Icons.event_note_rounded},
+    {'title': 'معلقة', 'count': _pendingReservations.length, 'color': Colors.orange.shade400, 'icon': Icons.hourglass_empty_rounded},
+    {'title': 'مؤكدة', 'count': _validatedReservations.length, 'color': Colors.green.shade400, 'icon': Icons.check_circle_rounded},
+    {'title': 'ملغاة', 'count': _cancelledReservations.length, 'color': Colors.red.shade400, 'icon': Icons.cancel_rounded},
+    {'title': 'أرشيف', 'count': _archivedReservations.length, 'color': Colors.purple.shade400, 'icon': Icons.archive_rounded},
+  ];
 
-  Widget _buildModernStatistics(bool isDark) {
-    final stats = [
-      {'title': 'الإجمالي', 'count': _allReservations.length, 'color': Colors.blue.shade400, 'icon': Icons.event_note_rounded},
-      {'title': 'معلقة', 'count': _pendingReservations.length, 'color': Colors.orange.shade400, 'icon': Icons.hourglass_empty_rounded},
-      {'title': 'مؤكدة', 'count': _validatedReservations.length, 'color': Colors.green.shade400, 'icon': Icons.check_circle_rounded},
-      {'title': 'ملغاة', 'count': _cancelledReservations.length, 'color': Colors.red.shade400, 'icon': Icons.cancel_rounded},
-    ];
+  // Make it responsive based on screen width
+  final screenWidth = MediaQuery.of(context).size.width;
+  final cardWidth = screenWidth < 600 ? 95.0 : 120.0;
+  final cardHeight = screenWidth < 600 ? 90.0 : 100.0;
 
-    return SizedBox(
-      height: 90,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: stats.length,
-        itemBuilder: (context, index) {
-          final stat = stats[index];
-          return Container(
-            width: 95,
-            margin: EdgeInsets.only(left: index < stats.length - 1 ? 12 : 0),
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: (stat['color'] as Color).withOpacity(isDark ? 0.2 : 0.1),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: (stat['color'] as Color).withOpacity(isDark ? 0.3 : 0.2)),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(stat['icon'] as IconData, color: stat['color'] as Color, size: 22),
-                const SizedBox(height: 2),
-                Text(
-                  '${stat['count']}',
+  return SizedBox(
+    height: cardHeight,
+    child: ListView.builder(
+      scrollDirection: Axis.horizontal,
+      itemCount: stats.length,
+      itemBuilder: (context, index) {
+        final stat = stats[index];
+        return Container(
+          width: cardWidth,
+          margin: EdgeInsets.only(left: index < stats.length - 1 ? 12 : 0),
+          padding: EdgeInsets.all(screenWidth < 600 ? 10 : 12),
+          decoration: BoxDecoration(
+            color: (stat['color'] as Color).withOpacity(isDark ? 0.2 : 0.1),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: (stat['color'] as Color).withOpacity(isDark ? 0.3 : 0.2)),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(stat['icon'] as IconData, color: stat['color'] as Color, 
+                size: screenWidth < 600 ? 22 : 26),
+              SizedBox(height: screenWidth < 600 ? 2 : 4),
+              Text(
+                '${stat['count']}',
+                style: TextStyle(
+                  fontSize: screenWidth < 600 ? 15 : 18,
+                  fontWeight: FontWeight.bold,
+                  color: stat['color'] as Color,
+                ),
+              ),
+              Flexible(
+                child: Text(
+                  stat['title'] as String,
                   style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: stat['color'] as Color,
+                    fontSize: screenWidth < 600 ? 9 : 11, 
+                    color: isDark ? Colors.grey.shade400 : Colors.grey.shade600
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                Flexible(
-                  child: Text(
-                    stat['title'] as String,
-                    style: TextStyle(fontSize: 9, 
-                      color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
+              ),
+            ],
+          ),
+        );
+      },
+    ),
+  );
+}
+
 
   Widget _buildReservationsList(List<dynamic> reservations, String type, bool isDark) {
     if (reservations.isEmpty) {
@@ -626,7 +725,7 @@ Future<void> _showPaymentRequiredDialog() async {
       onRefresh: _loadAllReservations,
       color: AppColors.primary,
       child: ListView.builder(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.all(MediaQuery.of(context).size.width < 600 ? 12 : 20),
         itemCount: reservations.length,
         itemBuilder: (context, index) {
           return _buildModernReservationCard(reservations[index], type, isDark);
@@ -640,6 +739,7 @@ Future<void> _showPaymentRequiredDialog() async {
       'pending': {'icon': Icons.hourglass_empty_rounded, 'message': 'لا توجد حجوزات معلقة'},
       'validated': {'icon': Icons.check_circle_outline_rounded, 'message': 'لا توجد حجوزات مؤكدة'},
       'cancelled': {'icon': Icons.cancel_outlined, 'message': 'لا توجد حجوزات ملغاة'},
+      'archived': {'icon': Icons.archive_outlined, 'message': 'لا توجد حجوزات في الأرشيف'},
       'all': {'icon': Icons.event_note_outlined, 'message': 'لا توجد حجوزات'},
     };
 
@@ -685,10 +785,12 @@ Future<void> _showPaymentRequiredDialog() async {
     final date1 = reservation['date1'] ?? '';
     final date2 = reservation['date2'];
     final date2Bool = reservation['date2_bool'] ?? false;
+    final isArchived = _isReservationArchived(reservation);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
+        margin: EdgeInsets.only(
+          bottom: MediaQuery.of(context).size.width < 600 ? 12 : 16
+        ),      decoration: BoxDecoration(
         color: isDark ? AppColors.darkCard : Colors.white,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
@@ -713,8 +815,14 @@ Future<void> _showPaymentRequiredDialog() async {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           collapsedShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           leading: CircleAvatar(
-            backgroundColor: _getStatusColor(status).withOpacity(isDark ? 0.2 : 0.1),
-            child: Icon(_getStatusIcon(status), color: _getStatusColor(status), size: 20),
+            backgroundColor: isArchived 
+              ? Colors.purple.shade400.withOpacity(isDark ? 0.2 : 0.1)
+              : _getStatusColor(status).withOpacity(isDark ? 0.2 : 0.1),
+            child: Icon(
+              isArchived ? Icons.archive_rounded : _getStatusIcon(status), 
+              color: isArchived ? Colors.purple.shade400 : _getStatusColor(status), 
+              size: 20
+            ),
           ),
           title: Text(
             '$first_name - $last_name',
@@ -747,7 +855,33 @@ Future<void> _showPaymentRequiredDialog() async {
                 ],
               ),
               const SizedBox(height: 8),
-              _buildModernStatusChip(status, isDark),
+              Row(
+                children: [
+                  _buildModernStatusChip(status, isDark),
+                  if (isArchived) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.purple.shade400.withOpacity(isDark ? 0.2 : 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.purple.shade400.withOpacity(isDark ? 0.4 : 0.3)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.archive_rounded, size: 12, color: Colors.purple.shade400),
+                          const SizedBox(width: 4),
+                          Text(
+                            'أرشيف',
+                            style: TextStyle(color: Colors.purple.shade400, fontWeight: FontWeight.w500, fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ],
           ),
           children: [
@@ -776,6 +910,9 @@ Future<void> _showPaymentRequiredDialog() async {
     );
   }
 List<Widget> _buildDetailRows(Map<String, dynamic> reservation, bool isDark) {
+  final screenWidth = MediaQuery.of(context).size.width;
+  final labelWidth = screenWidth < 600 ? 100.0 : 140.0;
+  
   final details = [
     ['رقم الحجز:', '${reservation['id'] ?? 0}'],
     ['اسم العريس (المستخدم):', reservation['first_name'] ?? 'غير محدد'],
@@ -786,7 +923,7 @@ List<Widget> _buildDetailRows(Map<String, dynamic> reservation, bool isDark) {
     ['اليوم الأول:', _formatDate(reservation['date1'])],
     if (reservation['date2_bool'] == true && reservation['date2'] != null)
       ['اليوم الثاني:', _formatDate(reservation['date2'])],
-    ['حالة الدفع:', reservation['payment_valid'] == true ? '✓ مكتمل' : '✗ غير مكتمل'],  // ADDED
+    ['حالة الدفع:', reservation['payment_valid'] == true ? '✓ مكتمل' : '✗ غير مكتمل'],
     ['حفل جماعي:', reservation['join_to_mass_wedding'] == true ? 'نعم' : 'لا'],
     ['يسمح للآخرين:', reservation['allow_others'] == true ? 'نعم' : 'لا'],
     ['تاريخ الإنشاء:', _formatDateTime(reservation['created_at'])],
@@ -796,29 +933,55 @@ List<Widget> _buildDetailRows(Map<String, dynamic> reservation, bool isDark) {
 
   return details.map((detail) => Padding(
     padding: const EdgeInsets.only(bottom: 8),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 120,
-          child: Text(detail[0], 
-            style: TextStyle(fontWeight: FontWeight.w500, 
-              color: isDark ? Colors.grey.shade400 : Colors.grey.shade700)),
+    child: screenWidth < 600 
+      ? Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(detail[0], 
+              style: TextStyle(
+                fontWeight: FontWeight.w500, 
+                fontSize: 12,
+                color: isDark ? Colors.grey.shade400 : Colors.grey.shade700
+              )
+            ),
+            SizedBox(height: 4),
+            Text(detail[1], 
+              style: TextStyle(
+                fontSize: 13,
+                color: detail[0] == 'حالة الدفع:' 
+                  ? (reservation['payment_valid'] == true ? Colors.green : Colors.red)
+                  : (isDark ? Colors.white70 : Colors.grey.shade800),
+                fontWeight: detail[0] == 'حالة الدفع:' ? FontWeight.w600 : FontWeight.normal,
+              )
+            ),
+          ],
+        )
+      : Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: labelWidth,
+              child: Text(detail[0], 
+                style: TextStyle(
+                  fontWeight: FontWeight.w500, 
+                  color: isDark ? Colors.grey.shade400 : Colors.grey.shade700
+                )
+              ),
+            ),
+            Expanded(
+              child: Text(detail[1], 
+                style: TextStyle(
+                  color: detail[0] == 'حالة الدفع:' 
+                    ? (reservation['payment_valid'] == true ? Colors.green : Colors.red)
+                    : (isDark ? Colors.white70 : Colors.grey.shade800),
+                  fontWeight: detail[0] == 'حالة الدفع:' ? FontWeight.w600 : FontWeight.normal,
+                )
+              ),
+            ),
+          ],
         ),
-        Expanded(
-          child: Text(detail[1], 
-            style: TextStyle(
-              color: detail[0] == 'حالة الدفع:' 
-                ? (reservation['payment_valid'] == true ? Colors.green : Colors.red)
-                : (isDark ? Colors.white70 : Colors.grey.shade800),
-              fontWeight: detail[0] == 'حالة الدفع:' ? FontWeight.w600 : FontWeight.normal,
-            )),
-        ),
-      ],
-    ),
   )).toList();
 }
-
   Widget _buildModernStatusChip(String status, bool isDark) {
     final color = _getStatusColor(status);
     final displayText = _getStatusDisplayText(status);
@@ -839,6 +1002,7 @@ List<Widget> _buildDetailRows(Map<String, dynamic> reservation, bool isDark) {
 Widget _buildModernActionButtons(Map<String, dynamic> reservation, String status, int groomId, int reservationId, String groomName) {
   List<Widget> buttons = [];
   final paymentValid = reservation['payment_valid'] ?? false;
+  final screenWidth = MediaQuery.of(context).size.width;
 
   // Download PDF button
   buttons.add(
@@ -847,18 +1011,19 @@ Widget _buildModernActionButtons(Map<String, dynamic> reservation, String status
       icon: Icons.download_rounded,
       label: 'تحميل PDF',
       color: Colors.blue.shade400,
+      isCompact: screenWidth < 600,
     ),
   );
 
   // Status-specific buttons
   if (status == 'pending_validation') {
-    // Payment toggle button - shows appropriate action based on current status
     buttons.add(
       _buildActionButton(
         onPressed: () => _togglePaymentStatus(reservationId, groomName, paymentValid),
         icon: paymentValid ? Icons.money_off_rounded : Icons.payment_rounded,
         label: paymentValid ? 'إلغاء الدفع' : 'تأكيد الدفع',
         color: paymentValid ? Colors.orange.shade400 : Colors.indigo.shade400,
+        isCompact: screenWidth < 600,
       ),
     );
     
@@ -868,6 +1033,7 @@ Widget _buildModernActionButtons(Map<String, dynamic> reservation, String status
         icon: Icons.check_rounded,
         label: 'تأكيد',
         color: Colors.green.shade400,
+        isCompact: screenWidth < 600,
       ),
     );
     buttons.add(
@@ -876,16 +1042,17 @@ Widget _buildModernActionButtons(Map<String, dynamic> reservation, String status
         icon: Icons.close_rounded,
         label: 'إلغاء',
         color: Colors.red.shade400,
+        isCompact: screenWidth < 600,
       ),
     );
   } else if (status == 'validated') {
-    // Payment toggle button - available in validated state too
     buttons.add(
       _buildActionButton(
         onPressed: () => _togglePaymentStatus(reservationId, groomName, paymentValid),
         icon: paymentValid ? Icons.money_off_rounded : Icons.payment_rounded,
         label: paymentValid ? 'إلغاء الدفع' : 'تأكيد الدفع',
         color: paymentValid ? Colors.orange.shade400 : Colors.indigo.shade400,
+        isCompact: screenWidth < 600,
       ),
     );
     
@@ -895,6 +1062,7 @@ Widget _buildModernActionButtons(Map<String, dynamic> reservation, String status
         icon: Icons.close_rounded,
         label: 'إلغاء',
         color: Colors.red.shade400,
+        isCompact: screenWidth < 600,
       ),
     );
   }
@@ -902,31 +1070,37 @@ Widget _buildModernActionButtons(Map<String, dynamic> reservation, String status
   return Wrap(
     spacing: 8,
     runSpacing: 8,
+    alignment: screenWidth < 600 ? WrapAlignment.center : WrapAlignment.start,
     children: buttons,
   );
 }
-
-
-
-  Widget _buildActionButton({
-    required VoidCallback onPressed,
-    required IconData icon,
-    required String label,
-    required Color color,
-  }) {
-    return ElevatedButton.icon(
-      onPressed: onPressed,
-      icon: Icon(icon, size: 18),
-      label: Text(label),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: color,
-        foregroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        elevation: 0,
+Widget _buildActionButton({
+  required VoidCallback onPressed,
+  required IconData icon,
+  required String label,
+  required Color color,
+  bool isCompact = false,
+}) {
+  return ElevatedButton.icon(
+    onPressed: onPressed,
+    icon: Icon(icon, size: isCompact ? 16 : 18),
+    label: Text(
+      label,
+      style: TextStyle(fontSize: isCompact ? 12 : 14),
+    ),
+    style: ElevatedButton.styleFrom(
+      backgroundColor: color,
+      foregroundColor: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      padding: EdgeInsets.symmetric(
+        horizontal: isCompact ? 12 : 16, 
+        vertical: isCompact ? 6 : 8
       ),
-    );
-  }
+      elevation: 0,
+    ),
+  );
+}
+
 
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {

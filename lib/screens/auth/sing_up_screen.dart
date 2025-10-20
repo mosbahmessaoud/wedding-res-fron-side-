@@ -626,7 +626,7 @@ Future<void> _signup() async {
     );
   }
 
-  Widget _buildStepTitle(String title, String subtitle) {
+  Widget _buildStepTitle(String title, [String subtitle = '']) {
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 24),
       child: Column(
@@ -641,39 +641,44 @@ Future<void> _signup() async {
             ),
           ),
           SizedBox(height: 8),
-          Text(
-            subtitle,
-            style: TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 16,
+          if (subtitle.isNotEmpty) ...[
+            Text(
+              subtitle,
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 16,
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );
   }
+// Replace the build method's AppBar section with this:
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        title: Text(
-          'إنشاء حساب جديد',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        foregroundColor: AppColors.primary,
-        centerTitle: true,
+@override
+Widget build(BuildContext context) {
+  return Scaffold(
+    backgroundColor: Colors.grey[50],
+    appBar: AppBar(
+      title: Text(
+        'إنشاء حساب جديد',
+        style: TextStyle(fontWeight: FontWeight.bold),
       ),
-      body: FadeTransition(
-        opacity: _fadeAnimation,
-        child: Column(
-          children: [
-            _buildProgressIndicator(),
-            Expanded(
-              child: PageView(
+      backgroundColor: Colors.white,
+      elevation: 0,
+      foregroundColor: AppColors.primary,
+      centerTitle: true,
+      automaticallyImplyLeading: _currentStep == 0, // Show back button only on first step
+      leading: _currentStep > 0 ? SizedBox.shrink() : null, // Hide back button on other steps
+    ),
+    body: FadeTransition(
+      opacity: _fadeAnimation,
+      child: Column(
+        children: [
+          _buildProgressIndicator(),
+          Expanded(
+            child: PageView(
               controller: _pageController,
               physics: NeverScrollableScrollPhysics(),
               children: [
@@ -683,14 +688,13 @@ Future<void> _signup() async {
                 _buildSecurityStep(),
               ],
             ),
-            ),
-            _buildNavigationButtons(),
-          ],
-        ),
+          ),
+          _buildNavigationButtons(),
+        ],
       ),
-    );
-  }
-
+    ),
+  );
+}
   Widget _buildPersonalInfoStep() {
     return SingleChildScrollView(
       padding: EdgeInsets.all(24),
@@ -699,7 +703,7 @@ Future<void> _signup() async {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildStepTitle('معلومات العريس', 'أدخل بياناتك الأساسية'),
+            _buildStepTitle('المعلومات الشخصية للعريس'),
             SizedBox(height: 32),
 
             CustomTextField(
@@ -787,7 +791,7 @@ Widget _buildLocationStep() {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildStepTitle('معلومات الموقع', ' اختر القصر والعشيرة  '),
+        _buildStepTitle('معلومات الجهة'),
         SizedBox(height: 32),
 
         Theme(
@@ -883,83 +887,82 @@ Widget _buildLocationStep() {
     ),
   );
 }
+Widget _buildGuardianInfoStep() {
+  return SingleChildScrollView(
+    padding: EdgeInsets.all(24),
+    child: Form(
+      key: _formKeys[0],
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildStepTitle('المعلومات الشخصية لولي العريس'),
+          SizedBox(height: 32),
 
-  Widget _buildGuardianInfoStep() {
-    return SingleChildScrollView(
-      padding: EdgeInsets.all(24),
-      child: Form(
-        key: _formKeys[0],
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildStepTitle('معلومات ولي العريس', ' المعلومات الشخصية لولي العريس'),
-            SizedBox(height: 32),
+          CustomTextField(
+            controller: _guardianNameController,
+            label: 'الاسم الكامل',
+            hint: "  اللقب و الاسم, اسم الاب ,اسم الجد",
+            validator: (value) => _validateRequired(value, 'الاسم الكامل'),
+            prefixIcon: Icons.person_4,
+          ),
+          SizedBox(height: 20),
 
-            CustomTextField(
-              controller: _guardianNameController,
-              label: 'الاسم الكامل',
-              hint: "  اللقب و الاسم, اسم الاب ,اسم الجد",
-              validator: (value) => _validateRequired(value, 'الاسم الكامل'),
-              prefixIcon: Icons.person_4,
-            ),
-            SizedBox(height: 20),
+          CustomTextField(
+            controller: _guardianPhoneController,
+            label: 'رقم هاتف ',
+            keyboardType: TextInputType.phone,
+            validator: _validatePhone,
+            prefixIcon: Icons.phone,
+            hint: '0xxxxxxxxx',
+          ),
+          SizedBox(height: 20),
 
-            CustomTextField(
-              controller: _guardianPhoneController,
-              label: 'رقم هاتف ',
-              keyboardType: TextInputType.phone,
-              validator: _validatePhone,
-              prefixIcon: Icons.phone,
-              hint: '0xxxxxxxxx',
-            ),
-            SizedBox(height: 20),
+          CustomDropdown<String>(
+            label: 'صلة القرابة بالعريس',
+            value: _selectedGuardianRelation,
+            hint: ' صلة القرابة بالعريس ',
+            items: AppConstants.guardianRelations.map((relation) => 
+              DropdownMenuItem<String>(
+                value: relation,
+                child: Text(relation),
+              )
+            ).toList(),
+            onChanged: (relation) {
+              setState(() {
+                _selectedGuardianRelation = relation;
+              });
+            },
+            prefixIcon: Icons.family_restroom,
+          ),
+          SizedBox(height: 20),
 
-            CustomDropdown<String>(
-              label: 'صلة القرابة بالعريس',
-              value: _selectedGuardianRelation,
-              hint: ' صلة القرابة بالعريس ',
-              items: AppConstants.guardianRelations.map((relation) => 
-                DropdownMenuItem<String>(
-                  value: relation,
-                  child: Text(relation),
-                )
-              ).toList(),
-              onChanged: (relation) {
-                setState(() {
-                  _selectedGuardianRelation = relation;
-                });
-              },
-              prefixIcon: Icons.family_restroom,
-            ),
-            SizedBox(height: 20),
+          _buildDateSelector(
+            label: 'تاريخ ميلاد ',
+            selectedDate: _guardianBirthDate,
+            onTap: () => _selectDate(isGuardian: true),
+            icon: Icons.calendar_today,
+          ),
+          SizedBox(height: 20),
 
-            _buildDateSelector(
-              label: 'تاريخ ميلاد ',
-              selectedDate: _guardianBirthDate,
-              onTap: () => _selectDate(isGuardian: true),
-              icon: Icons.calendar_today,
-            ),
-            SizedBox(height: 20),
+          CustomTextField(
+            controller: _guardianBirthAddressController,
+            label: 'مكان الميلاد ',
+            validator: (value) => _validateRequired(value, 'مكان الميلاد '),
+            prefixIcon: Icons.location_on,
+          ),
+          SizedBox(height: 20),
 
-            CustomTextField(
-              controller: _guardianBirthAddressController,
-              label: 'مكان الميلاد ',
-              validator: (value) => _validateRequired(value, 'مكان الميلاد '),
-              prefixIcon: Icons.location_on,
-            ),
-            SizedBox(height: 20),
-
-            CustomTextField(
-              controller: _guardianHomeAddressController,
-              label: 'عنوان سكن ',
-              validator: (value) => _validateRequired(value, 'عنوان سكن '),
-              prefixIcon: Icons.home,
-            ),
-          ],
-        ),
+          CustomTextField(
+            controller: _guardianHomeAddressController,
+            label: 'عنوان السكن ',
+            validator: (value) => _validateRequired(value, 'عنوان السكن '),
+            prefixIcon: Icons.home,
+          ),
+        ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildSecurityStep() {
     return SingleChildScrollView(

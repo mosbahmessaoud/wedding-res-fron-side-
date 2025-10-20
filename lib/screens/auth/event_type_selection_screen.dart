@@ -192,7 +192,7 @@ class _EventTypeSelectionScreenState extends State<EventTypeSelectionScreen>
                             child: Opacity(
                               opacity: _fadeAnimation.value * 0.8,
                               child: Text(
-                                'يرجى تحديد نوع الحفل الذي ستنظمه',
+                                'يرجى تحديد نوع المناسبة المراد حجز تاريخها',
                                 style: TextStyle(
                                   fontSize: 16,
                                   color: isDark ? const Color.fromARGB(255, 217, 255, 218) : Colors.green.shade700,
@@ -213,7 +213,7 @@ class _EventTypeSelectionScreenState extends State<EventTypeSelectionScreen>
                               child: _EventCard(
                                 icon: Icons.favorite_border,
                                 title: 'حفل زفاف',
-                                subtitle: 'إحياء مناسبة عرس',
+                                subtitle: 'إحياء حفل زفاف',
                                 isDark: isDark,
                                 onTap: () => _navigate('wedding'),
                               ),
@@ -227,7 +227,9 @@ class _EventTypeSelectionScreenState extends State<EventTypeSelectionScreen>
                             child: Opacity(
                               opacity: _fadeAnimation.value,
                               child: _EventCard(
-                                icon: Icons.mosque_outlined,
+                                // icon: Icons.bedtime_outlined,
+                                // icon: Icons.auto_awesome_outlined,
+                                icon: Icons.favorite_outlined,
                                 title: 'حفل الله أكبر',
                                 subtitle: 'إحياء حفل الله أكبر',
                                 isDark: isDark,
@@ -247,8 +249,8 @@ class _EventTypeSelectionScreenState extends State<EventTypeSelectionScreen>
                                 child: Text(
                                   'صَلُّوا عَلَى النَّبِيِّ ﷺ',
                                   style: TextStyle(
-                                    fontSize: 13,
-                                    color: isDark ? Colors.green.shade400 : Colors.green.shade400,
+                                    fontSize: 14,
+                                    color: isDark ? Colors.green.shade400 : Colors.green.shade800,
                                     height: 1.4,
                                   ),
                                   textAlign: TextAlign.center,

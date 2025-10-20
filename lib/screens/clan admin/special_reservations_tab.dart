@@ -46,7 +46,7 @@ class SpecialReservationsTabState extends State<SpecialReservationsTab> {
     final today = DateTime(now.year, now.month, now.day);
     
     var filtered = _specialReservations.where((reserv) {
-      // Search by name or date
+      // Search by name, date, full name, or phone
       final searchLower = _searchQuery.toLowerCase();
       final matchesName = reserv['reserv_name']
           .toString()
@@ -55,7 +55,15 @@ class SpecialReservationsTabState extends State<SpecialReservationsTab> {
       final matchesDate = _formatDate(reserv['date'] ?? '')
           .toLowerCase()
           .contains(searchLower);
-      final matchesSearch = matchesName || matchesDate;
+      final matchesFullName = (reserv['full_name'] ?? '')
+          .toString()
+          .toLowerCase()
+          .contains(searchLower);
+      final matchesPhone = (reserv['phone_number'] ?? '')
+          .toString()
+          .toLowerCase()
+          .contains(searchLower);
+      final matchesSearch = matchesName || matchesDate || matchesFullName || matchesPhone;
       
       // Parse reservation date
       DateTime? reservDate;
@@ -226,7 +234,7 @@ class SpecialReservationsTabState extends State<SpecialReservationsTab> {
                           fontSize: isPhone ? 14 : 16,
                         ),
                         decoration: InputDecoration(
-                          hintText: 'البحث بالاسم أو التاريخ...',
+                          hintText: 'البحث بالاسم، التاريخ، الاسم الكامل أو الهاتف...',
                           hintStyle: TextStyle(
                             color: isDark ? Colors.white38 : Colors.grey,
                             fontSize: isPhone ? 14 : 16,
@@ -309,7 +317,7 @@ class SpecialReservationsTabState extends State<SpecialReservationsTab> {
                             : SliverGrid(
                                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                                   crossAxisCount: isLargeScreen ? 3 : 2,
-                                  childAspectRatio: isLargeScreen ? 1.5 : 1.3,
+                                  childAspectRatio: isLargeScreen ? 1.4 : 1.2,
                                   crossAxisSpacing: 16,
                                   mainAxisSpacing: 16,
                                 ),
@@ -488,175 +496,233 @@ class SpecialReservationsTabState extends State<SpecialReservationsTab> {
     final date = reservation['date'] ?? '';
     final name = reservation['reserv_name'] ?? 'بدون اسم';
     final description = reservation['reserv_desctiption'] ?? '';
+    final fullName = reservation['full_name'] ?? '';
+    final homeAddress = reservation['home_address'] ?? '';
+    final phoneNumber = reservation['phone_number'] ?? '';
 
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF2D2D2D) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isValidated
-              ? AppColors.primary.withOpacity(0.3)
-              : Colors.red.withOpacity(0.3),
-          width: 2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+    return InkWell(
+      onTap: () => _showReservationDetailsDialog(reservation, isDark),
+      child: Container(
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF2D2D2D) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isValidated
+                ? AppColors.primary.withOpacity(0.3)
+                : Colors.red.withOpacity(0.3),
+            width: 2,
           ),
-        ],
-      ),
-      child: Stack(
-        children: [
-          // Status Badge
-          Positioned(
-            top: 12,
-            left: 12,
-            child: Container(
-              padding: EdgeInsets.symmetric(
-                horizontal: isPhone ? 10 : 12,
-                vertical: isPhone ? 5 : 6,
-              ),
-              decoration: BoxDecoration(
-                color: isValidated
-                    ? Colors.green.withOpacity(0.1)
-                    : Colors.red.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: isValidated ? Colors.green : Colors.red,
-                  width: 1.5,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Stack(
+          children: [
+            // Status Badge
+            Positioned(
+              top: 12,
+              left: 12,
+              child: Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: isPhone ? 10 : 12,
+                  vertical: isPhone ? 5 : 6,
+                ),
+                decoration: BoxDecoration(
+                  color: isValidated
+                      ? Colors.green.withOpacity(0.1)
+                      : Colors.red.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isValidated ? Colors.green : Colors.red,
+                    width: 1.5,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isValidated ? Icons.check_circle : Icons.cancel,
+                      color: isValidated ? Colors.green : Colors.red,
+                      size: isPhone ? 12 : 14,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      isValidated ? 'مفعّل' : 'ملغي',
+                      style: TextStyle(
+                        color: isValidated ? Colors.green : Colors.red,
+                        fontWeight: FontWeight.w600,
+                        fontSize: isPhone ? 10 : 11,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              child: Row(
+            ),
+
+            Padding(
+              padding: EdgeInsets.all(isPhone ? 12 : 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
-                    isValidated ? Icons.check_circle : Icons.cancel,
-                    color: isValidated ? Colors.green : Colors.red,
-                    size: isPhone ? 12 : 14,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    isValidated ? 'مفعّل' : 'ملغي',
-                    style: TextStyle(
-                      color: isValidated ? Colors.green : Colors.red,
-                      fontWeight: FontWeight.w600,
-                      fontSize: isPhone ? 10 : 11,
+                  SizedBox(height: isPhone ? 28 : 32),
+
+                  // Date Section
+                  Container(
+                    padding: EdgeInsets.all(isPhone ? 10 : 12),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.calendar_today,
+                          color: AppColors.primary,
+                          size: isPhone ? 18 : 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _formatDate(date),
+                            style: TextStyle(
+                              fontSize: isPhone ? 14 : 16,
+                              fontWeight: FontWeight.w600,
+                              color: isDark ? Colors.white : Colors.black87,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
-            ),
-          ),
 
-          Padding(
-            padding: EdgeInsets.all(isPhone ? 12 : 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SizedBox(height: isPhone ? 28 : 32),
+                  SizedBox(height: isPhone ? 10 : 12),
 
-                // Date Section
-                Container(
-                  padding: EdgeInsets.all(isPhone ? 10 : 12),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
+                  // Name
+                  Text(
+                    name,
+                    style: TextStyle(
+                      fontSize: isPhone ? 16 : 18,
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? Colors.white : Colors.black87,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.calendar_today,
-                        color: AppColors.primary,
-                        size: isPhone ? 18 : 20,
+
+                  // Full Name
+                  if (fullName.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.person_outline,
+                          size: isPhone ? 14 : 16,
+                          color: isDark ? Colors.white60 : Colors.grey,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            fullName,
+                            style: TextStyle(
+                              fontSize: isPhone ? 12 : 13,
+                              color: isDark ? Colors.white60 : Colors.grey,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+
+                  // Phone Number
+                  if (phoneNumber.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.phone_outlined,
+                          size: isPhone ? 14 : 16,
+                          color: isDark ? Colors.white60 : Colors.grey,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            phoneNumber,
+                            style: TextStyle(
+                              fontSize: isPhone ? 12 : 13,
+                              color: isDark ? Colors.white60 : Colors.grey,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+
+                  if (description.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      description,
+                      style: TextStyle(
+                        fontSize: isPhone ? 12 : 13,
+                        color: isDark ? Colors.white60 : Colors.grey,
                       ),
-                      const SizedBox(width: 8),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+
+                  SizedBox(height: isPhone ? 10 : 12),
+
+                  // Actions
+                  Row(
+                    children: [
                       Expanded(
-                        child: Text(
-                          _formatDate(date),
-                          style: TextStyle(
-                            fontSize: isPhone ? 14 : 16,
-                            fontWeight: FontWeight.w600,
-                            color: isDark ? Colors.white : Colors.black87,
+                        child: ElevatedButton.icon(
+                          onPressed: () => _toggleReservationStatus(reservation),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: isValidated
+                                ? Colors.red.withOpacity(0.1)
+                                : Colors.green.withOpacity(0.1),
+                            foregroundColor: isValidated ? Colors.red : Colors.green,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side: BorderSide(
+                                color: isValidated ? Colors.red : Colors.green,
+                              ),
+                            ),
+                            padding: EdgeInsets.symmetric(
+                              vertical: isPhone ? 10 : 12,
+                            ),
+                          ),
+                          icon: Icon(
+                            isValidated ? Icons.block : Icons.check_circle,
+                            size: isPhone ? 16 : 18,
+                          ),
+                          label: Text(
+                            isValidated ? 'إلغاء' : 'تفعيل',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: isPhone ? 12 : 13,
+                            ),
                           ),
                         ),
                       ),
                     ],
                   ),
-                ),
-
-                SizedBox(height: isPhone ? 10 : 12),
-
-                // Name
-                Text(
-                  name,
-                  style: TextStyle(
-                    fontSize: isPhone ? 16 : 18,
-                    fontWeight: FontWeight.w700,
-                    color: isDark ? Colors.white : Colors.black87,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-
-                if (description.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    description,
-                    style: TextStyle(
-                      fontSize: isPhone ? 12 : 13,
-                      color: isDark ? Colors.white60 : Colors.grey,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
                 ],
-
-                SizedBox(height: isPhone ? 10 : 12),
-
-                // Actions
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () => _toggleReservationStatus(reservation),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: isValidated
-                              ? Colors.red.withOpacity(0.1)
-                              : Colors.green.withOpacity(0.1),
-                          foregroundColor: isValidated ? Colors.red : Colors.green,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            side: BorderSide(
-                              color: isValidated ? Colors.red : Colors.green,
-                            ),
-                          ),
-                          padding: EdgeInsets.symmetric(
-                            vertical: isPhone ? 10 : 12,
-                          ),
-                        ),
-                        icon: Icon(
-                          isValidated ? Icons.block : Icons.check_circle,
-                          size: isPhone ? 16 : 18,
-                        ),
-                        label: Text(
-                          isValidated ? 'إلغاء' : 'تفعيل',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: isPhone ? 12 : 13,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -705,9 +771,213 @@ class SpecialReservationsTabState extends State<SpecialReservationsTab> {
     );
   }
 
+  void _showReservationDetailsDialog(Map<String, dynamic> reservation, bool isDark) {
+    final screenSize = MediaQuery.of(context).size;
+    final isPhone = screenSize.width <= 600;
+    final isValidated = reservation['status'] == 'validated';
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF2D2D2D) : Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                Icons.info_outline,
+                color: AppColors.primary,
+                size: isPhone ? 20 : 24,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'تفاصيل الحجز',
+                style: TextStyle(
+                  color: isDark ? Colors.white : Colors.black87,
+                  fontWeight: FontWeight.w700,
+                  fontSize: isPhone ? 16 : 18,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Status Badge
+              Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isValidated
+                        ? Colors.green.withOpacity(0.1)
+                        : Colors.red.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: isValidated ? Colors.green : Colors.red,
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isValidated ? Icons.check_circle : Icons.cancel,
+                        color: isValidated ? Colors.green : Colors.red,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        isValidated ? 'مفعّل' : 'ملغي',
+                        style: TextStyle(
+                          color: isValidated ? Colors.green : Colors.red,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              
+              _buildDetailRow(
+                'التاريخ',
+                _formatDate(reservation['date'] ?? ''),
+                Icons.calendar_today,
+                isDark,
+              ),
+              const SizedBox(height: 12),
+              
+              _buildDetailRow(
+                'اسم الحجز',
+                reservation['reserv_name'] ?? 'بدون اسم',
+                Icons.event_note,
+                isDark,
+              ),
+              
+              if (reservation['full_name'] != null && reservation['full_name'].toString().isNotEmpty) ...[
+                const SizedBox(height: 12),
+                _buildDetailRow(
+                  'الاسم الكامل',
+                  reservation['full_name'],
+                  Icons.person,
+                  isDark,
+                ),
+              ],
+              
+              if (reservation['phone_number'] != null && reservation['phone_number'].toString().isNotEmpty) ...[
+                const SizedBox(height: 12),
+                _buildDetailRow(
+                  'رقم الهاتف',
+                  reservation['phone_number'],
+                  Icons.phone,
+                  isDark,
+                ),
+              ],
+              
+              if (reservation['home_address'] != null && reservation['home_address'].toString().isNotEmpty) ...[
+                const SizedBox(height: 12),
+                _buildDetailRow(
+                  'العنوان',
+                  reservation['home_address'],
+                  Icons.location_on,
+                  isDark,
+                ),
+              ],
+              
+              if (reservation['reserv_desctiption'] != null && reservation['reserv_desctiption'].toString().isNotEmpty) ...[
+                const SizedBox(height: 12),
+                _buildDetailRow(
+                  'الوصف',
+                  reservation['reserv_desctiption'],
+                  Icons.description,
+                  isDark,
+                ),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'إغلاق',
+              style: TextStyle(
+                color: isDark ? Colors.white60 : Colors.grey,
+                fontSize: isPhone ? 14 : 16,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value, IconData icon, bool isDark) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark ? Colors.white12 : Colors.grey.shade200,
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            icon,
+            color: AppColors.primary,
+            size: 20,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark ? Colors.white60 : Colors.grey,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: isDark ? Colors.white : Colors.black87,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showAddReservationDialog(bool isDark) {
     final nameController = TextEditingController();
     final descriptionController = TextEditingController();
+    final fullNameController = TextEditingController();
+    final phoneController = TextEditingController();
+    final addressController = TextEditingController();
     DateTime? selectedDate;
     final formKey = GlobalKey<FormState>();
     final screenSize = MediaQuery.of(context).size;
@@ -870,6 +1140,151 @@ class SpecialReservationsTabState extends State<SpecialReservationsTab> {
                   ),
                   const SizedBox(height: 16),
 
+                  // Full Name Field
+                  TextFormField(
+                    controller: fullNameController,
+                    style: TextStyle(
+                      color: isDark ? Colors.white : Colors.black87,
+                      fontSize: isPhone ? 14 : 16,
+                    ),
+                    decoration: InputDecoration(
+                      labelText: 'الاسم الكامل (اختياري)',
+                      labelStyle: TextStyle(
+                        color: isDark ? Colors.white60 : Colors.grey,
+                        fontSize: isPhone ? 13 : 14,
+                      ),
+                      hintText: 'اسم الشخص أو المسؤول',
+                      hintStyle: TextStyle(
+                        color: isDark ? Colors.white38 : Colors.grey.shade400,
+                        fontSize: isPhone ? 13 : 14,
+                      ),
+                      prefixIcon: Icon(
+                        Icons.person,
+                        color: AppColors.primary,
+                        size: isPhone ? 20 : 24,
+                      ),
+                      filled: true,
+                      fillColor: isDark
+                          ? Colors.white.withOpacity(0.05)
+                          : Colors.grey.shade100,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: isDark ? Colors.white12 : Colors.grey.shade300,
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: AppColors.primary,
+                          width: 2,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Phone Number Field
+                  TextFormField(
+                    controller: phoneController,
+                    style: TextStyle(
+                      color: isDark ? Colors.white : Colors.black87,
+                      fontSize: isPhone ? 14 : 16,
+                    ),
+                    keyboardType: TextInputType.phone,
+                    decoration: InputDecoration(
+                      labelText: 'رقم الهاتف (اختياري)',
+                      labelStyle: TextStyle(
+                        color: isDark ? Colors.white60 : Colors.grey,
+                        fontSize: isPhone ? 13 : 14,
+                      ),
+                      hintText: 'مثال: 0555123456',
+                      hintStyle: TextStyle(
+                        color: isDark ? Colors.white38 : Colors.grey.shade400,
+                        fontSize: isPhone ? 13 : 14,
+                      ),
+                      prefixIcon: Icon(
+                        Icons.phone,
+                        color: AppColors.primary,
+                        size: isPhone ? 20 : 24,
+                      ),
+                      filled: true,
+                      fillColor: isDark
+                          ? Colors.white.withOpacity(0.05)
+                          : Colors.grey.shade100,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: isDark ? Colors.white12 : Colors.grey.shade300,
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: AppColors.primary,
+                          width: 2,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Address Field
+                  TextFormField(
+                    controller: addressController,
+                    style: TextStyle(
+                      color: isDark ? Colors.white : Colors.black87,
+                      fontSize: isPhone ? 14 : 16,
+                    ),
+                    decoration: InputDecoration(
+                      labelText: 'العنوان (اختياري)',
+                      labelStyle: TextStyle(
+                        color: isDark ? Colors.white60 : Colors.grey,
+                        fontSize: isPhone ? 13 : 14,
+                      ),
+                      hintText: 'عنوان السكن',
+                      hintStyle: TextStyle(
+                        color: isDark ? Colors.white38 : Colors.grey.shade400,
+                        fontSize: isPhone ? 13 : 14,
+                      ),
+                      prefixIcon: Icon(
+                        Icons.location_on,
+                        color: AppColors.primary,
+                        size: isPhone ? 20 : 24,
+                      ),
+                      filled: true,
+                      fillColor: isDark
+                          ? Colors.white.withOpacity(0.05)
+                          : Colors.grey.shade100,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: isDark ? Colors.white12 : Colors.grey.shade300,
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: AppColors.primary,
+                          width: 2,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
                   // Description Field
                   TextFormField(
                     controller: descriptionController,
@@ -942,6 +1357,15 @@ class SpecialReservationsTabState extends State<SpecialReservationsTab> {
                       reservDescription: descriptionController.text.trim().isEmpty
                           ? null
                           : descriptionController.text.trim(),
+                      fullName: fullNameController.text.trim().isEmpty
+                          ? null
+                          : fullNameController.text.trim(),
+                      phoneNumber: phoneController.text.trim().isEmpty
+                          ? null
+                          : phoneController.text.trim(),
+                      homeAddress: addressController.text.trim().isEmpty
+                          ? null
+                          : addressController.text.trim(),
                     );
                     Navigator.pop(context);
                     _showSuccessSnackBar('تم إضافة الحجز الخاص بنجاح');

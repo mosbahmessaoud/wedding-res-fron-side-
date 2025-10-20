@@ -99,6 +99,17 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen>
     return null;
   }
 
+    Future<void> _DeletUser() async {
+    try {
+      print("---------  widget.phoneNumber = ${widget.phoneNumber}");
+      await ApiService.deleteUser(widget.phoneNumber);
+    } catch (e) {
+      // Handle error if needed
+      print('$e');
+
+    }
+    }
+
   Future<void> _verifyOTP() async {
     if (_otpCode.length != 6) {
       _showError('يرجى إدخال الرمز كاملاً');
@@ -223,7 +234,10 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen>
         centerTitle: true,
         leading: IconButton(
           icon: Icon(Icons.arrow_back_ios),
-          onPressed: () => Navigator.pop(context),
+          onPressed: (){
+            _DeletUser();
+            Navigator.pop(context);
+          },
         ),
       ),
       body: FadeTransition(
@@ -435,6 +449,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen>
               // Change Phone Number
               TextButton.icon(
                 onPressed: () {
+                  _DeletUser();
                   Navigator.pop(context);
                 },
                 icon: Icon(

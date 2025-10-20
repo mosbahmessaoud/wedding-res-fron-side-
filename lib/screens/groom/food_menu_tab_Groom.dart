@@ -200,7 +200,7 @@ Widget _buildFilters() {
               child: DropdownButtonFormField<String>(
                 value: _selectedFoodType,
                 decoration: InputDecoration(
-                  labelText: 'نوع الطعام',
+                  labelText: 'نوع طعام الوليمة ',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
@@ -225,7 +225,7 @@ Widget _buildFilters() {
               child: DropdownButtonFormField<int>(
                 value: _selectedVisitors,
                 decoration: InputDecoration(
-                  labelText: 'عدد الزوار',
+                  labelText: 'عدد المدعوين',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
@@ -323,7 +323,7 @@ Widget _buildMenuCard(dynamic menu) {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'عدد الزوار: $numberOfVisitors',
+                      'عدد المدعوين: $numberOfVisitors',
                       style: TextStyle(
                         fontSize: 16,
                         color: Colors.grey.shade600,
@@ -392,8 +392,8 @@ Widget _buildMenuCard(dynamic menu) {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              _buildDetailRow('نوع الطعام:', foodType),
-              _buildDetailRow('عدد الزوار:', numberOfVisitors.toString()),
+              _buildDetailRow('نوع طعام الوليمة:', foodType),
+              _buildDetailRow('عدد المدعوين:', numberOfVisitors.toString()),
               const SizedBox(height: 16),
               const Text(
                 'عناصر القائمة:',

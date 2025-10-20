@@ -41,18 +41,19 @@ class SettingsTabState extends State<SettingsTab>
   List<int> _selectedTwoDayMonths = [5, 6, 7, 8, 9, 10];
 
   final List<Map<String, dynamic>> _monthsList = [
-    {'value': 1, 'name': 'يناير'},
-    {'value': 2, 'name': 'فبراير'},
+    {'value': 1, 'name': 'جانفي'},
+    {'value': 2, 'name': 'فيفري'},
     {'value': 3, 'name': 'مارس'},
-    {'value': 4, 'name': 'أبريل'},
-    {'value': 5, 'name': 'مايو'},
-    {'value': 6, 'name': 'يونيو'},
-    {'value': 7, 'name': 'يوليو'},
-    {'value': 8, 'name': 'أغسطس'},
+    {'value': 4, 'name': 'أفريل'},
+    {'value': 5, 'name': 'ماي'},
+    {'value': 6, 'name': 'جوان'},
+    {'value': 7, 'name': 'جويلية'},
+    {'value': 8, 'name': 'أوت'},
     {'value': 9, 'name': 'سبتمبر'},
     {'value': 10, 'name': 'أكتوبر'},
     {'value': 11, 'name': 'نوفمبر'},
     {'value': 12, 'name': 'ديسمبر'},
+
   ];
 
 

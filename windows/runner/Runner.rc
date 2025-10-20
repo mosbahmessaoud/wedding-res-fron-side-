@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "تعشيرت" "\0"
-            VALUE "FileDescription", "تعشيرت Application" "\0"
+            VALUE "CompanyName", "أَسُولِي" "\0"
+            VALUE "FileDescription", "أَسُولِي Application" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "تعشيرت" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2025 تعشيرت. All rights reserved." "\0"
-            VALUE "OriginalFilename", "تعشيرت.exe" "\0"
-            VALUE "ProductName", "تعشيرت" "\0"
+            VALUE "InternalName", "أَسُولِي" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2025 أَسُولِي. All rights reserved." "\0"
+            VALUE "OriginalFilename", "أَسُولِي.exe" "\0"
+            VALUE "ProductName", "أَسُولِي" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

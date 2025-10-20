@@ -2,7 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:open_file/open_file.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:http/http.dart' as http;
 import '../../utils/colors.dart';
 import '../../services/api_service.dart';
 import '../../widgets/theme_toggle_button.dart';
@@ -19,6 +23,8 @@ class ClanRulesPageState extends State<ClanRulesPage> {
   Map<String, dynamic>? _rules;
   bool _isLoading = true;
   bool _isEditing = false;
+  bool _isDownloadingPdf = false;
+  double _downloadProgress = 0.0;
   int? _clanId;
   
   final _formKey = GlobalKey<FormState>();
@@ -26,9 +32,9 @@ class ClanRulesPageState extends State<ClanRulesPage> {
   final _groomSuppliesController = TextEditingController();
   final _clothingController = TextEditingController();
   final _kitchenwareController = TextEditingController();
-  String? _pdfUrl; // Changed from List to single URL
-  File? _pendingPdfFile; // Store the file temporarily until save
-  String? _pendingPdfFileName; // Store filename for display
+  String? _pdfUrl;
+  File? _pendingPdfFile;
+  String? _pendingPdfFileName;
   
   @override
   void initState() {
@@ -68,7 +74,6 @@ class ClanRulesPageState extends State<ClanRulesPage> {
       _clothingController.text = rules['rule_about_clothing'] ?? '';
       _kitchenwareController.text = rules['rule_about_kitchenware'] ?? '';
       
-      // Get single PDF URL
       _pdfUrl = rules['rules_book_of_clan_pdf']?.toString().isEmpty ?? true 
           ? null 
           : rules['rules_book_of_clan_pdf'];
@@ -86,43 +91,36 @@ class ClanRulesPageState extends State<ClanRulesPage> {
     try {
       Map<String, dynamic> result;
       
-      // Step 1: Create/Update clan rules WITHOUT PDF first
       if (_rules == null) {
-        print('🔵 Step 1: Creating clan rules...');
+        print('🔵 Creating clan rules...');
         result = await ApiService.createClanRulesWithDetails(
           clanId: _clanId!,
           generalRule: _generalRuleController.text.trim(),
           groomSupplies: _groomSuppliesController.text.trim().isEmpty ? null : _groomSuppliesController.text.trim(),
           ruleAboutClothing: _clothingController.text.trim().isEmpty ? null : _clothingController.text.trim(),
           ruleAboutKitchenware: _kitchenwareController.text.trim().isEmpty ? null : _kitchenwareController.text.trim(),
-          rulesBookOfClanPdfs: _pdfUrl, // Keep existing PDF if any
+          rulesBookOfClanPdfs: _pdfUrl,
         );
-        print('✅ Clan rules created successfully');
       } else {
-        print('🔵 Step 1: Updating clan rules...');
+        print('🔵 Updating clan rules...');
         result = await ApiService.updateClanRulesDetails(
           _rules!['id'],
           generalRule: _generalRuleController.text.trim(),
           groomSupplies: _groomSuppliesController.text.trim().isEmpty ? null : _groomSuppliesController.text.trim(),
           ruleAboutClothing: _clothingController.text.trim().isEmpty ? null : _clothingController.text.trim(),
           ruleAboutKitchenware: _kitchenwareController.text.trim().isEmpty ? null : _kitchenwareController.text.trim(),
-          rulesBookOfClanPdfs: _pdfUrl, // Keep existing PDF if any
+          rulesBookOfClanPdfs: _pdfUrl,
         );
-        print('✅ Clan rules updated successfully');
       }
       
-      // Step 2: Upload PDF AFTER clan rules are created (if there's a pending file)
       if (_pendingPdfFile != null) {
-        print('🔵 Step 2: Uploading PDF file...');
+        print('🔵 Uploading PDF file...');
         final uploadResult = await ApiService.uploadPdfFile(
           _pendingPdfFile!,
           clanId: _clanId!,
         );
         final uploadedPdfUrl = uploadResult['url'];
-        print('✅ PDF uploaded: $uploadedPdfUrl');
         
-        // Step 3: Update the clan rules with the new PDF URL
-        print('🔵 Step 3: Updating clan rules with PDF URL...');
         result = await ApiService.updateClanRulesDetails(
           result['id'],
           generalRule: _generalRuleController.text.trim(),
@@ -131,10 +129,8 @@ class ClanRulesPageState extends State<ClanRulesPage> {
           ruleAboutKitchenware: _kitchenwareController.text.trim().isEmpty ? null : _kitchenwareController.text.trim(),
           rulesBookOfClanPdfs: uploadedPdfUrl,
         );
-        print('✅ Clan rules updated with PDF URL');
       }
       
-      // Clear pending file after successful save
       _pendingPdfFile = null;
       _pendingPdfFileName = null;
       
@@ -183,7 +179,6 @@ class ClanRulesPageState extends State<ClanRulesPage> {
       
       final file = File(result.files.single.path!);
       
-      // Store the file temporarily, don't upload yet
       setState(() {
         _pendingPdfFile = file;
         _pendingPdfFileName = result.files.single.name;
@@ -197,7 +192,6 @@ class ClanRulesPageState extends State<ClanRulesPage> {
   }
   
   Future<void> _deletePdf() async {
-    // If it's a pending file (not yet uploaded), just clear it
     if (_pendingPdfFile != null) {
       setState(() {
         _pendingPdfFile = null;
@@ -207,7 +201,6 @@ class ClanRulesPageState extends State<ClanRulesPage> {
       return;
     }
     
-    // If it's an uploaded file, delete from server
     if (_pdfUrl == null || _clanId == null) return;
 
     final confirm = await _showConfirmDialog('هل تريد حذف هذا الملف؟');
@@ -227,29 +220,384 @@ class ClanRulesPageState extends State<ClanRulesPage> {
     }
   }
   
-  Future<void> _openPdf(String url) async {
+  /// Universal PDF download method that tries multiple approaches
+  Future<List<int>?> _downloadPdfUniversal(String url) async {
+    print('🔵 Starting universal PDF download from: $url');
+    
+    // Method 1: Try ApiService.downloadPdfFromUrl
     try {
-      final uri = Uri.parse(url);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        _showError('لا يمكن فتح الملف');
+      print('📥 Method 1: Using ApiService.downloadPdfFromUrl');
+      final bytes = await ApiService.downloadPdfFromUrl(url);
+      if (bytes != null && bytes.isNotEmpty) {
+        print('✅ Method 1 succeeded: ${bytes.length} bytes');
+        return bytes;
       }
     } catch (e) {
-      _showError('خطأ في فتح الملف');
+      print('⚠️ Method 1 failed: $e');
+    }
+    
+    // Method 2: Try extracting file ID and using downloadPdfe
+    try {
+      print('📥 Method 2: Using ApiService.downloadPdfe with file ID');
+      final fileId = url.split('/').last;
+      print('📄 Extracted File ID: $fileId');
+      final bytes = await ApiService.downloadPdfe(fileId);
+      if (bytes.isNotEmpty) {
+        print('✅ Method 2 succeeded: ${bytes.length} bytes');
+        return bytes;
+      }
+    } catch (e) {
+      print('⚠️ Method 2 failed: $e');
+    }
+    
+    // Method 3: Direct HTTP GET request
+    try {
+      print('📥 Method 3: Direct HTTP GET request');
+      final token = await ApiService.getToken();
+      final headers = {
+        'Content-Type': 'application/json',
+        if (token != null) 'Authorization': 'Bearer $token',
+      };
+      
+      final response = await http.get(
+        Uri.parse(url),
+        headers: headers,
+      );
+      
+      print('📊 HTTP Response status: ${response.statusCode}');
+      
+      if (response.statusCode == 200) {
+        print('✅ Method 3 succeeded: ${response.bodyBytes.length} bytes');
+        return response.bodyBytes;
+      } else {
+        print('❌ Method 3 failed with status: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('⚠️ Method 3 failed: $e');
+    }
+    
+    // Method 4: Try without /pdf prefix if it exists
+    if (url.contains('/pdf/')) {
+      try {
+        print('📥 Method 4: Trying URL without /pdf prefix');
+        final alternateUrl = url.replaceFirst('/pdf/', '/');
+        final token = await ApiService.getToken();
+        final headers = {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        };
+        
+        final response = await http.get(
+          Uri.parse(alternateUrl),
+          headers: headers,
+        );
+        
+        if (response.statusCode == 200) {
+          print('✅ Method 4 succeeded: ${response.bodyBytes.length} bytes');
+          return response.bodyBytes;
+        }
+      } catch (e) {
+        print('⚠️ Method 4 failed: $e');
+      }
+    }
+    
+    print('❌ All download methods failed');
+    return null;
+  }
+  
+  /// View/Open PDF (Quick preview)
+  Future<void> _viewPdf(String url) async {
+    setState(() {
+      _isDownloadingPdf = true;
+      _downloadProgress = 0.0;
+    });
+    
+    try {
+      print('🔵 Viewing PDF from: $url');
+      
+      final pdfBytes = await _downloadPdfUniversal(url);
+      
+      if (pdfBytes == null || pdfBytes.isEmpty) {
+        throw Exception('فشل تحميل الملف من الخادم');
+      }
+      
+      setState(() => _downloadProgress = 0.5);
+      
+      print('✅ PDF downloaded, size: ${pdfBytes.length} bytes');
+      
+      // Save to temporary directory
+      final tempDir = await getTemporaryDirectory();
+      final fileName = _generateFileName(url);
+      final tempFile = File('${tempDir.path}/$fileName');
+      
+      await tempFile.writeAsBytes(pdfBytes);
+      
+      setState(() => _downloadProgress = 1.0);
+      
+      print('✅ PDF saved to temp: ${tempFile.path}');
+      
+      setState(() => _isDownloadingPdf = false);
+      
+      // Open the file
+      final result = await OpenFile.open(tempFile.path);
+      
+      if (result.type != ResultType.done) {
+        _showError('لا يمكن فتح الملف: ${result.message}');
+      }
+      
+    } catch (e) {
+      print('❌ View PDF error: $e');
+      setState(() => _isDownloadingPdf = false);
+      _showError('فشل فتح الملف: ${_cleanError(e)}');
+    }
+  }
+  
+  /// Download PDF to device storage (Permanent save)
+  Future<void> _downloadPdfToDevice(String url) async {
+    // Request permissions for Android
+    if (Platform.isAndroid) {
+      var status = await Permission.storage.status;
+      if (!status.isGranted) {
+        status = await Permission.storage.request();
+        if (!status.isGranted) {
+          status = await Permission.manageExternalStorage.request();
+          if (!status.isGranted) {
+            _showError('يجب منح صلاحية الوصول للتخزين');
+            return;
+          }
+        }
+      }
+    }
+
+    setState(() {
+      _isDownloadingPdf = true;
+      _downloadProgress = 0.0;
+    });
+
+    try {
+      print('🔵 Downloading PDF to device from: $url');
+      _showSuccess('جاري التحميل...');
+      
+      final pdfBytes = await _downloadPdfUniversal(url);
+      
+      if (pdfBytes == null || pdfBytes.isEmpty) {
+        throw Exception('فشل تحميل الملف من الخادم');
+      }
+      
+      setState(() => _downloadProgress = 0.6);
+      
+      print('✅ PDF downloaded, size: ${pdfBytes.length} bytes');
+
+      final savedFile = await _savePdfToDevice(pdfBytes, url);
+      
+      setState(() {
+        _downloadProgress = 1.0;
+        _isDownloadingPdf = false;
+      });
+
+      if (savedFile != null) {
+        print('✅ PDF saved to: ${savedFile.path}');
+        _showDownloadSuccessDialog(savedFile.path, pdfBytes);
+      } else {
+        throw Exception('فشل حفظ الملف في الجهاز');
+      }
+    } catch (e) {
+      print('❌ Download error: $e');
+      setState(() => _isDownloadingPdf = false);
+      _showError('خطأ في التحميل: ${_cleanError(e)}');
     }
   }
 
-  Future<void> _loadClanPdf() async {
-    if (_clanId == null) return;
-    
+  /// Save PDF to device storage
+  Future<File?> _savePdfToDevice(List<int> pdfBytes, String url) async {
     try {
-      final result = await ApiService.getClanRulesPdf(_clanId!);
-      setState(() => _pdfUrl = result['pdf_url']);
+      Directory? directory;
+      
+      if (Platform.isAndroid) {
+        // Try Downloads folder first
+        try {
+          final downloadsPath = '/storage/emulated/0/Download';
+          directory = Directory(downloadsPath);
+          
+          if (!await directory.exists()) {
+            directory = await getExternalStorageDirectory();
+            if (directory != null) {
+              final publicPath = Directory('${directory.path}/Download');
+              await publicPath.create(recursive: true);
+              directory = publicPath;
+            }
+          }
+        } catch (e) {
+          print('⚠️ Could not access Downloads, using app directory');
+          directory = await getExternalStorageDirectory();
+        }
+      } else if (Platform.isWindows) {
+        // Windows - use Downloads folder
+        final userProfile = Platform.environment['USERPROFILE'];
+        if (userProfile != null) {
+          directory = Directory('$userProfile\\Downloads');
+          if (!await directory.exists()) {
+            directory = await getApplicationDocumentsDirectory();
+          }
+        } else {
+          directory = await getApplicationDocumentsDirectory();
+        }
+      } else if (Platform.isLinux || Platform.isMacOS) {
+        // Linux/Mac - try Downloads folder
+        final home = Platform.environment['HOME'];
+        if (home != null) {
+          directory = Directory('$home/Downloads');
+          if (!await directory.exists()) {
+            directory = await getApplicationDocumentsDirectory();
+          }
+        } else {
+          directory = await getApplicationDocumentsDirectory();
+        }
+      } else {
+        // iOS or other
+        directory = await getApplicationDocumentsDirectory();
+      }
+      
+      if (directory == null) {
+        throw Exception('لا يمكن الوصول إلى مجلد التخزين');
+      }
+      
+      if (!await directory.exists()) {
+        await directory.create(recursive: true);
+      }
+      
+      final fileName = _generateFileName(url);
+      final file = File('${directory.path}${Platform.pathSeparator}$fileName');
+
+      await file.writeAsBytes(pdfBytes);
+      
+      print('✅ File saved to: ${file.path}');
+      return file;
     } catch (e) {
-      // No PDF found, that's okay
-      setState(() => _pdfUrl = null);
+      print('❌ Error saving file: $e');
+      return null;
     }
+  }
+
+  /// Generate a proper filename
+  String _generateFileName(String url) {
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final clanName = _rules?['clan_name'] ?? 'العشيرة';
+    return 'قوانين_${clanName.replaceAll(' ', '_')}_$timestamp.pdf';
+  }
+
+  /// Share PDF
+  Future<void> _sharePdf(List<int> pdfBytes, String url) async {
+    try {
+      final fileName = _generateFileName(url);
+      final tempDir = await getTemporaryDirectory();
+      final tempFile = File('${tempDir.path}/$fileName');
+      
+      await tempFile.writeAsBytes(pdfBytes);
+      
+      await Share.shareXFiles(
+        [XFile(tempFile.path)],
+        text: 'كتاب قوانين العشيرة',
+        subject: 'قوانين العشيرة',
+      );
+      
+      _showSuccess('تم فتح خيارات المشاركة');
+    } catch (e) {
+      print('❌ Share error: $e');
+      _showError('خطأ في مشاركة الملف: ${_cleanError(e)}');
+    }
+  }
+
+  /// Show success dialog after download
+  void _showDownloadSuccessDialog(String filePath, List<int> pdfBytes) {
+    if (!mounted) return;
+    
+    final isDesktop = Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.check_circle, color: Colors.green, size: 28),
+            SizedBox(width: 8),
+            Text('تم التحميل بنجاح'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('تم حفظ الملف في:'),
+            SizedBox(height: 8),
+            Container(
+              padding: EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.grey[200],
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: SelectableText(
+                filePath,
+                style: TextStyle(fontSize: 12, fontFamily: 'monospace'),
+              ),
+            ),
+            SizedBox(height: 16),
+            Row(
+              children: [
+                Icon(Icons.folder, color: Colors.blue, size: 16),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    isDesktop 
+                        ? 'الملف محفوظ في مجلد التحميلات'
+                        : 'الملف محفوظ في جهازك',
+                    style: TextStyle(fontSize: 12, color: Colors.blue[700]),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('إغلاق'),
+          ),
+          if (!isDesktop)
+            ElevatedButton.icon(
+              onPressed: () async {
+                Navigator.pop(context);
+                await _sharePdf(pdfBytes, _pdfUrl!);
+              },
+              icon: Icon(Icons.share, size: 18),
+              label: Text('مشاركة'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ElevatedButton.icon(
+            onPressed: () async {
+              Navigator.pop(context);
+              try {
+                final result = await OpenFile.open(filePath);
+                if (result.type != ResultType.done) {
+                  _showError('لا يمكن فتح الملف تلقائياً');
+                }
+              } catch (e) {
+                _showError('خطأ في فتح الملف');
+              }
+            },
+            icon: Icon(Icons.open_in_new, size: 18),
+            label: Text('فتح الملف'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
   }
   
   void _clearFields() {
@@ -267,7 +615,10 @@ class ClanRulesPageState extends State<ClanRulesPage> {
   }
   
   String _cleanError(dynamic error) {
-    return error.toString().replaceAll('Exception: ', '').replaceAll('خطأ في ', '');
+    return error.toString()
+        .replaceAll('Exception: ', '')
+        .replaceAll('خطأ في ', '')
+        .replaceAll('Failed to download PDF: ', '');
   }
   
   Future<bool> _showConfirmDialog(String message) async {
@@ -292,13 +643,29 @@ class ClanRulesPageState extends State<ClanRulesPage> {
     return result ?? false;
   }
   
-  void _showError(String msg) => ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(content: Text(msg), backgroundColor: AppColors.error),
-  );
+  void _showError(String msg) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(msg),
+          backgroundColor: AppColors.error,
+          duration: Duration(seconds: 4),
+        ),
+      );
+    }
+  }
   
-  void _showSuccess(String msg) => ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(content: Text(msg), backgroundColor: AppColors.success),
-  );
+  void _showSuccess(String msg) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(msg),
+          backgroundColor: AppColors.success,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
   
   @override
   Widget build(BuildContext context) {
@@ -331,7 +698,6 @@ class ClanRulesPageState extends State<ClanRulesPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Show edit/create mode when: rules is null OR editing is true
                     if (_rules == null || _isEditing) ...[
                       _buildTextField(
                         controller: _generalRuleController,
@@ -392,7 +758,6 @@ class ClanRulesPageState extends State<ClanRulesPage> {
                         ],
                       ),
                     ] 
-                    // Show view mode only when rules exist AND not editing
                     else if (_rules != null && !_isEditing)
                       _buildViewMode(isDark),
 
@@ -423,9 +788,8 @@ class ClanRulesPageState extends State<ClanRulesPage> {
       validator: required ? (v) => v?.trim().isEmpty ?? true ? 'هذا الحقل مطلوب' : null : null,
     );
   }
-  
+
   Widget _buildPdfSection(bool isDark, {bool isEditing = false}) {
-    // Check if there's a PDF (either uploaded or pending)
     final hasPdf = _pdfUrl != null || _pendingPdfFile != null;
     
     return Card(
@@ -496,14 +860,32 @@ class ClanRulesPageState extends State<ClanRulesPage> {
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Show open button only for uploaded PDFs
-                      if (_pdfUrl != null)
-                        IconButton(
-                          icon: const Icon(Icons.open_in_new, color: AppColors.primary),
-                          onPressed: () => _openPdf(_pdfUrl!),
-                          tooltip: 'فتح الملف',
-                        ),
-                      // Only show delete button in edit mode
+                      if (_pdfUrl != null) ...[
+                        _isDownloadingPdf
+                          ? const Padding(
+                              padding: EdgeInsets.all(8.0),
+                              child: SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                            )
+                          : Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                // IconButton(
+                                //   icon: const Icon(Icons.visibility, color: AppColors.primary),
+                                //   onPressed: () => _downloadAndOpenPdf(_pdfUrl!),
+                                //   tooltip: 'عرض الملف',
+                                // ),
+                                IconButton(
+                                  icon: const Icon(Icons.download, color: Colors.green),
+                                  onPressed: () => _downloadPdfToDevice(_pdfUrl!),
+                                  tooltip: 'تحميل للجهاز',
+                                ),
+                              ],
+                            ),
+                      ],
                       if (isEditing)
                         IconButton(
                           icon: const Icon(Icons.delete, color: AppColors.error),
@@ -524,7 +906,7 @@ class ClanRulesPageState extends State<ClanRulesPage> {
     try {
       return url.split('/').last.replaceAll(RegExp(r'[a-f0-9-]{36}'), 'rules');
     } catch (e) {
-      return 'كتاب القوانين.pdf';
+      return 'كتاب_القوانين.pdf';
     }
   }
   

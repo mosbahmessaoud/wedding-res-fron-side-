@@ -21,7 +21,7 @@ class _EventTypeSelectionScreenState extends State<EventTypeSelectionScreen>
   void initState() {
     super.initState();
     _animationController = AnimationController(
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 500), // Reduced from 800ms
       vsync: this,
     );
 
@@ -32,7 +32,7 @@ class _EventTypeSelectionScreenState extends State<EventTypeSelectionScreen>
       ),
     );
 
-    _slideAnimation = Tween<double>(begin: 30.0, end: 0.0).animate(
+    _slideAnimation = Tween<double>(begin: 20.0, end: 0.0).animate( // Reduced from 30.0
       CurvedAnimation(
         parent: _animationController,
         curve: Curves.easeOut,
@@ -48,13 +48,16 @@ class _EventTypeSelectionScreenState extends State<EventTypeSelectionScreen>
     super.dispose();
   }
 
-
-
   void _navigate(String type) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => type == 'religious' ? ReligiousEventScreen() : WelcomeScreen(),
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) => 
+          type == 'religious' ? const ReligiousEventScreen() : const WelcomeScreen(),
+        transitionDuration: const Duration(milliseconds: 200),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return FadeTransition(opacity: animation, child: child);
+        },
       ),
     );
   }
@@ -64,211 +67,177 @@ class _EventTypeSelectionScreenState extends State<EventTypeSelectionScreen>
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage(''),
-            fit: BoxFit.cover,
-            colorFilter: ColorFilter.mode(
-              isDark 
-                ? Color.fromARGB(120, 0, 0, 0) 
-                : Color.fromARGB(55, 255, 255, 255),
-              BlendMode.overlay,
-            ),
-          ),
-        ),
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: isDark
-                ? [
-                    Colors.black.withOpacity(0.7),
-                    Colors.green.shade900.withOpacity(0.6),
-                    Colors.black.withOpacity(0.8),
-                  ]
-                : [
-                    const Color.fromARGB(84, 255, 255, 255).withOpacity(0.95),
-                    const Color.fromARGB(20, 248, 248, 248).withOpacity(0.4),
-                    const Color.fromARGB(93, 255, 255, 255).withOpacity(0.95),
-                  ],
-              stops: const [0.0, 0.5, 1.0],
-            ),
-          ),
-          child: SafeArea(
-            child: Stack(
-              children: [
-                // Theme Toggle Button on top right
-                Positioned(
-                  top: 8,
-                  left: 16,
-                  child: ThemeToggleButton(),
-                ),
-                
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 32.0),
-                  child: AnimatedBuilder(
-                    animation: _animationController,
-                    builder: (context, child) {
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const SizedBox(height: 60),
-                          
-                          // App Icon
-                          Transform.translate(
-                            offset: Offset(0, _slideAnimation.value),
-                            child: Opacity(
-                              opacity: _fadeAnimation.value,
-                              child: Container(
-                                width: 64,
-                                height: 64,
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                    colors: [
-                                      Colors.green.shade600,
-                                      Colors.green.shade800,
-                                    ],
-                                  ),
-                                  borderRadius: BorderRadius.circular(16),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.green.shade300.withOpacity(isDark ? 0.4 : 0.4),
-                                      blurRadius: 12,
-                                      offset: const Offset(0, 6),
-                                    ),
-                                  ],
-                                ),
-                                child: const Icon(
-                                  Icons.celebration_outlined,
-                                  color: Colors.white,
-                                  size: 32,
-                                ),
-                              ),
-                            ),
-                          ),
-                          
-                          const SizedBox(height: 48),
-                          
-                          // Main Heading
-                          Transform.translate(
-                            offset: Offset(0, _slideAnimation.value),
-                            child: Opacity(
-                              opacity: _fadeAnimation.value,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'اختر نوع',
-                                    style: TextStyle(
-                                      fontSize: 28,
-                                      fontWeight: FontWeight.w300,
-                                      color: isDark ? Colors.white70 : Colors.black87,
-                                      height: 1.2,
-                                    ),
-                                  ),
-                                  Text(
-                                    'المناسبة',
-                                    style: TextStyle(
-                                      fontSize: 34,
-                                      fontWeight: FontWeight.bold,
-                                      color: isDark ? Colors.green.shade300 : Colors.green.shade800,
-                                      height: 1.1,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          
-                          const SizedBox(height: 16),
-                          
-                          // Subtitle
-                          Transform.translate(
-                            offset: Offset(0, _slideAnimation.value),
-                            child: Opacity(
-                              opacity: _fadeAnimation.value * 0.8,
-                              child: Text(
-                                'يرجى تحديد نوع المناسبة المراد حجز تاريخها',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: isDark ? const Color.fromARGB(255, 217, 255, 218) : Colors.green.shade700,
-                                  height: 1.5,
-                                  fontWeight: FontWeight.w400,
-                                ),
-                              ),
-                            ),
-                          ),
-                          
-                          const SizedBox(height: 48),
-                          
-                          // Event Cards
-                          Transform.translate(
-                            offset: Offset(0, _slideAnimation.value * 0.5),
-                            child: Opacity(
-                              opacity: _fadeAnimation.value,
-                              child: _EventCard(
-                                icon: Icons.favorite_border,
-                                title: 'حفل زفاف',
-                                subtitle: 'إحياء حفل زفاف',
-                                isDark: isDark,
-                                onTap: () => _navigate('wedding'),
-                              ),
-                            ),
-                          ),
-                          
-                          const SizedBox(height: 16),
-                          
-                          Transform.translate(
-                            offset: Offset(0, _slideAnimation.value * 0.5),
-                            child: Opacity(
-                              opacity: _fadeAnimation.value,
-                              child: _EventCard(
-                                // icon: Icons.bedtime_outlined,
-                                // icon: Icons.auto_awesome_outlined,
-                                icon: Icons.favorite_outlined,
-                                title: 'حفل الله أكبر',
-                                subtitle: 'إحياء حفل الله أكبر',
-                                isDark: isDark,
-                                onTap: () => _navigate('religious'),
-                              ),
-                            ),
-                          ),
-                          
-                          const Spacer(),
-                           
-                          // Footer text
-                          Transform.translate(
-                            offset: Offset(0, _slideAnimation.value * 0.3),
-                            child: Opacity(
-                              opacity: _fadeAnimation.value * 0.6,
-                              child: Center(
-                                child: Text(
-                                  'صَلُّوا عَلَى النَّبِيِّ ﷺ',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: isDark ? Colors.green.shade400 : Colors.green.shade800,
-                                    height: 1.4,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                              ),
-                            ),
-                          ),
-                          
-                          const SizedBox(height: 40),
-                        ],
-                      );
-                    },
-                  ),
-                ),
+      body: _GradientBackground(isDark: isDark, onNavigate: _navigate),
+    );
+  }
+}
+
+// Separate widget to prevent gradient rebuilds
+class _GradientBackground extends StatelessWidget {
+  final bool isDark;
+  final Function(String) onNavigate;
+
+  const _GradientBackground({
+    required this.isDark,
+    required this.onNavigate,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: isDark
+            ? [
+                Colors.black.withOpacity(0.7),
+                Colors.green.shade900.withOpacity(0.6),
+                Colors.black.withOpacity(0.8),
+              ]
+            : [
+                const Color.fromARGB(84, 255, 255, 255).withOpacity(0.95),
+                const Color.fromARGB(20, 248, 248, 248).withOpacity(0.4),
+                const Color.fromARGB(93, 255, 255, 255).withOpacity(0.95),
               ],
-            ),
-          ),
+          stops: const [0.0, 0.5, 1.0],
         ),
+      ),
+      child: SafeArea(
+        child: Stack(
+          children: [
+            // Theme Toggle
+            const Positioned(
+              top: 8,
+              left: 16,
+              child: ThemeToggleButton(),
+            ),
+            
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 60),
+                  
+                  // App Icon - Simplified
+                  _AppIcon(isDark: isDark),
+                  
+                  const SizedBox(height: 48),
+                  
+                  // Headings
+                  Text(
+                    'اختر نوع',
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w300,
+                      color: isDark ? Colors.white70 : Colors.black87,
+                      height: 1.2,
+                    ),
+                  ),
+                  Text(
+                    'المناسبة',
+                    style: TextStyle(
+                      fontSize: 34,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.green.shade300 : Colors.green.shade800,
+                      height: 1.1,
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 16),
+                  
+                  // Subtitle
+                  Text(
+                    'يرجى تحديد نوع المناسبة المراد حجز تاريخها',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: isDark ? const Color.fromARGB(255, 217, 255, 218) : Colors.green.shade700,
+                      height: 1.5,
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 48),
+                  
+                  // Event Cards
+                  _EventCard(
+                    icon: Icons.favorite_border,
+                    title: 'حفل زفاف',
+                    subtitle: 'إحياء حفل زفاف',
+                    isDark: isDark,
+                    onTap: () => onNavigate('wedding'),
+                  ),
+                  
+                  const SizedBox(height: 16),
+                  
+                  _EventCard(
+                    icon: Icons.favorite_outlined,
+                    title: 'حفل الله أكبر',
+                    subtitle: 'إحياء حفل الله أكبر',
+                    isDark: isDark,
+                    onTap: () => onNavigate('religious'),
+                  ),
+                  
+                  const Spacer(),
+                  
+                  // Footer
+                  Center(
+                    child: Text(
+                      'صَلُّوا عَلَى النَّبِيِّ ﷺ',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: isDark ? Colors.green.shade400 : Colors.green.shade800,
+                        height: 1.4,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 40),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Optimized App Icon widget
+class _AppIcon extends StatelessWidget {
+  final bool isDark;
+
+  const _AppIcon({required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 64,
+      height: 64,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.green.shade600,
+            Colors.green.shade800,
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.green.shade300.withOpacity(0.3), // Reduced opacity
+            blurRadius: 8, // Reduced blur
+            offset: const Offset(0, 4), // Reduced offset
+          ),
+        ],
+      ),
+      child: const Icon(
+        Icons.celebration_outlined,
+        color: Colors.white,
+        size: 32,
       ),
     );
   }
@@ -306,10 +275,10 @@ class _EventCard extends StatelessWidget {
         boxShadow: [
           BoxShadow(
             color: isDark 
-              ? Colors.green.shade300.withOpacity(0.2)
-              : Colors.green.shade300.withOpacity(0.1),
-            blurRadius: isDark ? 8 : 18,
-            offset: const Offset(0, 4),
+              ? Colors.green.shade300.withOpacity(0.15) // Reduced opacity
+              : Colors.green.shade300.withOpacity(0.08), // Reduced opacity
+            blurRadius: isDark ? 6 : 12, // Reduced blur
+            offset: const Offset(0, 3), // Reduced offset
           ),
         ],
       ),
@@ -322,33 +291,7 @@ class _EventCard extends StatelessWidget {
             padding: const EdgeInsets.all(20),
             child: Row(
               children: [
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        Colors.green.shade600,
-                        Colors.green.shade800,
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.green.shade300.withOpacity(0.3),
-                        blurRadius: 8,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Icon(
-                    icon,
-                    size: 28,
-                    color: Colors.white,
-                  ),
-                ),
+                _EventIcon(icon: icon, isDark: isDark),
                 
                 const SizedBox(width: 16),
                 
@@ -386,6 +329,45 @@ class _EventCard extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+// Separate widget for event icon to cache decoration
+class _EventIcon extends StatelessWidget {
+  final IconData icon;
+  final bool isDark;
+
+  const _EventIcon({required this.icon, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 56,
+      height: 56,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.green.shade600,
+            Colors.green.shade800,
+          ],
+        ),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.green.shade300.withOpacity(0.2), // Reduced opacity
+            blurRadius: 6, // Reduced blur
+            offset: const Offset(0, 3), // Reduced offset
+          ),
+        ],
+      ),
+      child: Icon(
+        icon,
+        size: 28,
+        color: Colors.white,
       ),
     );
   }

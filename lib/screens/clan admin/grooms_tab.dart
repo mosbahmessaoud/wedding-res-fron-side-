@@ -1,4 +1,5 @@
 
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -25,16 +26,75 @@ class GroomManagementScreenState extends State<GroomManagementScreen> {
   @override
   void initState() {
     super.initState();
-    _loadGrooms();
+    _checkConnectivityAndLoad();
   }
 
  void refreshData() {
     // Add your refresh logic here
-    _loadGrooms();
+    _checkConnectivityAndLoad();
     setState(() {
       // Trigger rebuild
     });
   }
+
+
+
+  Future<void> _checkConnectivityAndLoad() async {
+  setState(() {
+    isLoading = true;
+  });
+  
+  // Show loading for 2 seconds
+  await Future.delayed(Duration(seconds: 2));
+  final connectivityResult = await Connectivity().checkConnectivity();
+  
+  if (connectivityResult.contains(ConnectivityResult.none)) {
+    _showNoInternetDialog();
+    setState(() {
+      isLoading = false;
+    });
+    return;
+  }
+  
+  await _loadGrooms();
+}
+
+void _showNoInternetDialog() {
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: Row(
+        children: [
+          Icon(Icons.wifi_off, color: Colors.orange),
+          SizedBox(width: 10),
+          Text('لا يوجد اتصال'),
+        ],
+      ),
+      content: Text('يرجى التحقق من اتصالك بالإنترنت'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text('إلغاء'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            Navigator.pop(context);
+            _checkConnectivityAndLoad();
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.blue.shade700,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          child: Text('إعادة المحاولة', style: TextStyle(color: Colors.white)),
+        ),
+      ],
+    ),
+  );
+}
+
+
   void _showViewGroomDialog(Map<String, dynamic> groom) {
     showDialog(
       context: context,
@@ -952,7 +1012,7 @@ PreferredSizeWidget _buildModernAppBar() {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: IconButton(
-                  onPressed: _loadGrooms,
+                  onPressed: _checkConnectivityAndLoad,
                   icon: Icon(Icons.refresh, size: isSmallScreen ? 18 : 20),
                   tooltip: 'تحديث القائمة',
                   padding: EdgeInsets.all(isSmallScreen ? 8 : 12),
@@ -1076,7 +1136,7 @@ Widget _buildErrorState() {
           ),
           SizedBox(height: 20),
           ElevatedButton.icon(
-            onPressed: _loadGrooms,
+            onPressed: _checkConnectivityAndLoad,
             icon: Icon(Icons.refresh),
             label: Text('إعادة المحاولة'),
             style: ElevatedButton.styleFrom(

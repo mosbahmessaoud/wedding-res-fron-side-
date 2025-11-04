@@ -1,4 +1,4 @@
-package com.example.client
+package app.MeDev.ASULI
 
 import io.flutter.embedding.android.FlutterActivity
 

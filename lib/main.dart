@@ -8,6 +8,8 @@ import 'package:wedding_reservation_app/screens/auth/sing_up_screen.dart';
 import 'package:wedding_reservation_app/screens/clan%20admin/home_screen.dart';
 import 'package:wedding_reservation_app/screens/groom/create_reservation_screen.dart';
 import 'package:wedding_reservation_app/screens/groom/groom_home_screen.dart';
+import 'package:wedding_reservation_app/services/api_service.dart';
+import 'package:wedding_reservation_app/services/connectivity_service.dart';
 import 'screens/auth/splash_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'utils/colors.dart';
@@ -17,7 +19,9 @@ void main() async {
   
   // Initialize date formatting for Arabic locale
   await initializeDateFormatting('ar');
-  
+  ConnectivityService().initialize();
+  await ApiService.initializeToken(); // Add this line
+
   runApp(WeddingReservationApp());
 }
 

@@ -1,6 +1,7 @@
 // lib/screens/clan_admin/reservations_tab.dart
 import 'dart:io';
 
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -36,33 +37,101 @@ class ReservationsTabState extends State<ReservationsTab> with SingleTickerProvi
   bool _isLoading = false;
   String _searchQuery = '';
 
+  // @override
+  // void initState() {
+  //   super.initState();
+  //   _tabController = TabController(length: 5, vsync: this);
+  //   _loadAllReservations();
+  // }
   @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 5, vsync: this);
-    _loadAllReservations();
-  }
+void initState() {
+  super.initState();
+  _tabController = TabController(length: 5, vsync: this);
+  _checkConnectivityAndLoad();
+}
   
   void refreshData() {
-    _loadInitialData();
+    _checkConnectivityAndLoad();
     setState(() {});
   }
 
-  Future<void> _loadInitialData() async {
-    await Future.wait([
-      _loadAllReservations(),
-    ]);
-    
-    if (mounted) {
-      setState(() {});
-    }
-  }
+Future<void> _loadInitialData() async {
   
+  await _loadAllReservations();
+  
+  if (mounted) {
+    setState(() {});
+  }
+}
+
   @override
   void dispose() {
     _tabController.dispose();
     super.dispose();
   }
+
+
+Future<void> _checkConnectivityAndLoad() async {
+    setState(() {
+    _isLoading = true;
+  });
+  
+  // Show loading for 2 seconds
+  await Future.delayed(Duration(seconds: 2));
+  final connectivityResult = await Connectivity().checkConnectivity();
+  
+  if (connectivityResult.contains(ConnectivityResult.none)) {
+    _showNoInternetDialog();
+    setState(() {
+      _isLoading = false;
+    });
+    return;
+  }
+  
+  await _loadInitialData();
+}
+
+void _showNoInternetDialog() {
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) {
+      final isDark = Theme.of(context).brightness == Brightness.dark;
+      return AlertDialog(
+        backgroundColor: isDark ? AppColors.darkCard : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Icon(Icons.wifi_off, color: Colors.orange),
+            SizedBox(width: 10),
+            Text('لا يوجد اتصال', 
+              style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
+          ],
+        ),
+        content: Text('يرجى التحقق من اتصالك بالإنترنت',
+          style: TextStyle(color: isDark ? Colors.white70 : Colors.grey.shade700)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('إلغاء'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _checkConnectivityAndLoad();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: Text('إعادة المحاولة', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      );
+    },
+  );
+}
+
 
   bool _isReservationArchived(Map<String, dynamic> reservation) {
     final date2 = reservation['date2'];
@@ -542,7 +611,6 @@ class ReservationsTabState extends State<ReservationsTab> with SingleTickerProvi
             ),
             decoration: BoxDecoration(
               color: isDark ? AppColors.darkCard : Colors.white,
-              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(24)),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
@@ -587,40 +655,40 @@ class ReservationsTabState extends State<ReservationsTab> with SingleTickerProvi
               ],
             ),
           ),
-          
-Container(
-  color: isDark ? AppColors.darkCard : Colors.white,
-  child: TabBar(
-    controller: _tabController,
-    isScrollable: true,
-    tabAlignment: TabAlignment.start, // Ensures tabs start from the right (RTL)
-    indicatorColor: AppColors.primary,
-    indicatorWeight: 3,
-    labelColor: AppColors.primary,
-    unselectedLabelColor: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
-    labelStyle: TextStyle(
-      fontWeight: FontWeight.w600, 
-      fontSize: MediaQuery.of(context).size.width < 600 ? 12 : 14
-    ),
-    unselectedLabelStyle: TextStyle(
-      fontWeight: FontWeight.w500,
-      fontSize: MediaQuery.of(context).size.width < 600 ? 12 : 14
-    ),
-    labelPadding: EdgeInsets.symmetric(
-      horizontal: MediaQuery.of(context).size.width < 600 ? 12 : 16
-    ),
-    padding: EdgeInsets.symmetric(
-      horizontal: MediaQuery.of(context).size.width < 600 ? 8 : 12
-    ),
-    tabs: [
-      Tab(text: 'الكل (${_allReservations.length})'),
-      Tab(text: 'معلقة (${_pendingReservations.length})'),
-      Tab(text: 'مؤكدة (${_validatedReservations.length})'),
-      Tab(text: 'ملغاة (${_cancelledReservations.length})'),
-      Tab(text: 'أرشيف (${_archivedReservations.length})'),
-    ],
-  ),
-),
+                      
+            Container(
+              color: isDark ? AppColors.darkCard : Colors.white,
+              child: TabBar(
+                controller: _tabController,
+                isScrollable: true,
+                tabAlignment: TabAlignment.start, // Ensures tabs start from the right (RTL)
+                indicatorColor: AppColors.primary,
+                indicatorWeight: 3,
+                labelColor: AppColors.primary,
+                unselectedLabelColor: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                labelStyle: TextStyle(
+                  fontWeight: FontWeight.w600, 
+                  fontSize: MediaQuery.of(context).size.width < 600 ? 12 : 14
+                ),
+                unselectedLabelStyle: TextStyle(
+                  fontWeight: FontWeight.w500,
+                  fontSize: MediaQuery.of(context).size.width < 600 ? 12 : 14
+                ),
+                labelPadding: EdgeInsets.symmetric(
+                  horizontal: MediaQuery.of(context).size.width < 600 ? 12 : 16
+                ),
+                padding: EdgeInsets.symmetric(
+                  horizontal: MediaQuery.of(context).size.width < 600 ? 8 : 12
+                ),
+                tabs: [
+                  Tab(text: 'الكل (${_allReservations.length})'),
+                  Tab(text: 'معلقة (${_pendingReservations.length})'),
+                  Tab(text: 'مؤكدة (${_validatedReservations.length})'),
+                  Tab(text: 'ملغاة (${_cancelledReservations.length})'),
+                  Tab(text: 'أرشيف (${_archivedReservations.length})'),
+                ],
+              ),
+            ),
           // Tab Views
           Expanded(
             child: _isLoading
@@ -651,6 +719,7 @@ Container(
       ),
     );
   }
+  
 Widget _buildModernStatistics(bool isDark) {
   final stats = [
     {'title': 'الإجمالي', 'count': _allReservations.length, 'color': Colors.blue.shade400, 'icon': Icons.event_note_rounded},

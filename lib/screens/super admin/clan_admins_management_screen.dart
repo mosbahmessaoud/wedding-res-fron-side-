@@ -91,32 +91,38 @@ class _ClanAdminsManagementScreenState extends State<ClanAdminsManagementScreen>
       });
     }
   }
+Future<void> _loadClanAdmins() async {
+  if (_selectedCountyId == null) return;
 
-  Future<void> _loadClanAdmins() async {
-    if (_selectedCountyId == null) return;
+  try {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = '';
+    });
 
-    try {
-      setState(() {
-        _isLoading = true;
-        _errorMessage = '';
-      });
+    final admins = await ApiService.getClanAdminsByCounty(_selectedCountyId!);
+    
+    // Check if widget is still mounted before calling setState
+    if (!mounted) return;
+    
+    setState(() {
+      _clanAdmins = admins;
+      _filteredAdmins = admins;
+      _isLoading = false;
+    });
 
-      final admins = await ApiService.getClanAdminsByCounty(_selectedCountyId!);
-      
-      setState(() {
-        _clanAdmins = admins;
-        _filteredAdmins = admins;
-        _isLoading = false;
-      });
-
-      _applyFilters();
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'خطأ في تحميل مدراء العشائر: $e';
-        _isLoading = false;
-      });
-    }
+    _applyFilters();
+  } catch (e) {
+    // Check if widget is still mounted before calling setState
+    if (!mounted) return;
+    
+    setState(() {
+      _errorMessage = 'خطأ في تحميل مدراء العشائر: $e';
+      _isLoading = false;
+    });
   }
+}
+
 
   void _applyFilters() {
     setState(() {
@@ -134,33 +140,38 @@ class _ClanAdminsManagementScreenState extends State<ClanAdminsManagementScreen>
       }).toList();
     });
   }
+Future<void> _deleteClanAdmin(int adminId, String adminName) async {
+  final confirmed = await _showDeleteConfirmationDialog(adminName);
+  if (!confirmed) return;
 
-  Future<void> _deleteClanAdmin(int adminId, String adminName) async {
-    final confirmed = await _showDeleteConfirmationDialog(adminName);
-    if (!confirmed) return;
+  try {
+    await ApiService.deleteClanAdmin(adminId);
+    
+    // Check if widget is still mounted
+    if (!mounted) return;
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('تم حذف مدير العشيرة بنجاح'),
+        backgroundColor: Colors.green,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
 
-    try {
-      await ApiService.deleteClanAdmin(adminId);
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('تم حذف مدير العشيرة بنجاح'),
-          backgroundColor: Colors.green,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-
-      _loadClanAdmins(); // Reload data
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('خطأ في حذف مدير العشيرة: $e'),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
+    _loadClanAdmins(); // Reload data
+  } catch (e) {
+    // Check if widget is still mounted
+    if (!mounted) return;
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('خطأ في حذف مدير العشيرة: $e'),
+        backgroundColor: Colors.red,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
+}
 Future<void> _updateClanAdmin(Map<String, dynamic> admin) async {
   final result = await showDialog<Map<String, dynamic>>(
     context: context,
@@ -170,6 +181,9 @@ Future<void> _updateClanAdmin(Map<String, dynamic> admin) async {
   if (result != null) {
     try {
       await ApiService.updateClanAdmin(admin['id'], result);
+      
+      // Check if widget is still mounted
+      if (!mounted) return;
       
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -181,6 +195,9 @@ Future<void> _updateClanAdmin(Map<String, dynamic> admin) async {
 
       _loadClanAdmins(); // Reload data
     } catch (e) {
+      // Check if widget is still mounted
+      if (!mounted) return;
+      
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('خطأ في تحديث مدير العشيرة: $e'),
@@ -881,125 +898,190 @@ items: _counties.map<DropdownMenuItem<int>>((county) {
     );
   }
 
+  // Update _buildAdminCard method - status badge section
 Widget _buildAdminCard(Map<String, dynamic> admin, bool isTablet, bool isDesktop) {
   final clan = _clans.firstWhere(
-    (c) => c.id == admin['clan_id'],  // Changed from c['id'] to c.id
-    orElse: () => Clan(id: 0, name: 'غير محدد', countyId: 0),  // Return a Clan object instead of Map
+    (c) => c.id == admin['clan_id'],
+    orElse: () => Clan(id: 0, name: 'غير محدد', countyId: 0),
   );
+  
+  // Changed: Get status as string
+  final status = admin['status'] ?? 'inactive';
+  final isActive = status == 'active';
 
-    return Container(
-      margin: EdgeInsets.only(bottom: 16),
-      padding: EdgeInsets.all(isDesktop ? 20 : isTablet ? 18 : 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            offset: Offset(0, 4),
-            blurRadius: 16,
-          ),
-        ],
-        border: Border.all(
-          color: AppColors.primary.withOpacity(0.1),
+  return Container(
+    margin: EdgeInsets.only(bottom: 16),
+    padding: EdgeInsets.all(isDesktop ? 20 : isTablet ? 18 : 16),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.04),
+          offset: Offset(0, 4),
+          blurRadius: 16,
         ),
+      ],
+      border: Border.all(
+        color: AppColors.primary.withOpacity(0.1),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header Row
-          Row(
-            children: [
-              Container(
-                padding: EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  Icons.person,
-                  color: AppColors.primary,
-                  size: isDesktop ? 24 : 20,
-                ),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Header Row
+        Row(
+          children: [
+            Container(
+              padding: EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
               ),
-              SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '${admin['first_name'] ?? ''} ${admin['last_name'] ?? ''}'.trim(),
-                      style: TextStyle(
-                        fontSize: isDesktop ? 18 : isTablet ? 16 : 14,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    SizedBox(height: 2),
-                    Text(
-                      'مدير عشيرة ${clan.name}',  // Changed from clan['name'] to clan.name
-                      style: TextStyle(
-                        fontSize: isDesktop ? 14 : 12,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
+              child: Icon(
+                Icons.person,
+                color: AppColors.primary,
+                size: isDesktop ? 24 : 20,
               ),
-              PopupMenuButton<String>(
-                icon: Icon(Icons.more_vert, color: AppColors.textSecondary),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                itemBuilder: (context) => [
-                  PopupMenuItem<String>(
-                    value: 'view',
-                    child: Row(
-                      children: [
-                        Icon(Icons.visibility, color: AppColors.primary, size: 20),
-                        SizedBox(width: 12),
-                        Text('عرض التفاصيل'),
-                      ],
-                    ),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${admin['first_name'] ?? ''} ${admin['last_name'] ?? ''}'.trim(),
+                          style: TextStyle(
+                            fontSize: isDesktop ? 18 : isTablet ? 16 : 14,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                      // Add status badge here
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: isActive ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isActive ? Colors.green : Colors.red,
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              isActive ? Icons.check_circle : Icons.cancel,
+                              size: 14,
+                              color: isActive ? Colors.green : Colors.red,
+                            ),
+                            SizedBox(width: 4),
+                            Text(
+                              isActive ? 'نشط' : 'غير نشط',
+                              style: TextStyle(
+                                fontSize: isDesktop ? 12 : 11,
+                                fontWeight: FontWeight.w600,
+                                color: isActive ? Colors.green : Colors.red,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                  PopupMenuItem<String>(
-                    value: 'edit',
-                    child: Row(
-                      children: [
-                        Icon(Icons.edit, color: AppColors.primary, size: 20),
-                        SizedBox(width: 12),
-                        Text('تعديل البيانات'),
-                      ],
-                    ),
-                  ),
-                  PopupMenuItem<String>(
-                    value: 'delete',
-                    child: Row(
-                      children: [
-                        Icon(Icons.delete, color: Colors.red, size: 20),
-                        SizedBox(width: 12),
-                        Text('حذف', style: TextStyle(color: Colors.red)),
-                      ],
+                  SizedBox(height: 2),
+                  Text(
+                    'مدير عشيرة ${clan.name}',
+                    style: TextStyle(
+                      fontSize: isDesktop ? 14 : 12,
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 ],
-                onSelected: (value) {
-                  switch (value) {
-                    case 'view':
-                      _showAdminDetails(admin);
-                      break;
-                    case 'edit':
-                      _updateClanAdmin(admin);
-                      break;
-                    case 'delete':
-                      final adminName = '${admin['first_name']} ${admin['last_name']}';
-                      _deleteClanAdmin(admin['id'], adminName);
-                      break;
-                  }
-                },
               ),
-            ],
-          ),
+            ),
+            PopupMenuButton<String>(
+              icon: Icon(Icons.more_vert, color: AppColors.textSecondary),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              itemBuilder: (context) => [
+                PopupMenuItem<String>(
+                  value: 'view',
+                  child: Row(
+                    children: [
+                      Icon(Icons.visibility, color: AppColors.primary, size: 20),
+                      SizedBox(width: 12),
+                      Text('عرض التفاصيل'),
+                    ],
+                  ),
+                ),
+                PopupMenuItem<String>(
+                  value: 'edit',
+                  child: Row(
+                    children: [
+                      Icon(Icons.edit, color: AppColors.primary, size: 20),
+                      SizedBox(width: 12),
+                      Text('تعديل البيانات'),
+                    ],
+                  ),
+                ),
+                // Add status toggle option
+                PopupMenuItem<String>(
+                  value: 'toggle_status',
+                  child: Row(
+                    children: [
+                      Icon(
+                        isActive ? Icons.block : Icons.check_circle,
+                        color: isActive ? Colors.orange : Colors.green,
+                        size: 20,
+                      ),
+                      SizedBox(width: 12),
+                      Text(
+                        isActive ? 'تعطيل الحساب' : 'تفعيل الحساب',
+                        style: TextStyle(
+                          color: isActive ? Colors.orange : Colors.green,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                PopupMenuItem<String>(
+                  value: 'delete',
+                  child: Row(
+                    children: [
+                      Icon(Icons.delete, color: Colors.red, size: 20),
+                      SizedBox(width: 12),
+                      Text('حذف', style: TextStyle(color: Colors.red)),
+                    ],
+                  ),
+                ),
+              ],
+              onSelected: (value) {
+                switch (value) {
+                  case 'view':
+                    _showAdminDetails(admin);
+                    break;
+                  case 'edit':
+                    _updateClanAdmin(admin);
+                    break;
+                  case 'toggle_status':
+                    _toggleAdminStatus(admin);
+                    break;
+                  case 'delete':
+                    final adminName = '${admin['first_name']} ${admin['last_name']}';
+                    _deleteClanAdmin(admin['id'], adminName);
+                    break;
+                }
+              },
+            ),
+          ],
+        ),
           
           SizedBox(height: 16),
           
@@ -1077,7 +1159,20 @@ Widget _buildAdminCard(Map<String, dynamic> admin, bool isTablet, bool isDesktop
                   ),
                 ),
               ),
-
+              SizedBox(width: 8),
+              OutlinedButton.icon(
+                onPressed: () => _toggleAdminStatus(admin),
+                icon: Icon(isActive ? Icons.block : Icons.check_circle),
+                label: Text(isActive ? 'تعطيل' : 'تفعيل'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: isActive ? Colors.orange : Colors.green,
+                  side: BorderSide(color: isActive ? Colors.orange : Colors.green),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                ),
+              ),
               SizedBox(width: 8),
               OutlinedButton.icon(
                 onPressed: () {
@@ -1101,6 +1196,166 @@ Widget _buildAdminCard(Map<String, dynamic> admin, bool isTablet, bool isDesktop
       ),
     );
   }
+
+
+  // Update _toggleAdminStatus method
+Future<void> _toggleAdminStatus(Map<String, dynamic> admin) async {
+  print('🔍 Starting toggle status for admin ID: ${admin['id']}');
+  
+  // Get the CURRENT status from local data first (faster UI feedback)
+  final localStatus = admin['status'] ?? 'inactive';
+  final isCurrentlyActive = localStatus == 'active';
+  
+  final adminName = '${admin['first_name']} ${admin['last_name']}';
+  
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Row(
+        children: [
+          Icon(
+            isCurrentlyActive ? Icons.block : Icons.check_circle,
+            color: isCurrentlyActive ? Colors.orange : Colors.green,
+            size: 28,
+          ),
+          SizedBox(width: 12),
+          Text(isCurrentlyActive ? 'تعطيل الحساب' : 'تفعيل الحساب'),
+        ],
+      ),
+      content: Text(
+        isCurrentlyActive
+            ? 'هل أنت متأكد من تعطيل حساب "$adminName"؟\n\nلن يتمكن من تسجيل الدخول حتى يتم تفعيل الحساب مرة أخرى.'
+            : 'هل أنت متأكد من تفعيل حساب "$adminName"؟\n\nسيتمكن من تسجيل الدخول واستخدام النظام.',
+        style: TextStyle(fontSize: 16),
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: Text('إلغاء'),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.of(context).pop(true),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: isCurrentlyActive ? Colors.orange : Colors.green,
+            foregroundColor: Colors.white,
+          ),
+          child: Text(isCurrentlyActive ? 'تعطيل' : 'تفعيل'),
+        ),
+      ],
+    ),
+  );
+
+  if (confirmed != true) return;
+
+  // Show loading indicator
+  if (!mounted) return;
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Row(
+        children: [
+          SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+            ),
+          ),
+          SizedBox(width: 12),
+          Text('جاري تغيير حالة الحساب...'),
+        ],
+      ),
+      duration: Duration(seconds: 30),
+      backgroundColor: AppColors.primary,
+    ),
+  );
+
+  try {
+    print('🔍 Calling API to change status for admin ID: ${admin['id']}');
+    
+    // Call API to change status
+    final response = await ApiService.changeClanAdminStatus(admin['id']);
+    
+    print('✅ API response received: $response');
+    
+    if (!mounted) return;
+    
+    // Hide loading indicator
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    
+    // Get the new status from response
+    final newStatus = response['status']; // String: 'active' or 'inactive'
+    
+    print('✅ New status: $newStatus');
+    
+    // Update the local state immediately
+    setState(() {
+      // Update in main list
+      final adminIndex = _clanAdmins.indexWhere((a) => a['id'] == admin['id']);
+      if (adminIndex != -1) {
+        _clanAdmins[adminIndex]['status'] = newStatus;
+        print('✅ Updated main list at index $adminIndex');
+      }
+      
+      // Update in filtered list
+      final filteredIndex = _filteredAdmins.indexWhere((a) => a['id'] == admin['id']);
+      if (filteredIndex != -1) {
+        _filteredAdmins[filteredIndex]['status'] = newStatus;
+        print('✅ Updated filtered list at index $filteredIndex');
+      }
+    });
+    
+    // Show success message
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(Icons.check_circle, color: Colors.white),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                newStatus == 'active'
+                    ? 'تم تفعيل حساب مدير العشيرة بنجاح'
+                    : 'تم تعطيل حساب مدير العشيرة بنجاح',
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: Colors.green,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+    
+  } catch (e) {
+    print('❌ Error in toggle status: $e');
+    
+    if (!mounted) return;
+    
+    // Hide loading indicator
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    
+    // Show error message
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(Icons.error, color: Colors.white),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text('خطأ في تغيير حالة مدير العشيرة: $e'),
+            ),
+          ],
+        ),
+        backgroundColor: Colors.red,
+        behavior: SnackBarBehavior.floating,
+        duration: Duration(seconds: 5),
+      ),
+    );
+  }
+}
 
   Widget _buildInfoItem(
     IconData icon,
@@ -1236,7 +1491,61 @@ final county = _counties.firstWhere(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Add Status Card at the top
+                  Container(
+                    width: double.infinity,
+                    padding: EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: (admin['status'] == 'active') 
+                          ? Colors.green.withOpacity(0.1) 
+                          : Colors.red.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: (admin['status'] == 'active') ? Colors.green : Colors.red,
+                        width: 2,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          (admin['status'] == 'active') ? Icons.check_circle : Icons.cancel,
+                          color: (admin['status'] == 'active') ? Colors.green : Colors.red,
+                          size: 32,
+                        ),
+                        SizedBox(width: 12),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'حالة الحساب',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textSecondary,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              (admin['status'] == 'active') ? 'الحساب نشط' : 'الحساب معطل',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                                color: (admin['status'] == 'active') ? Colors.green : Colors.red,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  SizedBox(height: 24),
+
+
+
+
                   _buildDetailSection('المعلومات الشخصية', [
+                    _buildDetailRow('الحالة', admin['status'] == 'active' ? 'نشط' : 'غير نشط'),
                     _buildDetailRow('رقم الهاتف', admin['phone_number'] ?? 'غير محدد'),
                     _buildDetailRow('اسم الأب', admin['father_name'] ?? 'غير محدد'),
                     _buildDetailRow('اسم الجد', admin['grandfather_name'] ?? 'غير محدد'),
@@ -1262,13 +1571,32 @@ final county = _counties.firstWhere(
                         child: OutlinedButton.icon(
                           onPressed: () {
                             Navigator.of(context).pop();
-                            _updateClanAdmin(admin);
+                            _toggleAdminStatus(admin);
                           },
-                          icon: Icon(Icons.edit),
-                          label: Text('تعديل البيانات'),
+                          icon: Icon((admin['status'] == 'active') ? Icons.block : Icons.check_circle),
+                          label: Text((admin['status'] == 'active') ? 'تعطيل الحساب' : 'تفعيل الحساب'),
                           style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.orange,
-                            side: BorderSide(color: Colors.orange),
+                            foregroundColor: (admin['status'] == 'active') ? Colors.orange : Colors.green,
+                            side: BorderSide(color: (admin['status'] == 'active') ? Colors.orange : Colors.green),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            padding: EdgeInsets.symmetric(vertical: 16),
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                            _toggleAdminStatus(admin);
+                          },
+                          icon: Icon((admin['is_active'] ?? true) ? Icons.block : Icons.check_circle),
+                          label: Text((admin['is_active'] ?? true) ? 'تعطيل الحساب' : 'تفعيل الحساب'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: (admin['is_active'] ?? true) ? Colors.orange : Colors.green,
+                            side: BorderSide(color: (admin['is_active'] ?? true) ? Colors.orange : Colors.green),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),

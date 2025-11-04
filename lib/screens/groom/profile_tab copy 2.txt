@@ -19,92 +19,35 @@ class ProfileTabState extends State<ProfileTab> {
   Map<String, dynamic>? _clanInfo;
   Map<String, dynamic>? _countyInfo;
 
-  // ADD THESE CACHE VARIABLES:
-  Map<String, dynamic>? _cachedUserProfile;
-  Map<String, dynamic>? _cachedClanInfo;
-  Map<String, dynamic>? _cachedCountyInfo;
-  bool _hasLoadedOnce = false;
-
   @override
   void initState() {
     super.initState();
-    
-    // Show cached data immediately
-    _loadCachedData();
-    
-    // Load fresh data in background
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadProfileInBackground();
-    });
+    _checkConnectivityAndLoad();
   }
-Future<void> refreshData() async {
-  await _loadProfileInBackground();
-}
 
-// ============================================
-// 2. ADD: Load cached data method (instant)
-// ============================================
-
-void _loadCachedData() {
-  setState(() {
-    _userProfile = _cachedUserProfile;
-    _clanInfo = _cachedClanInfo;
-    _countyInfo = _cachedCountyInfo;
-    _isLoading = _cachedUserProfile == null && !_hasLoadedOnce;
-  });
-}
-
-
-// ============================================
-// 4. ADD: Background loading method (non-blocking)
-// ============================================
-
-Future<void> _loadProfileInBackground() async {
-  try {
-    // Don't show loading spinner if we have cached data
-    if (_cachedUserProfile == null) {
-      setState(() => _isLoading = true);
-    }
-    
-    // Load profile
-    _userProfile = await ApiService.getProfile();
-    _cachedUserProfile = _userProfile;
-    
-    // Load clan and county information in parallel
-    await Future.wait([
-      _loadClanInfo(),
-      _loadCountyInfo(),
-    ]);
-    
-    _hasLoadedOnce = true;
-    
-    if (mounted) {
-      setState(() => _isLoading = false);
-    }
-  } catch (e) {
-    // Keep cached data on error
-    if (mounted) {
-      setState(() => _isLoading = false);
-    }
+  void refreshData() {
+    _checkConnectivityAndLoad();
+    setState(() {});
   }
-}
 
 
+  
 Future<void> _checkConnectivityAndLoad() async {
-  // Show cached data first
-  _loadCachedData();
+  setState(() => _isLoading = true);
+  
+  // Show loading for 2 seconds
+  await Future.delayed(Duration(seconds: 2));
   
   final connectivityResult = await Connectivity().checkConnectivity();
   
   if (connectivityResult.contains(ConnectivityResult.none)) {
     _showNoInternetDialog();
+    setState(() => _isLoading = false);
     return;
   }
   
-  // Load fresh data in background
-  await _loadProfileInBackground();
+  await _loadProfile();
 }
-
 
 void _showNoInternetDialog() {
   showDialog(
@@ -142,8 +85,30 @@ void _showNoInternetDialog() {
 }
 
 Future<void> _loadProfile() async {
-  await _loadProfileInBackground();
+  setState(() => _isLoading = true);
+  
+  try {
+    _userProfile = await ApiService.getProfile();
+    
+    // Load clan and county information in parallel
+    await Future.wait([
+      _loadClanInfo(),
+      _loadCountyInfo(),
+    ]);
+    
+  } catch (e) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('خطأ في تحميل الملف الشخصي: ${e.toString()}')),
+      );
+    }
+  } finally {
+    if (mounted) {
+      setState(() => _isLoading = false);
+    }
+  }
 }
+
 Future<void> _loadClanInfo() async {
   if (_userProfile?['clan_id'] == null) return;
   
@@ -154,12 +119,10 @@ Future<void> _loadClanInfo() async {
       orElse: () => null,
     );
     _clanInfo = foundClan?.toJson();
-    _cachedClanInfo = _clanInfo; // Cache it
   } catch (e) {
-    // Keep cached data on error
+    // Handle clan loading error silently
   }
 }
-
 
 Future<void> _loadCountyInfo() async {
   if (_userProfile?['county_id'] == null) return;
@@ -171,50 +134,37 @@ Future<void> _loadCountyInfo() async {
       orElse: () => null,
     );
     _countyInfo = foundCounty?.toJson();
-    _cachedCountyInfo = _countyInfo; // Cache it
   } catch (e) {
-    // Keep cached data on error
+    // Handle county loading error silently
   }
 }
 
-@override
-Widget build(BuildContext context) {
-  // Show loading only on first load with no cache
-  if (_isLoading && _cachedUserProfile == null) {
-    return const Center(child: CircularProgressIndicator());
-  }
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
-  // Show cached or fresh data
-  return PopScope(
-    canPop: false,
-    onPopInvokedWithResult: (bool didPop, Object? result) {
-      // Do nothing - completely block back navigation
-      return;
-    },
-    child: RefreshIndicator(
-      onRefresh: _loadProfileInBackground,
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildProfileHeader(),
-            const SizedBox(height: 24),
-            _buildLocationInfo(),
-            const SizedBox(height: 24),
-            _buildPersonalInfoSection(),
-            const SizedBox(height: 24),
-            _buildGuardianInfoSection(),
-            const SizedBox(height: 24),
-            _buildActionButtons(),
-            const SizedBox(height: 60),
-          ],
-        ),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildProfileHeader(),
+          const SizedBox(height: 24),
+          _buildLocationInfo(),
+          const SizedBox(height: 24),
+          _buildPersonalInfoSection(),
+          const SizedBox(height: 24),
+          _buildGuardianInfoSection(),
+          const SizedBox(height: 24),
+          _buildActionButtons(),
+          const SizedBox(height: 60),
+
+        ],
       ),
-    ),
-  );
-}
+    );
+  }
 
   Widget _buildProfileHeader() {
     final fullName = '${_userProfile?['first_name'] ?? ''} ${_userProfile?['last_name'] ?? ''}'.trim();    
@@ -737,140 +687,46 @@ void _showNewsClan() {
   }
 
   void _showDeleteAccountDialog() {
-  showDialog(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: const Text('حذف الحساب'),
-      content: const Text('تحذير: هذا الإجراء لا يمكن التراجع عنه. سيتم حذف جميع بياناتك نهائياً.'),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('إلغاء'),
-        ),
-        ElevatedButton(
-          onPressed: () async {
-            Navigator.pop(context);
-            
-            // Capture the navigator and mounted check BEFORE showing loading dialog
-            final navigator = Navigator.of(context);
-            
-            // Show loading indicator
-            showDialog(
-              context: context,
-              barrierDismissible: false,
-              builder: (context) => const Center(
-                child: CircularProgressIndicator(),
-              ),
-            );
-
-            // Check for active reservations
-            final hasReservations = await _hasActiveReservations();
-            
-            // Hide loading using the captured navigator
-            navigator.pop();
-
-            if (hasReservations) {
-              // Show error dialog
-              if (mounted) {
-                _showCannotDeleteDialog();
-              }
-            } else {
-              // Proceed with deletion
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('حذف الحساب'),
+        content: const Text('تحذير: هذا الإجراء لا يمكن التراجع عنه. سيتم حذف جميع بياناتك نهائياً.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
               await _deleteAccount();
-            }
-          },
-          style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-          child: const Text('حذف الحساب'),
-        ),
-      ],
-    ),
-  );
-}
-void _showCannotDeleteDialog() {
-  showDialog(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: const Row(
-        children: [
-          Icon(Icons.warning, color: Colors.orange),
-          SizedBox(width: 10),
-          Text('لا يمكن حذف الحساب'),
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('حذف الحساب'),
+          ),
         ],
       ),
-      content: const Text(
-        'لديك حجز نشط (معلق أو مؤكد). يجب إلغاء الحجز أولاً قبل حذف الحساب.',
-        textAlign: TextAlign.right,
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('حسناً'),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            Navigator.pop(context);
-            // Navigate to reservations tab (assuming index 1)
-            DefaultTabController.of(context).animateTo(1);
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
-          ),
-          child: const Text('عرض الحجوزات'),
-        ),
-      ],
-    ),
-  );
-}
-
-Future<bool> _hasActiveReservations() async {
-  try {
-    // Check for pending reservation
-    final pendingReservation = await ApiService.getMyPendingReservation();
-    if (pendingReservation.isNotEmpty) {
-      return true;
-    }
-  } catch (e) {
-    // No pending reservation found
-    print('No pending reservation: $e');
+    );  
   }
 
-  try {
-    // Check for validated reservation
-    final validatedReservation = await ApiService.getMyValidatedReservation();
-    if (validatedReservation.isNotEmpty) {
-      return true;
-    }
-  } catch (e) {
-    // No validated reservation found
-    print('No validated reservation: $e');
-  }
-
-  return false;
-}
-
-Future<void> _deleteAccount() async {
-  try {
-    await ApiService.deleteProfile();
-    await ApiService.clearToken();
-    
-    if (mounted) {
-      Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('تم حذف الحساب بنجاح'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    }
-  } catch (e) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('خطأ في حذف الحساب: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
+  Future<void> _deleteAccount() async {
+    try {
+      await ApiService.deleteProfile();
+      ApiService.clearToken();
+      
+      if (mounted) {
+        Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تم حذف الحساب بنجاح')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('خطأ في حذف الحساب: ${e.toString()}')),
+        );
+      }
     }
   }
-}
 }

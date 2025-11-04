@@ -1,6 +1,7 @@
 // lib/screens/reservation/create_reservation_screen.dart
 import 'dart:math' as math;
 
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:wedding_reservation_app/screens/groom/groom_home_screen.dart';
 import '../../services/api_service.dart';
@@ -58,7 +59,7 @@ class CreateReservationScreenState extends State<CreateReservationScreen> {
   bool _date2Bool = false;
   bool _canSelectTwoDays = false; // Based on clan settings
   
-  bool _isLoading = true;
+  bool _isLoading = false;
   bool _isSubmitting = false;
   int _maxCapacityPerDate = 3;
   int _years_max_reserv_GroomFromOutClan = 1;
@@ -86,12 +87,19 @@ class CreateReservationScreenState extends State<CreateReservationScreen> {
     });
   }
   
+  // @override
+  // void dispose() {
+  //   _date1Controller.dispose();
+  //   _pageController.dispose();
+  //   super.dispose();
+  // }
   @override
-  void dispose() {
-    _date1Controller.dispose();
-    _pageController.dispose();
-    super.dispose();
-  }
+void dispose() {
+  _date1Controller.dispose();
+  // Remove or comment out this line:
+  // _pageController.dispose();
+  super.dispose();
+}
 // Add this method in the CreateReservationScreenState class
 bool get _isOriginClan {
   if (_userProfile == null || _selectedClan == null) {
@@ -164,8 +172,77 @@ void _showMessageDialog({
   );
 }
 
+// Future<void> _refreshData() async {
+//   setState(() => _isLoading = true);
+  
+//   try {
+//     // Reset all selections when refreshing
+//     _selectedClan = null;
+//     _selectedHall = null;
+//     _selectedHaiaCommittee = null;
+//     _selectedMadaehCommittee = null;
+//     _halls.clear();
+//     _clanSettings = null;
+//     _originClanSettings = null;
+//     _selectedClanSettings = null;
+//     _instructionSettingsLoaded = false;
+//     _canSelectTwoDays = false;
+//     _date2Bool = false;
+//     _maxCapacityPerDate = 3;
+    
+    
+//     // Clear form fields
+//     _date1Controller.clear();
+    
+//     // Reset options
+//     _allowOthers = false;
+//     _joinToMassWedding = false;
+    
+//     // Go back to first step
+//     _currentStep = 0;
+//     _pageController.animateToPage(
+//       0,
+//       duration: const Duration(milliseconds: 300),
+//       curve: Curves.easeInOut,
+//     );
+    
+//     await _loadInitialData();
+    
+//     if (mounted) {
+//       _showMessageDialog(
+//         title: 'تم التحديث',
+//         message: 'تم تحديث البيانات بنجاح',
+//         icon: Icons.refresh,
+//         isError: false,
+//       );
+//     }
+//   } catch (e) {
+//     if (mounted) {
+//       _showMessageDialog(
+//         title: 'خطأ في التحديث',
+//         message: 'خطأ في تحديث البيانات: $e',
+//         icon: Icons.error,
+//         isError: true,
+//       );
+//     }
+//   } finally {
+//     if (mounted) {
+//       setState(() => _isLoading = false);
+//     }
+//   }
+// }
 Future<void> _refreshData() async {
   setState(() => _isLoading = true);
+  
+  // Show loading for 2 seconds
+  // await Future.delayed(Duration(seconds: 2));
+  final connectivityResult = await Connectivity().checkConnectivity();
+  
+  if (connectivityResult.contains(ConnectivityResult.none)) {
+    _showNoInternetDialog();
+    setState(() => _isLoading = false); // Add this
+    return;
+  }
   
   try {
     // Reset all selections when refreshing
@@ -182,7 +259,6 @@ Future<void> _refreshData() async {
     _date2Bool = false;
     _maxCapacityPerDate = 3;
     
-    
     // Clear form fields
     _date1Controller.clear();
     
@@ -190,15 +266,17 @@ Future<void> _refreshData() async {
     _allowOthers = false;
     _joinToMassWedding = false;
     
-    // Go back to first step
-    _currentStep = 0;
-    _pageController.animateToPage(
-      0,
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-    );
+    // Go back to first step - FIXED VERSION
+    if (mounted && _pageController.hasClients) {
+      _currentStep = 0;
+      await _pageController.animateToPage(
+        0,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
     
-    await _loadInitialData();
+    await _loadData();
     
     if (mounted) {
       _showMessageDialog(
@@ -223,7 +301,6 @@ Future<void> _refreshData() async {
     }
   }
 }
-
 
 Future<void> _loadInstructionClanSettings() async {
   if (_instructionSettingsLoaded) return;
@@ -489,13 +566,49 @@ Widget _buildReservationInstructionWidget() {
       ),
     ),
   );
-}
-Future<void> _submitReservation() async {
+}  
+
+   Future<void> _submitReservation() async {
   setState(() => _isSubmitting = true);
   
   Map<String, dynamic>? response;
   
   try {
+    // NEW: Check if clan admin exists and is active
+    if (_userProfile!['clan_id'] != null) {
+      try {
+        final clanAdminStatus = await ApiService.checkClanAdminStatus();
+        
+        if (clanAdminStatus['has_admin']==false || clanAdminStatus['is_active']==false ) {
+          if (mounted) {
+            _showMessageDialog(
+              title: 'العشيرة غير مشتركة',
+              message: 'عذراً، عشيرة ${clanAdminStatus['clan_name']} غير مشتركة حالياً في التطبيق.\n\n'
+                      'يرجى التواصل مع إدارة العشيرة للانضمام إلى النظام.',
+              icon: Icons.business_center_outlined,
+              titleColor: Colors.orange,
+              isError: true,
+            );
+          }
+          return;
+
+        }
+        
+
+      } catch (e) {
+        print('Error checking clan admin status: $e');
+        if (mounted) {
+          _showMessageDialog(
+            title: 'خطأ في التحقق',
+            message: 'حدث خطأ أثناء التحقق من حالة العشيرة.\n\nيرجى المحاولة مرة أخرى.',
+            icon: Icons.error,
+            isError: true,
+          );
+        }
+        return;
+      }
+    }
+    
     // Prepare the reservation data matching backend expectations
     final reservationData = {
       'date1': _date1Controller.text,
@@ -621,6 +734,138 @@ Future<void> _submitReservation() async {
     }
   }
 }
+   
+// Future<void> _submitReservation() async {
+//   setState(() => _isSubmitting = true);
+  
+//   Map<String, dynamic>? response;
+  
+//   try {
+//     // Prepare the reservation data matching backend expectations
+//     final reservationData = {
+//       'date1': _date1Controller.text,
+//       'date2_bool': _date2Bool,
+//       'allow_others': _allowOthers,
+//       'join_to_mass_wedding': _joinToMassWedding,
+//       'clan_id': _selectedClan!['id'],
+//       'hall_id': _selectedHall!['id'],
+//       'haia_committee_id': _selectedHaiaCommittee!['id'],
+//       'madaeh_committee_id': _selectedMadaehCommittee!['id'],
+//     };
+
+//     print('Submitting reservation data: $reservationData');
+
+//     response = await ApiService.createReservation(reservationData);
+//     print('Reservation created successfully: ${response['reservation_id']}');
+
+//     if (mounted) {
+//       // Navigate to GroomHomeScreen with reservations tab selected
+//       Navigator.of(context).pushReplacement(
+//         MaterialPageRoute(
+//           builder: (context) => const GroomHomeScreen(initialTabIndex: 2),
+//         ),
+//       );
+      
+//       String daysMax = _getValidationDeadlineDays();
+//       String successMessage = 
+//         'تم إنشاء حجز جديد بنجاح!\n\n'
+//         'يجب طباعة الحجز وختمه وتوقيعه خلال $daysMax أيام كأقصى حد، '
+//         'وإلا سيتم إلغاء الحجز تلقائيًا.\n\n'
+//         'يمكنك الآن الذهاب إلى قائمة الحجوزات لطباعة الحجز.';
+
+//       _showMessageDialog(
+//         title: 'تم إنشاء الحجز بنجاح',
+//         message: successMessage,
+//         icon: Icons.check_circle,
+//         titleColor: Colors.green,
+//         isError: false,
+//       );
+//     }
+    
+//   } on FormatException catch (e) {
+//     print('Format error: $e');
+//     if (mounted) {
+//       _showMessageDialog(
+//         title: 'خطأ في التحليل',
+//         message: 'خطأ في تحليل استجابة الخادم.\n\nيرجى المحاولة مرة أخرى.',
+//         icon: Icons.error_outline,
+//         isError: true,
+//       );
+//     }
+//   } catch (e) {
+//     print('Error creating reservation: $e');
+    
+//     String errorStr = e.toString().toLowerCase();
+//     if (errorStr.contains('401') || errorStr.contains('unauthorized') || 
+//         errorStr.contains('invalid token') || errorStr.contains('token expired')) {
+//       if (mounted) {
+//         Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+//         _showMessageDialog(
+//           title: 'انتهاء الجلسة',
+//           message: 'انتهت صلاحية الجلسة.\n\nيرجى تسجيل الدخول مرة أخرى.',
+//           icon: Icons.login,
+//           isError: true,
+//         );
+//       }
+//       return;
+//     }
+
+//     if (response != null && response.containsKey('reservation_id')) {
+//       try {
+//         print('Deleting reservation due to error: ${response['reservation_id']}');
+//         await ApiService.deleteReservation(response['reservation_id']);
+//         print('Reservation deleted successfully');
+//       } catch (deleteError) {
+//         print('Failed to delete reservation: $deleteError');
+//       }
+//     }
+    
+//     if (mounted) {
+//       String errorTitle = 'خطأ في إرسال الطلب';
+//       String errorMessage = 'خطأ في إرسال طلب الحجز';
+      
+//       if (errorStr.contains('already have an active reservation')) {
+//         errorTitle = 'حجز موجود مسبقاً';
+//         errorMessage = 'لديك حجز نشط بالفعل.\n\nلا يمكن إنشاء حجز جديد حتى يتم إلغاء أو تأكيد الحجز الحالي.';
+//       } else if (errorStr.contains('not allowed in this month')) {
+//         errorTitle = 'غير مسموح في هذا الشهر';
+//         errorMessage = 'حجز يومين غير مسموح في هذا الشهر.\n\nيرجى اختيار يوم واحد فقط أو اختيار شهر آخر.';
+//       } else if (errorStr.contains('already reserved')) {
+//         errorTitle = 'التاريخ محجوز';
+//         errorMessage = 'التاريخ محجوز بالفعل من قبل شخص آخر.\n\nيرجى اختيار تاريخ آخر.';
+//       } else if (errorStr.contains('fully booked')) {
+//         errorTitle = 'التاريخ ممتلئ';
+//         errorMessage = 'التاريخ ممتلئ بالكامل ولا يمكن إضافة حجوزات جديدة.\n\nيرجى اختيار تاريخ آخر.';
+//       } else if (errorStr.contains('pdf')) {
+//         errorTitle = 'خطأ في إنشاء PDF';
+//         errorMessage = 'خطأ في إنشاء ملف PDF للحجز.\n\nيرجى المحاولة مرة أخرى.';
+//       } else if (errorStr.contains('server error') || errorStr.contains('500')) {
+//         errorTitle = 'خطأ في الخادم';
+//         errorMessage = 'حدث خطأ في الخادم.\n\nيرجى المحاولة لاحقاً أو التواصل مع الدعم الفني.';
+//       } else if (errorStr.contains('network') || errorStr.contains('connection')) {
+//         errorTitle = 'خطأ في الاتصال';
+//         errorMessage = 'خطأ في الاتصال بالإنترنت.\n\nتحقق من اتصالك بالإنترنت وحاول مرة أخرى.';
+//       } else {
+//         String actualError = e.toString();
+//         if (actualError.length > 150) {
+//           actualError = actualError.substring(0, 150) + '...';
+//         }
+//         errorMessage = ' \n\n$actualError\n\nيرجى المحاولة مرة أخرى  .';
+//       }
+      
+//       _showMessageDialog(
+//         title: errorTitle,
+//         message: errorMessage,
+//         icon: Icons.error,
+//         isError: true,
+//       );
+//     }
+//   } finally {
+//     if (mounted) {
+//       setState(() => _isSubmitting = false);
+//     }
+//   }
+// }
 
   // Load clan settings by clan ID
   Future<void> _loadSettingForClan(int clanId) async {
@@ -662,9 +907,86 @@ Future<void> _submitReservation() async {
 
 
 
-Future<void> _loadInitialData() async {
-  setState(() => _isLoading = true);
+// Future<void> _loadInitialData() async {
+//   setState(() => _isLoading = true);
   
+//   try {
+//     print('Loading user profile...');
+//     final profile = await ApiService.getProfile();
+//     print('Profile loaded: ${profile.runtimeType}');
+//     _userProfile = profile;
+    
+//     print('Loading clans for county: ${profile['county_id']}');
+//     final clans = await ApiService.getClansByCounty(profile['county_id']);
+//     print('Clans loaded: ${clans.runtimeType} - ${clans}');
+    
+//     print('Loading county info...');
+//     final county_n = await ApiService.getCounty(profile['county_id']);
+//     print('County loaded: ${county_n.runtimeType}');
+//     _selectedCounty = county_n as Map<String, dynamic>?;
+    
+//     print('Loading Haia committees...');
+//     final haiaCommittees = await ApiService.getGroomHaia();
+//     print('Haia committees loaded: ${haiaCommittees.runtimeType} - Length: ${haiaCommittees.length}');
+    
+//     print('Loading Madaeh committees...');
+//     final madaehCommittees = await ApiService.getGroomMadaihCommittee();
+//     print('Madaeh committees loaded: ${madaehCommittees.runtimeType} - Length: ${madaehCommittees.length}');
+    
+//     setState(() {
+//       if (clans is List) {
+//         _clans = clans;
+//       } else {
+//         print('WARNING: clans is not a List, it is: ${clans.runtimeType}');
+//         _clans = [];
+//       }
+      
+//       _haiaCommittees = haiaCommittees;
+//       _madaehCommittees = madaehCommittees;
+//     });
+    
+//     print('All data loaded successfully');
+    
+//   } catch (e, stackTrace) {
+//     print('Error in _loadInitialData: $e');
+//     print('Stack trace: $stackTrace');
+//     if (mounted) {
+//       _showMessageDialog(
+//         title: 'خطأ في تحميل البيانات',
+//         message: 'حدث خطأ أثناء تحميل البيانات الأساسية:\n\n${e.toString()}\n\nيرجى المحاولة مرة أخرى أو التواصل مع الدعم الفني.',
+//         icon: Icons.error,
+//         isError: true,
+//       );
+//     }
+//   } finally {
+//     if (mounted) {
+//       setState(() => _isLoading = false);
+//     }
+//   }
+// }
+
+Future<void> _loadInitialData() async {
+  await _checkConnectivityAndLoad();
+}
+
+Future<void> _checkConnectivityAndLoad() async {
+  setState(() => _isLoading = false);
+  
+  // Show loading for 2 seconds
+  // await Future.delayed(Duration(seconds: 2));
+  
+  final connectivityResult = await Connectivity().checkConnectivity();
+  
+  if (connectivityResult.contains(ConnectivityResult.none)) {
+    _showNoInternetDialog();
+    setState(() => _isLoading = false);
+    return;
+  }
+  
+  await _loadData();
+}
+
+Future<void> _loadData() async {
   try {
     print('Loading user profile...');
     final profile = await ApiService.getProfile();
@@ -703,7 +1025,7 @@ Future<void> _loadInitialData() async {
     print('All data loaded successfully');
     
   } catch (e, stackTrace) {
-    print('Error in _loadInitialData: $e');
+    print('Error in _loadData: $e');
     print('Stack trace: $stackTrace');
     if (mounted) {
       _showMessageDialog(
@@ -719,6 +1041,42 @@ Future<void> _loadInitialData() async {
     }
   }
 }
+
+void _showNoInternetDialog() {
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: Row(
+        children: [
+          Icon(Icons.wifi_off, color: Colors.orange),
+          SizedBox(width: 10),
+          Text('لا يوجد اتصال'),
+        ],
+      ),
+      content: Text('يرجى التحقق من اتصالك بالإنترنت'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text('إلغاء'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            Navigator.pop(context);
+            _checkConnectivityAndLoad();
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          child: Text('إعادة المحاولة', style: TextStyle(color: Colors.white)),
+        ),
+      ],
+    ),
+  );
+}
+
 
 
  Future<void> _loadHallsForClan(int clanId) async {
@@ -1052,81 +1410,90 @@ Future<void> _selectDate(TextEditingController controller, String title) async {
 //   );
   
 // }
-
 @override
 Widget build(BuildContext context) {
   final isDark = Theme.of(context).brightness == Brightness.dark;
   
   if (_isLoading) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('إنشاء حجز جديد'),
-        backgroundColor: isDark ? AppColors.darkBackground : AppColors.primary,
-        foregroundColor: Colors.white,
-      ),
-      body: Center(
-        child: CircularProgressIndicator(
-          color: isDark ? AppColors.darkPrimary : AppColors.primary,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (bool didPop, dynamic result) {
+        // Do nothing - blocks back navigation during loading
+        return;
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('إنشاء حجز جديد'),
+          backgroundColor: isDark ? AppColors.darkBackground : AppColors.primary,
+          foregroundColor: Colors.white,
+          automaticallyImplyLeading: false, // No back button
+        ),
+        body: Center(
+          child: CircularProgressIndicator(
+            color: isDark ? AppColors.darkPrimary : AppColors.primary,
+          ),
         ),
       ),
     );
   }
 
-  return Scaffold(
-    // appBar: AppBar(
-    //   title: const Text('إنشاء حجز جديد'),
-    //   backgroundColor: isDark ? AppColors.darkBackground : AppColors.primary,
-    //   foregroundColor: Colors.white,
-    // ),
-    backgroundColor: isDark ? AppColors.darkBackground : Colors.white,
-    body: Column(
-      children: [
-        // Progress indicator
-        Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Row(
-            children: [
-              for (int i = 0; i < 3; i++) ...[
-                Expanded(
-                  child: Container(
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: i <= _currentStep 
-                        ? (isDark ? AppColors.darkPrimary : const Color.fromARGB(255, 0, 151, 98))
-                        : (isDark 
-                            ? AppColors.darkPrimary.withOpacity(0.3)
-                            : const Color.fromARGB(255, 110, 174, 122).withOpacity(0.3)),
-                      borderRadius: BorderRadius.circular(2),
+  return PopScope(
+    canPop: false, // Prevents back navigation
+    onPopInvokedWithResult: (bool didPop, dynamic result) {
+      // Do nothing - completely blocks all back button attempts
+      return;
+    },
+    child: Scaffold(
+      backgroundColor: isDark ? AppColors.darkBackground : Colors.white,
+      body: Column(
+        children: [
+          // Progress indicator
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              children: [
+                for (int i = 0; i < 3; i++) ...[
+                  Expanded(
+                    child: Container(
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: i <= _currentStep 
+                          ? (isDark ? AppColors.darkPrimary : const Color.fromARGB(255, 0, 151, 98))
+                          : (isDark 
+                              ? AppColors.darkPrimary.withOpacity(0.3)
+                              : const Color.fromARGB(255, 110, 174, 122).withOpacity(0.3)),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
                     ),
                   ),
-                ),
-                if (i < 2) const SizedBox(width: 8),
-              ],
-            ],
-          ),
-        ),
-        
-        // Main content
-        Expanded(
-          child: RefreshIndicator(
-            onRefresh: _refreshData,
-            color: AppColors.primary,
-            backgroundColor: Colors.white,
-            child: Form(
-              key: _formKey,
-              child: PageView(
-                controller: _pageController,
-                onPageChanged: (index) => setState(() => _currentStep = index),
-                children: [
-                  _buildClanAndHallSelectionStep(),
-                  _buildReservationDetailsStep(),
-                  _buildConfirmationStep(),
+                  if (i < 2) const SizedBox(width: 8),
                 ],
+              ],
+            ),
+          ),
+          
+          // Main content
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: _refreshData,
+              color: AppColors.primary,
+              backgroundColor: Colors.white,
+              child: Form(
+                key: _formKey,
+                child: PageView(
+                  controller: _pageController,
+                  onPageChanged: (index) => setState(() => _currentStep = index),
+                  children: [
+                    _buildClanAndHallSelectionStep(),
+                    _buildReservationDetailsStep(),
+                    _buildConfirmationStep(),
+                  ],
+                ),
               ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     ),
   );
 }
@@ -2059,27 +2426,27 @@ Widget _buildBottomNavigation() {
     ),
   );
 }
-  void _goToPreviousStep() {
-    if (_currentStep > 0) {
-      _pageController.previousPage(
+void _goToPreviousStep() {
+  if (_currentStep > 0 && _pageController.hasClients) {
+    _pageController.previousPage(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
+  }
+}
+
+ void _handleNextStep() {
+  if (_currentStep == 2) {
+    _submitReservation();
+  } else {
+    if (_validateCurrentStep() && _pageController.hasClients) {
+      _pageController.nextPage(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
       );
     }
   }
-
-  void _handleNextStep() {
-    if (_currentStep == 2) {
-      _submitReservation();
-    } else {
-      if (_validateCurrentStep()) {
-        _pageController.nextPage(
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeInOut,
-        );
-      }
-    }
-  }
+}
 
 bool _validateCurrentStep() {
   switch (_currentStep) {

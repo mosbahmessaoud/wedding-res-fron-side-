@@ -1,3 +1,4 @@
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'dart:io';
@@ -39,14 +40,68 @@ class ClanRulesPageState extends State<ClanRulesPage> {
   @override
   void initState() {
     super.initState();
-    _loadData();
+    _checkConnectivityAndLoad();
   }
   
   void refreshData() {
-    _loadData();
+    _checkConnectivityAndLoad();
     setState(() {});
   }
+Future<void> _checkConnectivityAndLoad() async {
+    setState(() {
+    _isLoading = true;
+  });
+  
+  // Show loading for 2 seconds
+  await Future.delayed(Duration(seconds: 2));
+  
+  final connectivityResult = await Connectivity().checkConnectivity();
+  
+  if (connectivityResult.contains(ConnectivityResult.none)) {
+    _showNoInternetDialog();
+    setState(() {
+      _isLoading = false;
+    });
+    return;
+  }
+  
+  await _loadData();
+}
 
+void _showNoInternetDialog() {
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: Row(
+        children: [
+          Icon(Icons.wifi_off, color: Colors.orange),
+          SizedBox(width: 10),
+          Text('لا يوجد اتصال'),
+        ],
+      ),
+      content: Text('يرجى التحقق من اتصالك بالإنترنت'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text('إلغاء'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            Navigator.pop(context);
+            _checkConnectivityAndLoad();
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          child: Text('إعادة المحاولة', style: TextStyle(color: Colors.white)),
+        ),
+      ],
+    ),
+  );
+}
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {

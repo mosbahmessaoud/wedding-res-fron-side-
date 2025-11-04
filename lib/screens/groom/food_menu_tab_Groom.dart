@@ -1,4 +1,5 @@
 // lib/screens/clan_admin/food_tab.dart
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:wedding_reservation_app/services/api_service.dart';
 
@@ -10,8 +11,11 @@ class FoodMenuTabG extends StatefulWidget {
 }
 
 class FoodMenuTabGState extends State<FoodMenuTabG> {
+  // Initialize with empty data (cache)
   List<dynamic> _menus = [];
-  bool _isLoading = false;
+  List<dynamic> _cachedMenus = [];
+  bool _hasLoadedOnce = false;
+  
   String _searchQuery = '';
   String _selectedFoodType = 'الكل';
   int _selectedVisitors = 0;
@@ -22,35 +26,133 @@ class FoodMenuTabGState extends State<FoodMenuTabG> {
   @override
   void initState() {
     super.initState();
-    _loadInitialData();
+    
+    // Load cached data first
+    _loadCachedData();
+    
+    // Load fresh data in background
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkConnectivityAndLoad();
+    });
+  }
+
+  void _loadCachedData() {
+    setState(() {
+      _menus = _cachedMenus;
+    });
   }
 
   void refreshData() {
-
-    _loadInitialData();
-    setState(() {
-      // Trigger rebuild
-    });
+    _checkConnectivityAndLoad();
   }
   
 Future<void> _loadInitialData() async {
-  await Future.wait([
-    _loadFoodTypes(),
-    _loadVisitorOptions(), 
-    _loadMenus(),
-  ]);
-  
-  // Refresh the UI to update dropdown options after menus are loaded
-  if (mounted) {
-    setState(() {});
-  }
+  await _checkConnectivityAndLoad();
 }
 
+  void _showSnackBar(String message, Color backgroundColor) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: backgroundColor,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+
+Future<void> _checkConnectivityAndLoad() async {
+    final connectivityResult = await Connectivity().checkConnectivity();
+    
+    if (connectivityResult.contains(ConnectivityResult.none)) {
+      if (_cachedMenus.isEmpty && !_hasLoadedOnce) {
+        _showNoInternetDialog();
+      } else {
+        _showSnackBar('لا يوجد اتصال - عرض البيانات المحفوظة', Colors.orange);
+      }
+      return;
+    }
+    
+    await _loadData();
+  }
+Future<void> _loadFoodTypes() async {
+    try {
+      final foodTypes = await ApiService.getFoodTypes();
+      if (mounted) {
+        setState(() {
+          _foodTypes = List<String>.from(foodTypes);
+        });
+      }
+    } catch (e) {
+      // Keep existing data or use fallback
+      if (_foodTypes.isEmpty) {
+        setState(() {
+          _foodTypes = ['فريق', 'كسكس', 'كباب'];
+        });
+      }
+    }
+  }
+
+Future<void> _loadData() async {
+    try {
+      await Future.wait([
+        _loadFoodTypes(),
+        _loadVisitorOptions(), 
+        _loadMenus(),
+      ]);
+      
+      if (mounted) {
+        setState(() {});
+      }
+    } catch (e) {
+      print('Error loading data: $e');
+      _showSnackBar('خطأ في التحميل - عرض البيانات المحفوظة', Colors.orange);
+    }
+  }
+
+void _showNoInternetDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Icon(Icons.wifi_off, color: Colors.orange),
+            SizedBox(width: 10),
+            Text('لا يوجد اتصال'),
+          ],
+        ),
+        content: Text(
+          _hasLoadedOnce 
+            ? 'يتم عرض آخر البيانات المحفوظة\nللتحديث، تحقق من اتصالك بالإنترنت'
+            : 'يرجى التحقق من اتصالك بالإنترنت لتحميل البيانات'
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('موافق'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _checkConnectivityAndLoad();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: Text('إعادة المحاولة', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
 
   // Add these methods to get unique values from existing menus:
-
 List<String> get _uniqueFoodTypes {
-  final Set<String> foodTypes = {'الكل'}; // Add "All" option
+  final Set<String> foodTypes = {'الكل'};
   for (final menu in _menus) {
     final foodType = menu['food_type'] ?? '';
     if (foodType.isNotEmpty) {
@@ -60,8 +162,9 @@ List<String> get _uniqueFoodTypes {
   return foodTypes.toList();
 }
 
+// And change this:
 List<int> get _uniqueVisitorCounts {
-  final Set<int> visitorCounts = {0}; // Add "All" option (0 means all)
+  final Set<int> visitorCounts = {0};
   for (final menu in _menus) {
     final visitors = menu['number_of_visitors'] ?? 0;
     if (visitors > 0) {
@@ -74,67 +177,61 @@ List<int> get _uniqueVisitorCounts {
 }
 
 
-
-
-  Future<void> _loadFoodTypes() async {
-    try {
-      final foodTypes = await ApiService.getFoodTypes();
-      setState(() {
-        _foodTypes = List<String>.from(foodTypes);
-      });
-    } catch (e) {
-      // Fallback to default values if API fails
-      setState(() {
-        _foodTypes = ['فريق', 'كسكس', 'كباب'];
-      });
-    }
-  }
-
+ 
   Future<void> _loadVisitorOptions() async {
     try {
       final visitorOptions = await ApiService.getVisitorOptions();
-      setState(() {
-        _visitorOptions = List<int>.from(visitorOptions);
-      });
+      if (mounted) {
+        setState(() {
+          _visitorOptions = List<int>.from(visitorOptions);
+        });
+      }
     } catch (e) {
-      // Fallback to default values if API fails
-      setState(() {
-        _visitorOptions = [50, 100, 150, 200, 250, 300, 350,  400,450 , 500 ,600];
-      });
+      // Keep existing data or use fallback
+      if (_visitorOptions.isEmpty) {
+        setState(() {
+          _visitorOptions = [50, 100, 150, 200, 250, 300, 350, 400, 450, 500, 600];
+        });
+      }
     }
   }
 
+
+ 
+
+  
   Future<void> _loadMenus() async {
-    setState(() => _isLoading = true);
     try {
       final menus = await ApiService.getClanMenus();
-      setState(() {
-        _menus = menus;
-        _isLoading = false;
-      });
+      
+      if (mounted) {
+        setState(() {
+          _menus = menus;
+          // Update cache
+          _cachedMenus = List.from(menus);
+          _hasLoadedOnce = true;
+        });
+      }
     } catch (e) {
-      setState(() => _isLoading = false);
-      _showErrorSnackBar('خطأ في تحميل القوائم: $e');
+      print('Error loading menus: $e');
+      // Keep cached data visible
+      if (mounted && _cachedMenus.isNotEmpty) {
+        _showSnackBar('خطأ في التحميل - عرض البيانات المحفوظة', Colors.orange);
+      } else {
+        _showErrorSnackBar('خطأ في تحميل القوائم: $e');
+      }
     }
   }
 
+
   void _showErrorSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-      ),
-    );
+    _showSnackBar(message, Colors.red);
   }
 
   void _showSuccessSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.green,
-      ),
-    );
+    _showSnackBar(message, Colors.green);
   }
+
 
   List<dynamic> get _filteredMenus {
     return _menus.where((menu) {
@@ -151,24 +248,26 @@ List<int> get _uniqueVisitorCounts {
     }).toList();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
+@override
+Widget build(BuildContext context) {
+  return PopScope(
+    canPop: false,
+    onPopInvokedWithResult: (bool didPop, Object? result) {
+      // Do nothing - completely block back navigation
+      return;
+    },
+    child: Scaffold(
       body: Column(
         children: [
           _buildFilters(),
           Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _buildMenusList(),
+            child: _buildMenusList(),
           ),
         ],
       ),
-
-    );
-  }
-
-
+    ),
+  );
+}
 
 Widget _buildFilters() {
   return Container(
@@ -254,35 +353,81 @@ Widget _buildFilters() {
     final filteredMenus = _filteredMenus;
     
     if (filteredMenus.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.restaurant_menu,
-              size: 80,
-              color: Colors.grey.shade400,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              _menus.isEmpty ? 'لا توجد قوائم طعام' : 'لا توجد قوائم تطابق البحث',
-              style: TextStyle(
-                fontSize: 18,
-                color: Colors.grey.shade600,
+      return RefreshIndicator(
+        onRefresh: () async {
+          await _checkConnectivityAndLoad();
+        },
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Container(
+            height: MediaQuery.of(context).size.height * 0.6,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.restaurant_menu,
+                    size: 80,
+                    color: Colors.grey.shade400,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    _menus.isEmpty ? 'لا توجد قوائم طعام' : 'لا توجد قوائم تطابق البحث',
+                    style: TextStyle(
+                      fontSize: 18,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                  if (!_hasLoadedOnce && _cachedMenus.isEmpty) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.cloud_off, size: 16, color: Colors.orange),
+                          SizedBox(width: 8),
+                          Text(
+                            'غير متصل',
+                            style: TextStyle(color: Colors.orange, fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+                  Text(
+                    'اسحب لأسفل للتحديث',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey.shade500,
+                    ),
+                  ),
+                ],
               ),
             ),
-
-          ],
+          ),
         ),
       );
     }
 
     return RefreshIndicator(
-      onRefresh: _loadMenus,
+      onRefresh: () async {
+        await _checkConnectivityAndLoad();
+      },
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
-        itemCount: filteredMenus.length,
+        physics: const AlwaysScrollableScrollPhysics(),
+        itemCount: filteredMenus.length + 1,
         itemBuilder: (context, index) {
+          if (index == filteredMenus.length) {
+            return const SizedBox(height: 80);
+          }
           final menu = filteredMenus[index];
           return _buildMenuCard(menu);
         },

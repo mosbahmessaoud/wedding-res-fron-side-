@@ -1,4 +1,5 @@
 // lib/screens/clan admin/settings_tab.dart
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../utils/colors.dart';
@@ -73,20 +74,74 @@ class SettingsTabState extends State<SettingsTab>
     {'value': 7, 'name': 'الأحد'},
   ];
 
-  @override
-  void initState() {
-    super.initState();
-    _initAnimations();
-    _loadSettings();
-  }
+@override
+void initState() {
+  super.initState();
+  _initAnimations();
+  _checkConnectivityAndLoad();
+}
   void refreshData() {
-    _loadInitialData();
     _initAnimations();
-    _loadSettings();
+    _checkConnectivityAndLoad();
     setState(() {
       
     });
   }
+
+Future<void> _checkConnectivityAndLoad() async {
+    setState(() {
+    _isLoading = true;
+  });
+  
+  // Show loading for 2 seconds
+  await Future.delayed(Duration(seconds: 2));
+  final connectivityResult = await Connectivity().checkConnectivity();
+  
+  if (connectivityResult.contains(ConnectivityResult.none)) {
+    _showNoInternetDialog();
+    setState(() {
+      _isLoading = false;
+    });
+    return;
+  }
+  
+  await _loadInitialData();
+}
+
+void _showNoInternetDialog() {
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: Row(
+        children: [
+          Icon(Icons.wifi_off, color: Colors.orange),
+          SizedBox(width: 10),
+          Text('لا يوجد اتصال'),
+        ],
+      ),
+      content: Text('يرجى التحقق من اتصالك بالإنترنت'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text('إلغاء'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            Navigator.pop(context);
+            _checkConnectivityAndLoad();
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          child: Text('إعادة المحاولة', style: TextStyle(color: Colors.white)),
+        ),
+      ],
+    ),
+  );
+}
 
 Future<void> _loadInitialData() async {
   await Future.wait([

@@ -6,6 +6,7 @@ import 'package:dio/dio.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/http.dart' as _dio;
 import 'package:wedding_reservation_app/models/reservation.dart';
+import 'package:wedding_reservation_app/services/token_manager.dart';
 import '../models/user.dart';
 import '../models/county.dart';
 import '../models/clan.dart';
@@ -26,25 +27,40 @@ class ApiService {
   // static const String baseUrl = 'http://127.0.0.1:8000'; // Replace with your actual API URL
   static String? _token;
 
-  static void setToken(String token) {
-    _token = token;  
+//   static void setToken(String token) {
+//     _token = token;  
+// }
+static Future<void> setToken(String token) async {
+  await TokenManager.saveToken(token);
+  _token = token;
 }
 
   // clear token
-  static void clearToken() {
-    _token = null;
-  }
+  // static void clearToken() {
+  //   _token = null;
+  // }
+  static Future<void> clearToken() async {
+  await TokenManager.clearToken();
+  _token = null;
+}
 
-  static Map<String, String> get _headers {
-    final headers = {
-      'Content-Type': 'application/json',
-    };
-    if (_token != null) {
-      headers['Authorization'] = 'Bearer $_token';
-    }
-    return headers;
+static Future<Map<String, String>> get _headers async {
+  final headers = {
+    'Content-Type': 'application/json',
+  };
+  
+  // Get token from TokenManager
+  final token = await TokenManager.getToken();
+  if (token != null) {
+    headers['Authorization'] = 'Bearer $token';
   }
-
+  
+  return headers;
+}
+// Add this method near the top of your ApiService class
+static Future<void> initializeToken() async {
+  _token = await TokenManager.getToken();
+}
   // ==================== AUTH ENDPOINTS ====================
   
   // Get User Role
@@ -52,7 +68,7 @@ class ApiService {
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/auth/get_role'),
-        headers: _headers,
+        headers: await _headers,
       );
 
       if (response.statusCode == 200) {
@@ -72,7 +88,7 @@ class ApiService {
     try {
       final response = await http.delete(
         Uri.parse('$baseUrl/auth/delet_user/$phoneNumber'),
-        headers: _headers,
+        headers: await _headers,
       );
 
       if (response.statusCode != 200) {
@@ -89,7 +105,7 @@ class ApiService {
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/auth/me'),
-        headers: _headers,
+        headers: await _headers,
       );
 
       if (response.statusCode == 200) {
@@ -105,35 +121,38 @@ class ApiService {
 
   // Login
   static Future<Map<String, dynamic>> login(String phoneNumber, String password) async {
-    try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/auth/login'),
-        headers: _headers,
-        body: json.encode({
-          'phone_number': phoneNumber,
-          'password': password,
-        }),
-      );
+  try {
+    final response = await http.post(
+      Uri.parse('$baseUrl/auth/login'),
+      headers: await await _headers,
+      body: json.encode({
+        'phone_number': phoneNumber,
+        'password': password,
+      }),
+    );
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        setToken(data['access_token']);
-        return data;
-      } else {
-        final error = json.decode(response.body);
-        throw Exception(error['detail'] ?? 'فشل في تسجيل الدخول');
-      }
-    } catch (e) {
-      throw Exception('خطأ في تسجيل الدخول: $e');
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      
+      // Save token using async method
+      await setToken(data['access_token']);
+      
+      return data;
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل في تسجيل الدخول');
     }
+  } catch (e) {
+    throw Exception('خطأ في تسجيل الدخول: $e');
   }
+}
 
   // Register Groom
   static Future<Map<String, dynamic>> registerGroom(Map<String, dynamic> userData) async {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/auth/register/groom'),
-        headers: _headers,
+        headers: await _headers,
         body: json.encode(userData),
       );
 
@@ -153,7 +172,7 @@ class ApiService {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/auth/verify-phone'),
-        headers: _headers,
+        headers: await _headers,
         body: json.encode({
           'phone_number': phoneNumber,
           'code': code,
@@ -178,7 +197,7 @@ class ApiService {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/auth/resend-verification'),
-        headers: _headers,
+        headers: await _headers,
         body: json.encode({
           'phone_number': phoneNumber,
         }),
@@ -198,7 +217,7 @@ class ApiService {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/auth/verify-new-phone'),
-        headers: _headers,
+        headers: await _headers,
         body: json.encode(code),
       );
 
@@ -223,7 +242,7 @@ static Future<Map<String, dynamic>> resetPassword(
   try {
     final response = await http.post(
       Uri.parse('$baseUrl/auth/reset-password'),
-      headers: _headers,
+      headers: await _headers,
       body: json.encode({
         'phone_number': phoneNumber,
         'otp_code': otpCode,
@@ -248,7 +267,7 @@ static Future<Map<String, dynamic>> requestPasswordReset(String phoneNumber) asy
   try {
     final response = await http.post(
       Uri.parse('$baseUrl/auth/request-password-reset'),
-      headers: _headers,
+      headers: await _headers,
       body: json.encode({
         'phone_number': phoneNumber,
       }),
@@ -273,7 +292,7 @@ static Future<Map<String, dynamic>> requestPasswordReset(String phoneNumber) asy
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/super-admin/county'),
-        headers: _headers,
+        headers: await _headers,
         body: json.encode(countyData),
       );
 
@@ -293,7 +312,7 @@ static Future<Map<String, dynamic>> requestPasswordReset(String phoneNumber) asy
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/super-admin/counties'),
-        headers: _headers,
+        headers: await _headers,
       );
 
       if (response.statusCode == 200) {
@@ -310,7 +329,7 @@ static Future<Map<String, dynamic>> requestPasswordReset(String phoneNumber) asy
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/super-admin/counties'),
-        headers: _headers,
+        headers: await _headers,
       );
 
       if (response.statusCode == 200) {
@@ -328,7 +347,7 @@ static Future<Map<String, dynamic>> requestPasswordReset(String phoneNumber) asy
     try {
       final response = await http.put(
         Uri.parse('$baseUrl/super-admin/county/$countyId'),
-        headers: _headers,
+        headers: await _headers,
         body: json.encode(countyData),
       );
 
@@ -347,7 +366,7 @@ static Future<Map<String, dynamic>> requestPasswordReset(String phoneNumber) asy
     try {
       final response = await http.delete(
         Uri.parse('$baseUrl/super-admin/county/$countyId'),
-        headers: _headers,
+        headers: await _headers,
       );
 
       if (response.statusCode != 200) {
@@ -364,7 +383,7 @@ static Future<Map<String, dynamic>> requestPasswordReset(String phoneNumber) asy
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/super-admin/clan'),
-        headers: _headers,
+        headers: await _headers,
         body: json.encode(clanData),
       );
 
@@ -383,7 +402,7 @@ static Future<Map<String, dynamic>> requestPasswordReset(String phoneNumber) asy
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/super-admin/clans/$countyId'),
-        headers: _headers,
+        headers: await _headers,
       );
 
       if (response.statusCode == 200) {
@@ -401,7 +420,7 @@ static Future<Map<String, dynamic>> requestPasswordReset(String phoneNumber) asy
     try {
       final response = await http.put(
         Uri.parse('$baseUrl/super-admin/clan/$clanId'),
-        headers: _headers,
+        headers: await _headers,
         body: json.encode(clanData),
       );
 
@@ -420,7 +439,7 @@ static Future<Map<String, dynamic>> requestPasswordReset(String phoneNumber) asy
     try {
       final response = await http.delete(
         Uri.parse('$baseUrl/super-admin/clan/$clanId'),
-        headers: _headers,
+        headers: await _headers,
       );
 
       if (response.statusCode != 200) {
@@ -439,7 +458,7 @@ static Future<Map<String, dynamic>> requestPasswordReset(String phoneNumber) asy
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/super-admin/all_clans'),
-        headers: _headers,
+        headers: await _headers,
       );
 
       if (response.statusCode == 200) {
@@ -452,14 +471,16 @@ static Future<Map<String, dynamic>> requestPasswordReset(String phoneNumber) asy
       throw Exception('خطأ في الاتصال: $e');
     }
   }
+
 //////////////////////////////Clan Admin CRUD//////////////////////////////
+///
 
   // Clan Admin Management
   static Future<Map<String, dynamic>> createClanAdmin(Map<String, dynamic> userData) async {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/super-admin/create-clan-admin'),
-        headers: _headers,
+        headers: await _headers,
         body: json.encode(userData),
       );
 
@@ -480,7 +501,7 @@ static Future<Map<String, dynamic>> requestPasswordReset(String phoneNumber) asy
       // If not available, you might need to get all admins and filter
       final response = await http.get(
         Uri.parse('$baseUrl/super-admin/clan-admin/$adminId'),
-        headers: _headers,
+        headers: await _headers,
       );
 
       if (response.statusCode == 200) {
@@ -500,7 +521,7 @@ static Future<Map<String, dynamic>> requestPasswordReset(String phoneNumber) asy
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/super-admin/clan-admins/$countyId'),
-        headers: _headers,
+        headers: await _headers,
       );
 
       if (response.statusCode == 200) {
@@ -517,7 +538,7 @@ static Future<Map<String, dynamic>> requestPasswordReset(String phoneNumber) asy
     try {
       final response = await http.delete(
         Uri.parse('$baseUrl/super-admin/clan-admins/$adminId'),
-        headers: _headers,
+        headers: await _headers,
       );
 
       if (response.statusCode != 200) {
@@ -552,7 +573,7 @@ static Future<Map<String, dynamic>> requestPasswordReset(String phoneNumber) asy
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/super-admin/clan-admins/$countyId'),
-        headers: _headers,
+        headers: await _headers,
       );
 
       if (response.statusCode == 200) {
@@ -565,6 +586,71 @@ static Future<Map<String, dynamic>> requestPasswordReset(String phoneNumber) asy
       throw Exception('خطأ في تحميل مدراء العشائر: $e');
     }
   }
+
+  // Check clan admin status
+static Future<Map<String, dynamic>> checkClanAdminStatus() async {
+  try {
+    
+    final response = await http.get(
+      Uri.parse('$baseUrl/clan-admin/admin-status'),
+      headers: await _headers,
+    );
+
+    print('Clan admin status response: ${response.statusCode}');
+    print('Clan admin status body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return {
+        'has_admin': data['has_admin'] ,
+        'is_active': data['is_active'] ,
+        'admin_name': data['admin_name'],
+        'clan_name': data['clan_name'],
+        'message': data['message'] ?? '',
+      };
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل في التحقق من حالة مدير العشيرة');
+    }
+  } catch (e) {
+    print('Error checking clan admin status: $e');
+    throw Exception('خطأ في التحقق من حالة مدير العشيرة: $e');
+  }
+}
+static Future<bool> clanHasActiveAdmin() async {
+  try {
+    final status = await checkClanAdminStatus();
+    return status['has_admin'] == true && status['is_active'] == true;
+  } catch (e) {
+    print('Error checking if clan has active admin: $e');
+    return false;
+  }
+}
+
+/// Get clan admin status with fallback (returns null on error)
+static Future<Map<String, dynamic>?> getClanAdminStatusSafe() async {
+  try {
+    return await checkClanAdminStatus();
+  } catch (e) {
+    print('Error getting clan admin status (safe): $e');
+    return null;
+  }
+}
+
+/// Get user-friendly error message based on clan admin status
+static String getClanAdminStatusMessage(Map<String, dynamic> status, String clanName) {
+  if (!status['has_admin']) {
+    return 'عذراً، عشيرة $clanName غير مشتركة حالياً في التطبيق.\n\n'
+           'يرجى التواصل مع إدارة العشيرة للانضمام إلى النظام.';
+  }
+  
+  if (!status['is_active']) {
+    return 'عذراً، حساب إدارة عشيرة $clanName غير نشط حالياً.\n\n'
+           'يرجى التواصل مع إدارة العشيرة لتفعيل الحساب.';
+  }
+  
+  return 'العشيرة نشطة ويمكن إجراء الحجز';
+}
   // Fixed createClanAdminWithDetails method
 static Future<Map<String, dynamic>> createClanAdminWithDetails({
   required String phoneNumber,
@@ -642,7 +728,7 @@ static Future<Map<String, dynamic>> createClanAdminWithDetails({
     try {
       final response = await http.put(
         Uri.parse('$baseUrl/super-admin/clan-admins/$adminId'),
-        headers: _headers,
+        headers: await _headers,
         body: json.encode(userData),
       );
 
@@ -663,7 +749,7 @@ static Future<Map<String, dynamic>> createClanAdminWithDetails({
   //   try {
   //     final response = await http.delete(
   //       Uri.parse('$baseUrl/clan-admin/grooms_deleted/$groom_phone'),
-  //       headers: _headers,
+  //       headers: await _headers,
   //     );
   //     if (response.statusCode != 200) {
   //       final error = json.decode(response.body);
@@ -677,7 +763,7 @@ static Future<Map<String, dynamic>> createClanAdminWithDetails({
     try {
       final response = await http.delete(
         Uri.parse('$baseUrl/clan-admin/grooms_deleted/$groomPhone'),
-        headers: _headers,
+        headers: await _headers,
       );
           // Debug logging
       print('Delete response status: ${response.statusCode}');
@@ -719,7 +805,7 @@ static Future<Map<String, dynamic>> createClanAdminWithDetails({
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/super-admin/haia'),
-        headers: _headers,
+        headers: await _headers,
         body: json.encode(haiaData),
       );
 
@@ -738,7 +824,7 @@ static Future<Map<String, dynamic>> createClanAdminWithDetails({
     try {
       final response = await http.put(
         Uri.parse('$baseUrl/super-admin/haia/$haiaId/$countyId'),
-        headers: _headers,
+        headers: await _headers,
         body: json.encode(haiaData),
       );
 
@@ -757,7 +843,7 @@ static Future<Map<String, dynamic>> createClanAdminWithDetails({
     try {
       final response = await http.delete(
         Uri.parse('$baseUrl/super-admin/haia/$haiaId/$countyId'),
-        headers: _headers,
+        headers: await _headers,
       );
 
       if (response.statusCode != 200) {
@@ -773,7 +859,7 @@ static Future<Map<String, dynamic>> createClanAdminWithDetails({
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/super-admin/haia/$countyId'),
-        headers: _headers,
+        headers: await _headers,
       );
 
       if (response.statusCode == 200) {
@@ -791,7 +877,7 @@ static Future<Map<String, dynamic>> createClanAdminWithDetails({
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/super-admin/madaih_committe'),
-        headers: _headers,
+        headers: await _headers,
         body: json.encode(madaihData),
       );
 
@@ -810,7 +896,7 @@ static Future<Map<String, dynamic>> createClanAdminWithDetails({
     try {
       final response = await http.put(
         Uri.parse('$baseUrl/super-admin/madaih_committe/$madaihId/$countyId'),
-        headers: _headers,
+        headers: await _headers,
         body: json.encode(madaihData),
       );
 
@@ -829,7 +915,7 @@ static Future<Map<String, dynamic>> createClanAdminWithDetails({
     try {
       final response = await http.delete(
         Uri.parse('$baseUrl/super-admin/madaih_committe/$madaihId/$countyId'),
-        headers: _headers,
+        headers: await _headers,
       );
 
       if (response.statusCode != 200) {
@@ -845,7 +931,7 @@ static Future<Map<String, dynamic>> createClanAdminWithDetails({
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/super-admin/madaih_committe/$countyId'),
-        headers: _headers,
+        headers: await _headers,
       );
 
       if (response.statusCode == 200) {
@@ -857,8 +943,83 @@ static Future<Map<String, dynamic>> createClanAdminWithDetails({
       throw Exception('خطأ في الاتصال: $e');
     }
   }
-// Add these methods to your ApiService class in lib/services/api_service.dart
 
+// // Change Clan Admin Status (Super Admin only)
+// static Future<Map<String, dynamic>> changeClanAdminStatus(int adminId) async {
+//   try {
+//     final response = await http.put(
+//       Uri.parse('$baseUrl/super-admin/change_status/$adminId'),
+//       headers: await _headers,
+//     );
+
+//     if (response.statusCode == 200) {
+//       return json.decode(response.body);
+//     } else {
+//       final error = json.decode(response.body);
+//       throw Exception(error['detail'] ?? 'فشل في تغيير حالة مدير العشيرة');
+//     }
+//   } catch (e) {
+//     throw Exception('خطأ في تغيير حالة مدير العشيرة: $e');
+//   }
+// }
+
+// Change Clan Admin Status (Super Admin only)
+static Future<Map<String, dynamic>> changeClanAdminStatus(int adminId) async {
+  try {
+    final response = await http.put(
+      Uri.parse('$baseUrl/super-admin/change_status/$adminId'),
+      headers: await _headers,
+    );
+    
+    print('🔍 Change clan admin status URL: $baseUrl/super-admin/change_status/$adminId');
+    print('🔍 Change clan admin status response: ${response.statusCode}');
+    print('🔍 Change clan admin status body: ${response.body}');
+    
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return {
+        'id': data['id'],
+        'phone_number': data['phone_number'],
+        'first_name': data['first_name'],
+        'last_name': data['last_name'],
+        'status': data['status'], // 'active' or 'inactive'
+      };
+    } else if (response.statusCode == 404) {
+      throw Exception('لم يتم العثور على مدير العشيرة');
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل في تغيير حالة مدير العشيرة');
+    }
+  } catch (e) {
+    print('❌ Error in changeClanAdminStatus: $e');
+    throw Exception('خطأ في تغيير حالة مدير العشيرة: $e');
+  }
+}
+
+// Get Clan Admin by ID
+// static Future<Map<String, dynamic>> getClanAdminById(int adminId) async {
+//   try {
+//     final response = await http.get(
+//       Uri.parse('$baseUrl/super-admin/clan-admins/$adminId'),
+//       headers: await _headers,
+//     );
+    
+//     print('🔍 Get clan admin URL: $baseUrl/super-admin/clan-admins/$adminId');
+//     print('🔍 Get clan admin response: ${response.statusCode}');
+    
+//     if (response.statusCode == 200) {
+//       return json.decode(response.body);
+//     } else if (response.statusCode == 404) {
+//       throw Exception('لم يتم العثور على مدير العشيرة');
+//     } else {
+//       final error = json.decode(response.body);
+//       throw Exception(error['detail'] ?? 'فشل في جلب بيانات مدير العشيرة');
+//     }
+//   } catch (e) {
+//     print('❌ Error in getClanAdminById: $e');
+//     throw Exception('خطأ في جلب بيانات مدير العشيرة: $e');
+//   }
+// }
 
   // ==================== CLAN ADMIN ENDPOINTS ====================
   
@@ -867,7 +1028,7 @@ static Future<Map<String, dynamic>> createClanAdminWithDetails({
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/clan-admin/grooms'),
-        headers: _headers,
+        headers: await _headers,
       );
 
       if (response.statusCode == 200) {
@@ -885,7 +1046,7 @@ static Future<Map<String, dynamic>> createClanAdminWithDetails({
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/clan-admin/halls'),
-        headers: _headers,
+        headers: await _headers,
       );
 
       if (response.statusCode == 200) {
@@ -902,7 +1063,7 @@ static Future<Map<String, dynamic>> createClanAdminWithDetails({
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/clan-admin/halls'),
-        headers: _headers,
+        headers: await _headers,
         body: json.encode(hallData),
       );
 
@@ -921,7 +1082,7 @@ static Future<Map<String, dynamic>> createClanAdminWithDetails({
     try {
       final response = await http.delete(
         Uri.parse('$baseUrl/clan-admin/hall/$hallId'),
-        headers: _headers,
+        headers: await _headers,
       );
 
       if (response.statusCode != 200) {
@@ -938,7 +1099,7 @@ static Future<Map<String, dynamic>> createClanAdminWithDetails({
     try {
       final response = await http.put(
         Uri.parse('$baseUrl/clan-admin/hall/$hallId'),
-        headers: _headers,
+        headers: await _headers,
         body: json.encode(hallData),
       );
 
@@ -958,7 +1119,7 @@ static Future<Map<String, dynamic>> createClanAdminWithDetails({
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/clan-admin/settings'),
-        headers: _headers,
+        headers: await _headers,
       );
 
       if (response.statusCode == 200) {
@@ -975,7 +1136,7 @@ static Future<Map<String, dynamic>> getSettingsByClanId(String clanId) async {
   try {
     final response = await http.get(
       Uri.parse('$baseUrl/clan-admin/setings/$clanId'),
-      headers: _headers,
+      headers: await _headers,
     );
     print('------------- Settings response status: ${response.statusCode}');
     print('----------- Settings response body: ${response.body}');
@@ -993,7 +1154,7 @@ static Future<Map<String, dynamic>> getSettingsByClanId(String clanId) async {
     try {
       final response = await http.put(
         Uri.parse('$baseUrl/clan-admin/settings/$clanId'),
-        headers: _headers,
+        headers: await _headers,
         body: json.encode(settingsData),
       );
 
@@ -1015,7 +1176,7 @@ static Future<Map<String, dynamic>> getSettingsByClanId(String clanId) async {
   //   try {
   //     final response = await http.post(
   //       Uri.parse('$baseUrl/reservations/'),
-  //       headers: _headers,
+  //       headers: await _headers,
   //       body: json.encode(reservationData),
   //     );
 
@@ -1035,7 +1196,7 @@ static Future<Map<String, dynamic>> getSettingsByClanId(String clanId) async {
   //   try {
   //     final response = await http.get(
   //       Uri.parse('$baseUrl/reservations/download/$reservationId'),
-  //       headers: _headers,
+  //       headers: await _headers,
   //     );
 
   //     if (response.statusCode == 200) {
@@ -1056,7 +1217,7 @@ static Future<Map<String, dynamic>> getSettingsByClanId(String clanId) async {
   
 //   final response = await http.patch(
 //     url,
-//     headers:_headers,
+//     headers: await_headers,
 //   );
 
 //   if (response.statusCode != 200) {
@@ -1072,7 +1233,7 @@ static Future<Map<String, dynamic>> markPaymentCompleted(int groomId) async {
   try {
     final response = await http.put(
       Uri.parse('$baseUrl/clan-admin/reservations/payment_update/$groomId'),
-      headers: _headers,
+      headers: await _headers,
     );
 
     print('Update payment response status: ${response.statusCode}');
@@ -1097,7 +1258,7 @@ static Future<Map<String, dynamic>> changePaymentStatus(int reservationId) async
   try {
     final response = await http.post(
       Uri.parse('$baseUrl/clan-admin/$reservationId/change_payment_status'),
-      headers: _headers,
+      headers: await _headers,
     );
 
     print('Change payment status response: ${response.statusCode}');
@@ -1123,13 +1284,13 @@ static Future<Map<String, dynamic>> createReservation(Map<String, dynamic> reser
     
     final response = await http.post(
       Uri.parse('$baseUrl/reservations'), // Make sure this matches your backend route
-      headers:_headers,
+      headers: await _headers,
       body: json.encode(reservationData),
     );
 
     print('Response status code: ${response.statusCode}');
     print('Response body: ${response.body}');
-    print('Response headers: ${response.headers}');
+    print('Response headers: await ${response.headers}');
 
     if (response.statusCode == 200 || response.statusCode == 201) {
       // Check if response body is not empty
@@ -1179,7 +1340,7 @@ static Future<Map<String, dynamic>> createReservation(Map<String, dynamic> reser
 static Future<Uint8List> downloadPdfFromServer(int reservationId) async {
   final response = await http.get(
     Uri.parse('$baseUrl/reservations/download/$reservationId'), // Replace with your actual URL
-    headers: _headers,
+    headers: await _headers,
 
   );
   
@@ -1195,7 +1356,7 @@ static Future<Uint8List> downloadPdfFromServer(int reservationId) async {
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/reservations/reservations/my_all_reservations'),
-        headers: _headers,
+        headers: await _headers,
       );
 
       if (response.statusCode == 200) {
@@ -1212,7 +1373,7 @@ static Future<Uint8List> downloadPdfFromServer(int reservationId) async {
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/reservations/reservations/my_pending_reservation'),
-        headers: _headers,
+        headers: await _headers,
       );
 
       if (response.statusCode == 200) {
@@ -1229,7 +1390,7 @@ static Future<Uint8List> downloadPdfFromServer(int reservationId) async {
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/reservations/reservations/my_validated_reservation'),
-        headers: _headers,
+        headers: await _headers,
       );
  
       if (response.statusCode == 200) {
@@ -1246,7 +1407,7 @@ static Future<Uint8List> downloadPdfFromServer(int reservationId) async {
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/reservations/reservations/my_cancelled_reservation'),
-        headers: _headers,
+        headers: await _headers,
       );
 
       if (response.statusCode == 200) {
@@ -1264,7 +1425,7 @@ static Future<Uint8List> downloadPdfFromServer(int reservationId) async {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/reservations/reservations/$groomId/cancel'),
-        headers: _headers,
+        headers: await _headers,
       );
 
       if (response.statusCode == 200) {
@@ -1282,7 +1443,7 @@ static Future<Uint8List> downloadPdfFromServer(int reservationId) async {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/reservations/$groomId/validate'),
-        headers: _headers,
+        headers: await _headers,
       );
 
       if (response.statusCode == 200) {
@@ -1301,7 +1462,7 @@ static Future<Uint8List> downloadPdfFromServer(int reservationId) async {
     try {
       final response = await http.delete(
         Uri.parse('$baseUrl/delete_res/$reservationId'),
-        headers: _headers,
+        headers: await _headers,
       );
 
       if (response.statusCode != 200) {
@@ -1318,7 +1479,7 @@ static Future<Uint8List> downloadPdfFromServer(int reservationId) async {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/reservations/$groomId/cancel_by_clan_admin'),
-        headers: _headers,
+        headers: await _headers,
       );
 
       if (response.statusCode == 200) {
@@ -1337,7 +1498,7 @@ static Future<Uint8List> downloadPdfFromServer(int reservationId) async {
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/reservations/all_reservations'),
-        headers: _headers,
+        headers: await _headers,
       );
 
       if (response.statusCode == 200) {
@@ -1354,7 +1515,7 @@ static Future<Uint8List> downloadPdfFromServer(int reservationId) async {
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/reservations/pending_reservations'),
-        headers: _headers,
+        headers: await _headers,
       );
 
       if (response.statusCode == 200) {
@@ -1371,7 +1532,7 @@ static Future<Uint8List> downloadPdfFromServer(int reservationId) async {
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/reservations/validated_reservations'),
-        headers: _headers,
+        headers: await _headers,
       );
 
       if (response.statusCode == 200) {
@@ -1388,7 +1549,7 @@ static Future<Uint8List> downloadPdfFromServer(int reservationId) async {
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/reservations/cancled_reservations'),
-        headers: _headers,
+        headers: await _headers,
       );
 
       if (response.statusCode == 200) {
@@ -1412,7 +1573,7 @@ static Future<Uint8List> downloadPdfFromServer(int reservationId) async {
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/groom/profile'),
-        headers: _headers,
+        headers: await _headers,
       );
 
       if (response.statusCode == 200) {
@@ -1429,7 +1590,7 @@ static Future<Uint8List> downloadPdfFromServer(int reservationId) async {
     try {
       final response = await http.put(
         Uri.parse('$baseUrl/groom/profile'),
-        headers: _headers,
+        headers: await _headers,
         body: json.encode(userData),
       );
 
@@ -1448,7 +1609,7 @@ static Future<Uint8List> downloadPdfFromServer(int reservationId) async {
     try {
       final response = await http.delete(
         Uri.parse('$baseUrl/groom/profile'),
-        headers: _headers,
+        headers: await _headers,
       );
 
       if (response.statusCode != 200) {
@@ -1465,7 +1626,7 @@ static Future<Uint8List> downloadPdfFromServer(int reservationId) async {
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/groom/halls'),
-        headers: _headers,
+        headers: await _headers,
       );
 
       if (response.statusCode == 200) {
@@ -1483,7 +1644,7 @@ static Future<Uint8List> downloadPdfFromServer(int reservationId) async {
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/groom/counties'),
-        headers: _headers,
+        headers: await _headers,
       );
 
       if (response.statusCode == 200) {
@@ -1503,7 +1664,7 @@ static Future<Uint8List> downloadPdfFromServer(int reservationId) async {
       final response = await http.get(
         // Uri.parse('$baseUrl/super-admin/all_clans'),
         Uri.parse('$baseUrl/groom/clans'),
-        headers: _headers,
+        headers: await _headers,
       );
 
       if (response.statusCode == 200) {
@@ -1521,7 +1682,7 @@ static Future<Uint8List> downloadPdfFromServer(int reservationId) async {
   //   try {
   //     final response = await http.get(
   //       Uri.parse('$baseUrl/groom/haia'),
-  //       headers: _headers,
+  //       headers: await _headers,
   //     );
 
   //     if (response.statusCode == 200) {
@@ -1538,7 +1699,7 @@ static Future<Uint8List> downloadPdfFromServer(int reservationId) async {
   //   try {
   //     final response = await http.get(
   //       Uri.parse('$baseUrl/groom/madaih_committe'),
-  //       headers: _headers,
+  //       headers: await _headers,
   //     );
 
   //     if (response.statusCode == 200) {
@@ -1554,7 +1715,7 @@ static Future<List<dynamic>> getGroomHaia() async {
   try {
     final response = await http.get(
       Uri.parse('$baseUrl/groom/haia'),
-      headers: _headers,
+      headers: await _headers,
     );
 
     if (response.statusCode == 200) {
@@ -1582,7 +1743,7 @@ static Future<List<dynamic>> getGroomMadaihCommittee() async {
   try {
     final response = await http.get(
       Uri.parse('$baseUrl/groom/madaih_committe'),
-      headers: _headers,
+      headers: await _headers,
     );
 
     if (response.statusCode == 200) {
@@ -1609,7 +1770,7 @@ static Future<List<dynamic>> getGroomMadaihCommittee() async {
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/groom/rules'),
-        headers: _headers,
+        headers: await _headers,
       );
 
       if (response.statusCode == 200) {
@@ -1631,7 +1792,7 @@ static Future<Map<String, dynamic>> getFoodMenuDetails(int menuId) async {
   try {
     final response = await http.get(
       Uri.parse('$baseUrl/clan-admin/menu-details/$menuId'),
-      headers: _headers,
+      headers: await _headers,
     );
 
     if (response.statusCode == 200) {
@@ -1650,7 +1811,7 @@ static Future<List<FoodMenu>> listFoodMenus() async {
   try {
     final response = await http.get(
       Uri.parse('$baseUrl/clan-admin/menus'),
-      headers: _headers,
+      headers: await _headers,
     ); 
 
     if (response.statusCode == 200) {
@@ -1670,7 +1831,7 @@ static Future<List<FoodMenu>> listFoodMenus() async {
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/food/menu/food_types'),
-        headers: _headers,
+        headers: await _headers,
       );
 
       if (response.statusCode == 200) {
@@ -1688,7 +1849,7 @@ static Future<List<FoodMenu>> listFoodMenus() async {
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/food/menu/visitor_options'),
-        headers: _headers,
+        headers: await _headers,
       );
 
       if (response.statusCode == 200) {
@@ -1706,7 +1867,7 @@ static Future<List<FoodMenu>> listFoodMenus() async {
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/food/menu/$foodType/$visitors/$clanId'),
-        headers: _headers,
+        headers: await _headers,
       );
 
       if (response.statusCode == 200) {
@@ -1724,7 +1885,7 @@ static Future<List<FoodMenu>> listFoodMenus() async {
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/food/my_menus'),
-        headers: _headers,
+        headers: await _headers,
       );
 
       if (response.statusCode == 200) {
@@ -1742,7 +1903,7 @@ static Future<List<FoodMenu>> listFoodMenus() async {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/food/menu'),
-        headers: _headers,
+        headers: await _headers,
         body: json.encode(menuData),
       );
 
@@ -1762,7 +1923,7 @@ static Future<List<FoodMenu>> listFoodMenus() async {
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/food/menu-details/$menuId'),
-        headers: _headers,
+        headers: await _headers,
       );
 
       if (response.statusCode == 200) {
@@ -1780,7 +1941,7 @@ static Future<List<FoodMenu>> listFoodMenus() async {
     try {
       final response = await http.put(
         Uri.parse('$baseUrl/food/menu/$menuId'),
-        headers: _headers,
+        headers: await _headers,
         body: json.encode(menuData),
       );
 
@@ -1800,7 +1961,7 @@ static Future<List<FoodMenu>> listFoodMenus() async {
     try {
       final response = await http.delete(
         Uri.parse('$baseUrl/food/menu/$menuId'),
-        headers: _headers,
+        headers: await _headers,
       );
 
       if (response.statusCode != 200) {
@@ -1816,7 +1977,7 @@ static Future<List<String>> getUniqueFoodTypes() async {
   try {
     final response = await http.get(
       Uri.parse('$baseUrl/food/menu/unique-food-types'),
-      headers: _headers,
+      headers: await _headers,
     );
 
     if (response.statusCode == 200) {
@@ -1835,7 +1996,7 @@ static Future<List<int>> getUniqueVisitorCounts() async {
   try {
     final response = await http.get(
       Uri.parse('$baseUrl/food/menu/unique-visitor-counts'),
-      headers: _headers,
+      headers: await _headers,
     );
 
     if (response.statusCode == 200) {
@@ -2181,7 +2342,7 @@ static Future<List<int>> getUniqueVisitorCounts() async {
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/groom/counties'),
-        headers: {'Content-Type': 'application/json'},
+        headers: await {'Content-Type': 'application/json'},
       ).timeout(const Duration(seconds: 5));
       
       return response.statusCode == 200;
@@ -2220,7 +2381,7 @@ static Future<List<int>> getUniqueVisitorCounts() async {
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/public/clans/by-county/$countyId'),
-        headers: _headers,
+        headers: await _headers,
       );
       
       if (response.statusCode == 200) {
@@ -2239,7 +2400,7 @@ static Future<List<int>> getUniqueVisitorCounts() async {
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/public/halls/by-clan/$clanId'),
-        headers: _headers,
+        headers: await _headers,
       );
       
       if (response.statusCode == 200) {
@@ -2261,7 +2422,7 @@ static Future<Map<String, dynamic>> getCounty(int countyId) async {
   try {
     final response = await http.get(
       Uri.parse('$baseUrl/public/county/$countyId'), // or whatever your endpoint is
-      headers: _headers,
+      headers: await _headers,
     );
 
     if (response.statusCode == 200) {
@@ -2284,7 +2445,7 @@ static Future<Map<String, dynamic>> getCounty(int countyId) async {
 //     try {
 //       final response = await http.get(
 //         Uri.parse('$baseUrl/public/county/$countyId'),
-//         headers: _headers,
+//         headers: await _headers,
 //       );
       
 //       if (response.statusCode == 200) {
@@ -2312,7 +2473,7 @@ static Future<List<dynamic>> getValidatedDates(int clanId) async {
   try {
     final response = await http.get(
       Uri.parse('$baseUrl/reservations/validated-dates/$clanId'),
-      headers: _headers,
+      headers: await _headers,
     );
 
     if (response.statusCode == 200) {
@@ -2331,7 +2492,7 @@ static Future<List<dynamic>> getPendingDates(int clanId) async {
   try {
     final response = await http.get(
       Uri.parse('$baseUrl/reservations/pending-dates/$clanId'),
-      headers: _headers,
+      headers: await _headers,
     );
 
     if (response.statusCode == 200) {
@@ -2354,7 +2515,7 @@ static Future<String> getOtpCode(String phoneNumber) async {
   try {
     final response = await http.get(
       Uri.parse('$baseUrl/auth/get_otp/$phoneNumber'),
-      headers: _headers,
+      headers: await _headers,
     );
 
     if (response.statusCode == 200) {
@@ -2379,7 +2540,7 @@ static Future<Map<String, dynamic>> updateGroomStatus(
   try {
     final response = await http.put(
       Uri.parse('$baseUrl/clan-admin/grooms/$phoneNumber/status'),
-      headers: _headers,
+      headers: await _headers,
       body: json.encode({
         'status': status, // "active" or "inactive"
       }),
@@ -2404,7 +2565,7 @@ static Future<Map<String, dynamic>> getGroomStatus(String phoneNumber) async {
   try {
     final response = await http.get(
       Uri.parse('$baseUrl/clan-admin/grooms/$phoneNumber/status'),
-      headers: _headers,
+      headers: await _headers,
     );
 
     print('Get groom status response: ${response.statusCode}');
@@ -2428,7 +2589,7 @@ static Future<Map<String, dynamic>> updateGroom(int groomId, Map<String, dynamic
   try {
     final response = await http.put(
       Uri.parse('$baseUrl/auth/update-groom/$groomId'),
-      headers: _headers,
+      headers: await _headers,
       body: json.encode(updateData),
     );
 
@@ -2504,7 +2665,7 @@ static Future<Map<String, dynamic>> generatePdf(int reservationId) async {
   try {
     final response = await http.post(
       Uri.parse('$baseUrl/pdf/generate/$reservationId'),
-      headers: _headers,
+      headers: await _headers,
     );
 
     print('Generate PDF response status: ${response.statusCode}');
@@ -2527,7 +2688,7 @@ static Future<Map<String, dynamic>> regeneratePdf(int reservationId) async {
   try {
     final response = await http.post(
       Uri.parse('$baseUrl/pdf/regenerate/$reservationId'),
-      headers: _headers,
+      headers: await _headers,
     );
 
     print('Regenerate PDF response status: ${response.statusCode}');
@@ -2551,7 +2712,7 @@ static Future<Uint8List> downloadPdf(int reservationId) async {
   try {
     final response = await http.get(
       Uri.parse('$baseUrl/pdf/download/$reservationId'),
-      headers: _headers,
+      headers: await _headers,
     );
 
     print('Download PDF response status: ${response.statusCode}');
@@ -2574,7 +2735,7 @@ static Future<Map<String, dynamic>> checkPdfStatus(int reservationId) async {
   try {
     final response = await http.get(
       Uri.parse('$baseUrl/pdf/status/$reservationId'),
-      headers: _headers,
+      headers: await _headers,
     );
 
     print('Check PDF status response: ${response.statusCode}');
@@ -2810,7 +2971,7 @@ static Future<Map<String, dynamic>> createClanRules(Map<String, dynamic> rulesDa
   try {
     final response = await http.post(
       Uri.parse('$baseUrl/clan-admin/clan-rules'),
-      headers: _headers,
+      headers: await _headers,
       body: json.encode(rulesData),
     );
 
@@ -2864,7 +3025,7 @@ static Future<Map<String, dynamic>> getClanRulesById(int ruleId) async {
   try {
     final response = await http.get(
       Uri.parse('$baseUrl/clan-admin/clan-rules/$ruleId'),
-      headers: _headers,
+      headers: await _headers,
     );
 
     print('Get clan rules by ID response status: ${response.statusCode}');
@@ -2886,7 +3047,7 @@ static Future<Map<String, dynamic>> getClanRulesByClanId(int clanId) async {
   try {
     final response = await http.get(
       Uri.parse('$baseUrl/clan-admin/clan-rules/clan/$clanId'),
-      headers: _headers,
+      headers: await _headers,
     );
 
     print('Get clan rules by clan ID response status: ${response.statusCode}');
@@ -2911,7 +3072,7 @@ static Future<Map<String, dynamic>> updateClanRules(
   try {
     final response = await http.put(
       Uri.parse('$baseUrl/clan-admin/clan-rules/$ruleId'),
-      headers: _headers,
+      headers: await _headers,
       body: json.encode(rulesData),
     );
 
@@ -2959,7 +3120,7 @@ static Future<void> deleteClanRules(int ruleId) async {
   try {
     final response = await http.delete(
       Uri.parse('$baseUrl/clan-admin/clan-rules/$ruleId'),
-      headers: _headers,
+      headers: await _headers,
     );
 
     print('Delete clan rules response status: ${response.statusCode}');
@@ -2994,7 +3155,7 @@ static Future<Map<String, dynamic>> getGroomClanRules() async {
   try {
     final response = await http.get(
       Uri.parse('$baseUrl/groom/clan-rules'),
-      headers: _headers,
+      headers: await _headers,
     );
 
     print('Get groom clan rules response status: ${response.statusCode}');
@@ -3029,7 +3190,7 @@ static Future<Map<String, dynamic>> getGroomClanRulesByClanId(int clanId) async 
   try {
     final response = await http.get(
       Uri.parse('$baseUrl/groom/clan-rules/clan/$clanId'),
-      headers: _headers,
+      headers: await _headers,
     );
 
     print('Get groom clan rules by clan ID response status: ${response.statusCode}');
@@ -3059,7 +3220,7 @@ static Future<Map<String,dynamic>> getClanInfoByCurrentUser() async {
   try {
     final response = await http.get(
       Uri.parse('$baseUrl/clan-admin/clan_info'),
-      headers: _headers,
+      headers: await _headers,
     );
 
     print('Get groom clan info response status: ${response.statusCode}');
@@ -3473,7 +3634,7 @@ static Future<void> deletePdfByUrl(String url, {int? clanId}) async {
 
     final response = await http.delete(
       uri,
-      headers: _headers,
+      headers: await _headers,
     ).timeout(const Duration(seconds: 30));
 
     print('Delete response: ${response.statusCode}');
@@ -3509,7 +3670,7 @@ static Future<void> deletePdfById(String fileId, {int? clanId}) async {
 
     final response = await http.delete(
       uri,
-      headers: _headers,
+      headers: await _headers,
     ).timeout(const Duration(seconds: 30));
 
     print('Delete response: ${response.statusCode}');
@@ -3544,7 +3705,7 @@ static Future<Map<String, dynamic>> getClanRulesPdf(int clanId) async {
 
     final response = await http.get(
       Uri.parse('$baseUrl/pdf/api/clan/$clanId/rules/pdf'),
-      headers: _headers,
+      headers: await _headers,
     ).timeout(const Duration(seconds: 30));
 
     print('Response status: ${response.statusCode}');
@@ -3597,7 +3758,7 @@ static Future<List<int>> downloadPdfe(String filename) async {
 
     final response = await http.get(
       Uri.parse('$baseUrl/pdf/api/upload/pdf/$filename'),
-      headers: _headers,
+      headers: await _headers,
     ).timeout(const Duration(seconds: 60));
 
     print('Download response status: ${response.statusCode}');
@@ -3619,7 +3780,7 @@ static Future<Map<String, dynamic>> checkStorageHealth() async {
   try {
     final response = await http.get(
       Uri.parse('$baseUrl/pdf/api/upload/health'),
-      headers: _headers,
+      headers: await _headers,
     ).timeout(const Duration(seconds: 30));
 
     if (response.statusCode == 200) {
@@ -3644,7 +3805,7 @@ static Future<Map<String, dynamic>> debugClanRules(int clanId) async {
 
     final response = await http.get(
       Uri.parse('$baseUrl/pdf/api/debug/clan/$clanId/rules'),
-      headers: _headers,
+      headers: await _headers,
     ).timeout(const Duration(seconds: 30));
 
     print('Debug response status: ${response.statusCode}');
@@ -3679,7 +3840,7 @@ static Future<Map<String, dynamic>> createSpecialReservation({
   try {
     final response = await http.post(
       Uri.parse('$baseUrl/clan-admin/reserv_some_dates'),
-      headers: _headers,
+      headers: await _headers,
       body: json.encode({
         'date': date,
         'reserv_name': reservName,
@@ -3710,7 +3871,7 @@ static Future<List<dynamic>> getAllSpecialReservations() async {
   try {
     final response = await http.get(
       Uri.parse('$baseUrl/clan-admin/special_reservrations'),
-      headers: _headers,
+      headers: await _headers,
     );
 
     print('Get special reservations response: ${response.statusCode}');
@@ -3733,7 +3894,7 @@ static Future<Map<String, dynamic>> updateSpecialReservationStatus(int reservId)
   try {
     final response = await http.put(
       Uri.parse('$baseUrl/clan-admin/update_status_special_reserv/$reservId'),
-      headers: _headers,
+      headers: await _headers,
     );
 
     print('Update special reservation status response: ${response.statusCode}');
@@ -3818,7 +3979,7 @@ static Future<List<dynamic>> getSpecialReservations() async {
   try {
     final response = await http.get(
       Uri.parse('$baseUrl/clan-admin/special_reservations'),
-      headers: _headers,
+      headers: await _headers,
     );
 
     print('Get special reservations response: ${response.statusCode}');
@@ -3846,7 +4007,7 @@ static Future<Uint8List?> downloadPdfFromUrl(String pdfUrl) async {
   try {
     final response = await http.get(
       Uri.parse(pdfUrl),
-      headers: _headers,
+      headers: await _headers,
     );
 
     if (response.statusCode == 200) {
@@ -3874,7 +4035,7 @@ static Future<Map<String, dynamic>> getValidatedReservationsToday() async {
   try {
     final response = await http.get(
       Uri.parse('$baseUrl/reservations/valid_reservations_today'),
-      headers: _headers,
+      headers: await _headers,
     );
 
     if (response.statusCode == 200) {
@@ -3894,7 +4055,7 @@ static Future<Map<String, dynamic>> getValidatedReservationsMonth() async {
   try {
     final response = await http.get(
       Uri.parse('$baseUrl/reservations/valid_reservations_month'),
-      headers: _headers,
+      headers: await _headers,
     );
 
     if (response.statusCode == 200) {
@@ -3914,7 +4075,7 @@ static Future<Map<String, dynamic>> getValidatedReservationsYear() async {
   try {
     final response = await http.get(
       Uri.parse('$baseUrl/reservations/valid_reservations_year'),
-      headers: _headers,
+      headers: await _headers,
     );
 
     if (response.statusCode == 200) {
@@ -3936,7 +4097,7 @@ static Future<Map<String, dynamic>> getValidatedReservationsTodayCounty() async 
   try {
     final response = await http.get(
       Uri.parse('$baseUrl/reservations/valid_reservations_today_county'),
-      headers: _headers,
+      headers: await _headers,
     );
 
     if (response.statusCode == 200) {
@@ -3956,7 +4117,7 @@ static Future<Map<String, dynamic>> getValidatedReservationsMonthCounty() async 
   try {
     final response = await http.get(
       Uri.parse('$baseUrl/reservations/valid_reservations_month_county'),
-      headers: _headers,
+      headers: await _headers,
     );
 
     if (response.statusCode == 200) {
@@ -3976,7 +4137,7 @@ static Future<Map<String, dynamic>> getValidatedReservationsYearCounty() async {
   try {
     final response = await http.get(
       Uri.parse('$baseUrl/reservations/valid_reservations_year_county'),
-      headers: _headers,
+      headers: await _headers,
     );
 
     if (response.statusCode == 200) {
@@ -4038,7 +4199,7 @@ static Future<int> getValidatedReservationsYearCountyCount() async {
 //   try {
 //     final response = await http.get(
 //       Uri.parse('$baseUrl/reservations/valid_reservations_today'),
-//       headers: _headers,
+//       headers: await _headers,
 //     );
 
 //     if (response.statusCode == 200) {
@@ -4059,7 +4220,7 @@ static Future<int> getValidatedReservationsYearCountyCount() async {
 //   try {
 //     final response = await http.get(
 //       Uri.parse('$baseUrl/reservations/valid_reservations_month'),
-//       headers: _headers,
+//       headers: await _headers,
 //     );
 
 //     if (response.statusCode == 200) {
@@ -4080,7 +4241,7 @@ static Future<int> getValidatedReservationsYearCountyCount() async {
 //   try {
 //     final response = await http.get(
 //       Uri.parse('$baseUrl/reservations/valid_reservations_year'),
-//       headers: _headers,
+//       headers: await _headers,
 //     );
 
 //     if (response.statusCode == 200) {
@@ -4103,7 +4264,7 @@ static Future<int> getValidatedReservationsYearCountyCount() async {
 //   try {
 //     final response = await http.get(
 //       Uri.parse('$baseUrl/reservations/valid_reservations_today_county'),
-//       headers: _headers,
+//       headers: await _headers,
 //     );
 
 //     if (response.statusCode == 200) {
@@ -4124,7 +4285,7 @@ static Future<int> getValidatedReservationsYearCountyCount() async {
 //   try {
 //     final response = await http.get(
 //       Uri.parse('$baseUrl/reservations/valid_reservations_month_county'),
-//       headers: _headers,
+//       headers: await _headers,
 //     );
 
 //     if (response.statusCode == 200) {
@@ -4145,7 +4306,7 @@ static Future<int> getValidatedReservationsYearCountyCount() async {
 //   try {
 //     final response = await http.get(
 //       Uri.parse('$baseUrl/reservations/valid_reservations_year_county'),
-//       headers: _headers,
+//       headers: await _headers,
 //     );
 
 //     if (response.statusCode == 200) {

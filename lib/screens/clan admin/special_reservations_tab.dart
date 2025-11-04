@@ -1,4 +1,5 @@
 // lib/screens/clan_admin/special_reservations_tab.dart
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../services/api_service.dart';
@@ -20,10 +21,74 @@ class SpecialReservationsTabState extends State<SpecialReservationsTab> {
   @override
   void initState() {
     super.initState();
-    _loadSpecialReservations();
+    _checkConnectivityAndLoad();
+  }
+    void refreshData() {
+    _checkConnectivityAndLoad();
   }
 
+
+Future<void> _checkConnectivityAndLoad() async {
+  setState(() {
+    _isLoading = true;
+  });
+  
+  // Show loading for 2 seconds
+  await Future.delayed(Duration(seconds: 2));
+  final connectivityResult = await Connectivity().checkConnectivity();
+  
+  if (connectivityResult.contains(ConnectivityResult.none)) {
+    _showNoInternetDialog();
+    setState(() {
+      _isLoading = false;
+    });
+    return;
+  }
+  
+  await _loadSpecialReservations();
+}
+
+void _showNoInternetDialog() {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) => AlertDialog(
+      backgroundColor: isDark ? const Color(0xFF2D2D2D) : Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: Row(
+        children: [
+          Icon(Icons.wifi_off, color: Colors.orange),
+          SizedBox(width: 10),
+          Text('لا يوجد اتصال', 
+            style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
+        ],
+      ),
+      content: Text('يرجى التحقق من اتصالك بالإنترنت',
+        style: TextStyle(color: isDark ? Colors.white70 : Colors.grey.shade700)),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text('إلغاء'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            Navigator.pop(context);
+            _checkConnectivityAndLoad();
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          child: Text('إعادة المحاولة', style: TextStyle(color: Colors.white)),
+        ),
+      ],
+    ),
+  );
+}
   Future<void> _loadSpecialReservations() async {
+
     setState(() => _isLoading = true);
     try {
       final reservations = await ApiService.getAllSpecialReservations();
@@ -37,9 +102,6 @@ class SpecialReservationsTabState extends State<SpecialReservationsTab> {
     }
   }
 
-  void refreshData() {
-    _loadSpecialReservations();
-  }
 
   List<Map<String, dynamic>> get _filteredReservations {
     final now = DateTime.now();

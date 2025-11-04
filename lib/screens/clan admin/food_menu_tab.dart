@@ -1,4 +1,5 @@
 // lib/screens/clan_admin/food_tab.dart
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:wedding_reservation_app/services/api_service.dart';
@@ -24,15 +25,72 @@ class FoodTabState extends State<FoodTab> {
   @override
   void initState() {
     super.initState();
-    _loadInitialData();
+    _checkConnectivityAndLoad();
   }
   void refreshData() {
 
-    _loadInitialData();
+    _checkConnectivityAndLoad();
     setState(() {
       
     });
   }
+
+  Future<void> _checkConnectivityAndLoad() async {
+      setState(() {
+    _isLoading = true;
+  });
+  
+  // Show loading for 2 seconds
+  await Future.delayed(Duration(seconds: 2));
+  final connectivityResult = await Connectivity().checkConnectivity();
+  
+  if (connectivityResult.contains(ConnectivityResult.none)) {
+    _showNoInternetDialog();
+    setState(() {
+      _isLoading = false;
+    });
+    return;
+  }
+  
+  await _loadInitialData();
+}
+
+void _showNoInternetDialog() {
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: Row(
+        children: [
+          Icon(Icons.wifi_off, color: Colors.orange),
+          SizedBox(width: 10),
+          Text('لا يوجد اتصال'),
+        ],
+      ),
+      content: Text('يرجى التحقق من اتصالك بالإنترنت'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text('إلغاء'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            Navigator.pop(context);
+            _checkConnectivityAndLoad();
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.blue.shade700,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          child: Text('إعادة المحاولة', style: TextStyle(color: Colors.white)),
+        ),
+      ],
+    ),
+  );
+}
+
+
 List<String> get _uniqueFoodTypes {
   final Set<String> foodTypes = {'الكل'}; // Add "All" option
   for (final menu in _menus) {
@@ -81,7 +139,7 @@ Future<void> _loadInitialData() async {
     } catch (e) {
       // Fallback to default values if API fails
       setState(() {
-        _foodTypes = ['فريق', 'كسكس', 'كباب'];
+        _foodTypes = ['الجاري', 'الكسكس', 'الكباب'];
       });
     }
   }

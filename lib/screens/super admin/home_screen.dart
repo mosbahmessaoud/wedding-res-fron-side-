@@ -1,5 +1,6 @@
 // lib/screens/home/super_admin_home_screen.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:wedding_reservation_app/screens/super%20admin/clan_admins_management_screen.dart';
 import 'package:wedding_reservation_app/screens/super%20admin/clans_tab.dart';
 import 'package:wedding_reservation_app/screens/super%20admin/create_clan_admin_screen.dart';
@@ -10,6 +11,7 @@ import 'package:wedding_reservation_app/services/api_service.dart';
 import '../../utils/colors.dart';
 import '../../utils/constants.dart';
 import '../super admin/counties_tab.dart';
+import 'package:wedding_reservation_app/widgets/theme_toggle_button.dart';
 
 class SuperAdminHomeScreen extends StatefulWidget {
   const SuperAdminHomeScreen({super.key});
@@ -163,14 +165,46 @@ class _SuperAdminHomeScreenState extends State<SuperAdminHomeScreen>
     );
   }
 
+
   @override
-  Widget build(BuildContext context) {
-    final screenSize = MediaQuery.of(context).size;
-    final isTablet = screenSize.width > 600;
-    final isDesktop = screenSize.width > 1200;
-    
-    return Scaffold(
-      backgroundColor: Colors.grey[50],
+Widget build(BuildContext context) {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  final screenSize = MediaQuery.of(context).size;
+  final isTablet = screenSize.width > 600;
+  final isDesktop = screenSize.width > 1200;
+  
+  return PopScope(
+    canPop: false,
+    onPopInvokedWithResult: (bool didPop, dynamic result) async {
+      if (didPop) return;
+      
+      // Show exit confirmation dialog instead of going back
+      final shouldExit = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('الخروج من التطبيق'),
+          content: const Text('هل تريد الخروج من التطبيق؟'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('إلغاء'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              child: const Text('خروج'),
+            ),
+          ],
+        ),
+      );
+      
+      if (shouldExit == true && context.mounted) {
+        // Exit the app (on Android)
+        SystemNavigator.pop();
+      }
+    },
+    child: Scaffold(
+      backgroundColor: isDark ? Colors.grey[900] : Colors.grey[50],
       appBar: _buildModernAppBar(context, isTablet, isDesktop),
       body: IndexedStack(
         index: _currentIndex,
@@ -180,116 +214,78 @@ class _SuperAdminHomeScreenState extends State<SuperAdminHomeScreen>
           ClansTab(),
           MadaihTab(),
           HaiaTab(),
-          _buildProfileTab(),
+          _buildProfileTab(isDark),
         ],
       ),
       bottomNavigationBar: _buildModernBottomNav(isTablet, isDesktop),
-    );
-  }
+    ),
+  );
+}
+PreferredSizeWidget _buildModernAppBar(BuildContext context, bool isTablet, bool isDesktop) {
+  final isSmall = MediaQuery.of(context).size.width < 600;
+  final isDark = Theme.of(context).brightness == Brightness.dark;
 
-  PreferredSizeWidget _buildModernAppBar(BuildContext context, bool isTablet, bool isDesktop) {
-    return AppBar(
-      title: Row(
-        children: [
-          Container(
-            padding: EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [AppColors.primary, AppColors.primary.withOpacity(0.8)],
-              ),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              Icons.admin_panel_settings,
-              color: Colors.white,
-              size: isDesktop ? 24 : 20,
-            ),
+  return AppBar(
+    title: Row(
+      children: [
+        Container(
+          padding: EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(colors: [AppColors.primary, AppColors.primary.withOpacity(0.8)]),
+            borderRadius: BorderRadius.circular(12),
           ),
-          SizedBox(width: 12),
-          Column(
+          child: Icon(Icons.admin_panel_settings, color: isDark ? Colors.grey[850] : Colors.white, size: isDesktop ? 24 : 20),
+        ),
+        SizedBox(width: 12),
+        Expanded(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                AppConstants.appName,
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: isDesktop ? 22 : isTablet ? 20 : 18,
-                  letterSpacing: 0.5,
-                ),
-              ),
-              Text(
-                'لوحة التحكم الرئيسية',
-                style: TextStyle(
-                  fontSize: isDesktop ? 12 : 10,
-                  color: AppColors.textSecondary,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
+              Text(AppConstants.appName, style: TextStyle(fontWeight: FontWeight.w700, fontSize: isDesktop ? 22 : isTablet ? 20 : 18, letterSpacing: 0.5), overflow: TextOverflow.ellipsis),
+              if (!isSmall) Text('لوحة التحكم الرئيسية', style: TextStyle(fontSize: isDesktop ? 12 : 10, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
             ],
           ),
-        ],
-      ),
-      backgroundColor: Colors.white,
-      foregroundColor: AppColors.primary,
-      elevation: 0,
-      shadowColor: Colors.transparent,
-      surfaceTintColor: Colors.transparent,
-      bottom: PreferredSize(
-        preferredSize: Size.fromHeight(1),
-        child: Container(
-          height: 1,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                Colors.transparent,
-                AppColors.primary.withOpacity(0.1),
-                Colors.transparent,
-              ],
-            ),
-          ),
         ),
-      ),
-      actions: [
-        _buildAppBarAction(Icons.refresh, _loadDashboardData, isTablet, isDesktop),
-        _buildAppBarAction(Icons.admin_panel_settings, () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => ClanAdminsManagementScreen(),
-            ),
-          );
-        }, isTablet, isDesktop),
-        _buildAppBarAction(Icons.person_add, () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => CreateClanAdminScreen(),
-            ),
-          );
-        }, isTablet, isDesktop),
-        _buildAppBarAction(Icons.notifications_outlined, () {
-          // TODO: Navigate to notifications
-        }, isTablet, isDesktop),
-        _buildAppBarAction(Icons.person_outline, () {
-          // TODO: Navigate to profile
-        }, isTablet, isDesktop),
-        _buildAppBarAction(Icons.phone_android, () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => OTPVerificationScreenE(
-                isClanadmin: false,
-
-              ),
-            ),
-          );
-        }, isTablet, isDesktop),
-        _buildAppBarAction(Icons.logout, _showLogoutDialog, isTablet, isDesktop),
-        const SizedBox(width: 8),
       ],
-    );
-  }
+    ),
+    backgroundColor: isDark ? Colors.grey[850] : Colors.white,
+    foregroundColor: AppColors.primary,
+    elevation: 0,
+    bottom: PreferredSize(
+      preferredSize: Size.fromHeight(1),
+      child: Container(height: 1, decoration: BoxDecoration(gradient: LinearGradient(colors: [Colors.transparent, AppColors.primary.withOpacity(0.1), Colors.transparent]))),
+    ),
+    actions: [
+      if (!isSmall) ...[
+        _buildAppBarAction(Icons.refresh, _loadDashboardData, isTablet, isDesktop),
+        _buildAppBarAction(Icons.admin_panel_settings, () => Navigator.push(context, MaterialPageRoute(builder: (_) => ClanAdminsManagementScreen())), isTablet, isDesktop),
+        _buildAppBarAction(Icons.person_add, () => Navigator.push(context, MaterialPageRoute(builder: (_) => CreateClanAdminScreen())), isTablet, isDesktop),
+        _buildAppBarAction(Icons.notifications_outlined, () {}, isTablet, isDesktop),
+        _buildAppBarAction(Icons.person_outline, () {}, isTablet, isDesktop),
+        _buildAppBarAction(Icons.phone_android, () => Navigator.push(context, MaterialPageRoute(builder: (_) => OTPVerificationScreenE(isClanadmin: false))), isTablet, isDesktop),
+      ] else
+        _buildAppBarAction(Icons.refresh, _loadDashboardData, isTablet, isDesktop),
+      Container(margin: EdgeInsets.symmetric(horizontal: 4), child: ThemeToggleButton()),
+      if (!isSmall)
+        _buildAppBarAction(Icons.logout, _showLogoutDialog, isTablet, isDesktop)
+      else
+        PopupMenuButton<VoidCallback>(
+          icon: Icon(Icons.more_vert, color: AppColors.primary),
+          onSelected: (fn) => fn(),
+          itemBuilder: (_) => [
+            PopupMenuItem(value: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ClanAdminsManagementScreen())), child: Row(children: [Icon(Icons.admin_panel_settings, size: 20), SizedBox(width: 12), Text('إدارة المشرفين')])),
+            PopupMenuItem(value: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CreateClanAdminScreen())), child: Row(children: [Icon(Icons.person_add, size: 20), SizedBox(width: 12), Text('إضافة مشرف')])),
+            PopupMenuItem(value: () {}, child: Row(children: [Icon(Icons.notifications_outlined, size: 20), SizedBox(width: 12), Text('الإشعارات')])),
+            PopupMenuItem(value: () {}, child: Row(children: [Icon(Icons.person_outline, size: 20), SizedBox(width: 12), Text('الملف الشخصي')])),
+            PopupMenuItem(value: () => Navigator.push(context, MaterialPageRoute(builder: (_) => OTPVerificationScreenE(isClanadmin: false))), child: Row(children: [Icon(Icons.phone_android, size: 20), SizedBox(width: 12), Text('التحقق')])),
+            PopupMenuItem(value: _showLogoutDialog, child: Row(children: [Icon(Icons.logout, size: 20, color: Colors.red), SizedBox(width: 12), Text('خروج', style: TextStyle(color: Colors.red))])),
+          ],
+        ),
+      SizedBox(width: 8),
+    ],
+  );
+}
 
   Widget _buildAppBarAction(IconData icon, VoidCallback onPressed, bool isTablet, bool isDesktop) {
     return Container(
@@ -312,42 +308,43 @@ class _SuperAdminHomeScreenState extends State<SuperAdminHomeScreen>
     );
   }
 
-  Widget _buildModernBottomNav(bool isTablet, bool isDesktop) {
+Widget _buildModernBottomNav(bool isTablet, bool isDesktop) {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            offset: Offset(0, -4),
-            blurRadius: 20,
-            spreadRadius: 0,
-          ),
-        ],
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: isTablet ? 40 : 20,
-            vertical: 8,
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildNavItem(0, Icons.home_outlined, Icons.home, 'الرئيسية', isTablet),
-              _buildNavItem(1, Icons.location_city_outlined, Icons.location_city, 'القصور', isTablet),
-              _buildNavItem(2, Icons.groups_outlined, Icons.groups, 'العشائر', isTablet),
-              _buildNavItem(3, Icons.business_outlined, Icons.business, 'المدايح', isTablet),
-              _buildNavItem(4, Icons.group_work_outlined, Icons.group_work, 'الهيئات', isTablet),
-              _buildNavItem(5, Icons.person_outline, Icons.person, 'الملف', isTablet),
-            ],
-          ),
+  return Container(
+    decoration: BoxDecoration(
+      color: isDark ? Colors.grey[850] : Colors.white,
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.08),
+          offset: Offset(0, -4),
+          blurRadius: 20,
+          spreadRadius: 0,
+        ),
+      ],
+    ),
+    child: SafeArea(
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: isDesktop ? 60 : isTablet ? 40 : 8,
+          vertical: isTablet ? 12 : 8,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _buildNavItem(0, Icons.home_outlined, Icons.home, 'الرئيسية', isTablet),
+            _buildNavItem(1, Icons.location_city_outlined, Icons.location_city, 'القصور', isTablet),
+            _buildNavItem(2, Icons.groups_outlined, Icons.groups, 'العشائر', isTablet),
+            _buildNavItem(3, Icons.business_outlined, Icons.business, 'المدايح', isTablet),
+            _buildNavItem(4, Icons.group_work_outlined, Icons.group_work, 'الهيئات', isTablet),
+            _buildNavItem(5, Icons.person_outline, Icons.person, 'الملف', isTablet),
+          ],
         ),
       ),
-    );
-  }
- 
+    ),
+  );
+}
+
   Widget _buildNavItem(int index, IconData outlinedIcon, IconData filledIcon, 
                       String label, bool isTablet) {
     final isSelected = _currentIndex == index;
@@ -397,27 +394,34 @@ class _SuperAdminHomeScreenState extends State<SuperAdminHomeScreen>
   }
 
   Widget _buildHomeTab(BuildContext context, bool isTablet, bool isDesktop) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final padding = isDesktop ? 32.0 : isTablet ? 24.0 : 16.0;
-    
-    if (_isLoading) {
-      return _buildLoadingState(padding);
-    }
+  final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    if (_errorMessage.isNotEmpty) {
-      return _buildErrorState(padding);
-    }
-    
-    return FadeTransition(
+  final screenWidth = MediaQuery.of(context).size.width;
+  final padding = isDesktop ? 32.0 : isTablet ? 24.0 : 16.0;
+  
+  if (_isLoading) {
+    return _buildLoadingState(padding);
+  }
+
+  if (_errorMessage.isNotEmpty) {
+    return _buildErrorState(padding);
+  }
+  
+  return RefreshIndicator(
+    onRefresh: _loadDashboardData,
+    color: AppColors.primary,
+    backgroundColor: Colors.white,
+    child: FadeTransition(
       opacity: _fadeAnimation,
       child: SlideTransition(
         position: _slideAnimation,
         child: SingleChildScrollView(
+          physics: AlwaysScrollableScrollPhysics(),
           padding: EdgeInsets.all(padding),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildWelcomeCard(isTablet, isDesktop),
+              _buildWelcomeCard(isTablet, isDesktop, isDark),
               SizedBox(height: 32),
               
               if (isDesktop) ...[
@@ -467,13 +471,19 @@ class _SuperAdminHomeScreenState extends State<SuperAdminHomeScreen>
                 _buildSectionTitle('حالة النظام', isTablet, isDesktop),
                 SizedBox(height: 20),
                 _buildSystemStatus(isTablet, isDesktop),
+                if (!isTablet) ...[
+                  SizedBox(height: 32),
+                  _buildRecentActivity(isTablet, isDesktop),
+                ],
               ],
+              SizedBox(height: 32), // Bottom padding for better scroll
             ],
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildLoadingState(double padding) {
     return RefreshIndicator(
@@ -558,7 +568,7 @@ class _SuperAdminHomeScreenState extends State<SuperAdminHomeScreen>
     );
   }
 
-  Widget _buildWelcomeCard(bool isTablet, bool isDesktop) {
+  Widget _buildWelcomeCard(bool isTablet, bool isDesktop , bool isDark) {
     final apiHealth = _dashboardStats['apiHealth'] ?? {};
     final isHealthy = apiHealth['status'] == 'healthy';
     
@@ -598,7 +608,7 @@ class _SuperAdminHomeScreenState extends State<SuperAdminHomeScreen>
                 ),
                 child: Icon(
                   Icons.admin_panel_settings,
-                  color: Colors.white,
+                  color: isDark ? Colors.grey[850] : Colors.white,
                   size: isDesktop ? 32 : isTablet ? 28 : 24,
                 ),
               ),
@@ -614,7 +624,7 @@ class _SuperAdminHomeScreenState extends State<SuperAdminHomeScreen>
                     child: Text(
                       'مدير عام',
                       style: TextStyle(
-                        color: Colors.white,
+                        color: isDark ? Colors.grey[850] : Colors.white,
                         fontSize: isDesktop ? 16 : isTablet ? 14 : 12,
                         fontWeight: FontWeight.w600,
                       ),
@@ -629,7 +639,7 @@ class _SuperAdminHomeScreenState extends State<SuperAdminHomeScreen>
                     ),
                     child: Icon(
                       isHealthy ? Icons.check_circle : Icons.error,
-                      color: Colors.white,
+                      color: isDark ? Colors.grey[850] : Colors.white,
                       size: 16,
                     ),
                   ),
@@ -641,7 +651,7 @@ class _SuperAdminHomeScreenState extends State<SuperAdminHomeScreen>
           Text(
             'مرحباً بك في لوحة التحكم',
             style: TextStyle(
-              color: Colors.white,
+              color: isDark ? Colors.grey[850] : Colors.white,
               fontSize: isDesktop ? 36 : isTablet ? 32 : 28,
               fontWeight: FontWeight.w800,
               height: 1.2,
@@ -673,7 +683,9 @@ class _SuperAdminHomeScreenState extends State<SuperAdminHomeScreen>
     );
   }
 
-  Widget _buildSectionTitle(String title, bool isTablet, bool isDesktop) {
+  Widget _buildSectionTitle(String title, bool isTablet, bool isDesktop ) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Row(
       children: [
         Container(
@@ -690,7 +702,7 @@ class _SuperAdminHomeScreenState extends State<SuperAdminHomeScreen>
           style: TextStyle(
             fontSize: isDesktop ? 28 : isTablet ? 24 : 20,
             fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
+            color: isDark ?AppColors.darkTextPrimary : AppColors.textPrimary,
           ),
         ),
       ],
@@ -747,33 +759,65 @@ Widget _buildStatsGrid(bool isTablet, bool isDesktop) {
     },
   ];
 
-  final crossAxisCount = isDesktop ? 3 : isTablet ? 2 : 2;
-  final childAspectRatio = isDesktop ? 1.2 : isTablet ? 1.1 : 1.0;
+  return LayoutBuilder(
+    builder: (context, constraints) {
+      // Determine layout based on available width
+      final width = constraints.maxWidth;
+      
+      int crossAxisCount;
+      double childAspectRatio;
+      double spacing;
+      
+      if (width > 1200) {
+        // Desktop/Large screens
+        crossAxisCount = 3;
+        childAspectRatio = 1.4;
+        spacing = 20.0;
+      } else if (width > 800) {
+        // Tablet/Medium screens
+        crossAxisCount = 2;
+        childAspectRatio = 1.3;
+        spacing = 16.0;
+      } else if (width > 600) {
+        // Large phones/Small tablets
+        crossAxisCount = 2;
+        childAspectRatio = 1.2;
+        spacing = 12.0;
+      } else {
+        // Small phones
+        crossAxisCount = 2;
+        childAspectRatio = 0.95;
+        spacing = 10.0;
+      }
 
-  return GridView.builder(
-    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-      crossAxisCount: crossAxisCount,
-      mainAxisSpacing: 16,
-      crossAxisSpacing: 16,
-      childAspectRatio: childAspectRatio,
-    ),
-    shrinkWrap: true,
-    physics: NeverScrollableScrollPhysics(),
-    itemCount: stats.length,
-    itemBuilder: (context, index) {
-      final stat = stats[index]; // Changed from 'actions' to 'stats'
-      return _buildModernStatsCard( // Changed to use stats card instead of action card
-        icon: stat['icon'] as IconData,
-        title: stat['title'] as String,
-        count: stat['count'] as String, // Stats cards expect 'count' not 'subtitle'
-        subtitle: stat['subtitle'] as String,
-        color: stat['color'] as Color,
-        isTablet: isTablet,
-        isDesktop: isDesktop,
+      return GridView.builder(
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: crossAxisCount,
+          mainAxisSpacing: spacing,
+          crossAxisSpacing: spacing,
+          childAspectRatio: childAspectRatio,
+        ),
+        shrinkWrap: true,
+        physics: NeverScrollableScrollPhysics(),
+        padding: EdgeInsets.zero,
+        itemCount: stats.length,
+        itemBuilder: (context, index) {
+          final stat = stats[index];
+          return _buildModernStatsCard(
+            icon: stat['icon'] as IconData,
+            title: stat['title'] as String,
+            count: stat['count'] as String,
+            subtitle: stat['subtitle'] as String,
+            color: stat['color'] as Color,
+            isTablet: isTablet,
+            isDesktop: isDesktop,
+          );
+        },
       );
     },
   );
 }
+
   Widget _buildModernStatsCard({
     required IconData icon,
     required String title,
@@ -783,10 +827,12 @@ Widget _buildStatsGrid(bool isTablet, bool isDesktop) {
     required bool isTablet,
     required bool isDesktop,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       padding: EdgeInsets.all(isDesktop ? 24 : isTablet ? 20 : 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? Colors.grey[850] : Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -850,7 +896,7 @@ Widget _buildStatsGrid(bool isTablet, bool isDesktop) {
             title,
             style: TextStyle(
               fontSize: isDesktop ? 16 : isTablet ? 14 : 12,
-              color: AppColors.textPrimary,
+              color: isDark ?AppColors.darkTextPrimary : AppColors.textPrimary,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -870,212 +916,138 @@ Widget _buildStatsGrid(bool isTablet, bool isDesktop) {
     );
   }
 
- // FIND THIS METHOD AND ADD THE OTP VERIFICATION CARD
-  Widget _buildActionGrid(bool isTablet, bool isDesktop) {
-    final actions = [
-      {
-        'icon': Icons.location_city_outlined,
-        'title': 'إدارة البلديات',
-        'subtitle': 'عرض وإدارة البلديات',
-        'color': AppColors.primary,
-        'onTap': () {
-          setState(() {
-            _currentIndex = 1; // Navigate to Counties tab
-          });
-        },
-      },
-      {
-        'icon': Icons.groups_outlined,
-        'title': 'إدارة العشائر',
-        'subtitle': 'عرض وإدارة العشائر',
-        'color': AppColors.secondary,
-        'onTap': () {
-          setState(() {
-            _currentIndex = 2; // Navigate to Clans tab
-          });
-        },
-      },
-      {
-        'icon': Icons.business_outlined,
-        'title': 'إدارة المدايح',
-        'subtitle': 'عرض وإدارة المدايح',
-        'color': Colors.orange,
-        'onTap': () {
-          setState(() {
-            _currentIndex = 3; // Navigate to Madaih tab
-          });
-        },
-      },
-      {
-        'icon': Icons.group_work_outlined,
-        'title': 'إدارة الهيئات',
-        'subtitle': 'عرض وإدارة الهيئات',
-        'color': Colors.green,
-        'onTap': () {
-          setState(() {
-            _currentIndex = 4; // Navigate to Haia tab
-          });
-        },
-      },
-      // ADD THIS OTP VERIFICATION CARD
-      {
-        'icon': Icons.phone_android,
-        'title': 'التحقق من الهاتف',
-        'subtitle': 'تحقق من أرقام الهواتف',
-        'color': Colors.blue,
-        'onTap': () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => OTPVerificationScreenE(
-                isClanadmin: false,
-              ),
-            ),
-          );
-        },
-      },
-      {
-        'icon': Icons.person_add_outlined,
-        'title': 'إضافة مدير عشيرة',
-        'subtitle': 'إضافة مدير عشيرة جديد',
-        'color': Colors.purple,
-        'onTap': () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => CreateClanAdminScreen(),
-            ),
-          );
-        },
-      },
-      {
-        'icon': Icons.admin_panel_settings_outlined,
-        'title': 'إدارة المديرين',
-        'subtitle': 'عرض وإدارة مديري العشائر',
-        'color': Colors.indigo,
-        'onTap': () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => ClanAdminsManagementScreen(),
-            ),
-          );
-        },
-      },
-      {
-        'icon': Icons.settings_outlined,
-        'title': 'الإعدادات',
-        'subtitle': 'إعدادات النظام العامة',
-        'color': Colors.grey,
-        'onTap': () {
-          // TODO: Navigate to settings
-        },
-      },
-    ];
 
-    final crossAxisCount = isDesktop ? 4 : isTablet ? 3 : 2;
-    final childAspectRatio = isDesktop ? 1.1 : isTablet ? 1.0 : 0.9;
-
-    return GridView.builder(
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: crossAxisCount,
-        mainAxisSpacing: 16,
-        crossAxisSpacing: 16,
-        childAspectRatio: childAspectRatio,
-      ),
-      shrinkWrap: true,
-      physics: NeverScrollableScrollPhysics(),
-      itemCount: actions.length,
-      itemBuilder: (context, index) {
-        final action = actions[index];
-        return _buildModernActionCard(
-          icon: action['icon'] as IconData,
-          title: action['title'] as String,
-          subtitle: action['subtitle'] as String,
-          color: action['color'] as Color,
-          onTap: action['onTap'] as VoidCallback,
-          isTablet: isTablet,
-          isDesktop: isDesktop,
+// UPDATED _buildActionGrid METHOD - Better responsive action grid
+Widget _buildActionGrid(bool isTablet, bool isDesktop) {
+  final actions = [
+    {
+      'icon': Icons.location_city_outlined,
+      'title': 'إدارة البلديات',
+      'subtitle': 'عرض وإدارة البلديات',
+      'color': AppColors.primary,
+      'onTap': () {
+        setState(() {
+          _currentIndex = 1;
+        });
+      },
+    },
+    {
+      'icon': Icons.groups_outlined,
+      'title': 'إدارة العشائر',
+      'subtitle': 'عرض وإدارة العشائر',
+      'color': AppColors.secondary,
+      'onTap': () {
+        setState(() {
+          _currentIndex = 2;
+        });
+      },
+    },
+    {
+      'icon': Icons.business_outlined,
+      'title': 'إدارة المدايح',
+      'subtitle': 'عرض وإدارة المدايح',
+      'color': Colors.orange,
+      'onTap': () {
+        setState(() {
+          _currentIndex = 3;
+        });
+      },
+    },
+    {
+      'icon': Icons.group_work_outlined,
+      'title': 'إدارة الهيئات',
+      'subtitle': 'عرض وإدارة الهيئات',
+      'color': Colors.green,
+      'onTap': () {
+        setState(() {
+          _currentIndex = 4;
+        });
+      },
+    },
+    {
+      'icon': Icons.phone_android,
+      'title': 'التحقق من الهاتف',
+      'subtitle': 'تحقق من أرقام الهواتف',
+      'color': Colors.blue,
+      'onTap': () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => OTPVerificationScreenE(
+              isClanadmin: false,
+            ),
+          ),
         );
       },
-    );
-  }
+    },
+    {
+      'icon': Icons.person_add_outlined,
+      'title': 'إضافة مدير عشيرة',
+      'subtitle': 'إضافة مدير عشيرة جديد',
+      'color': Colors.purple,
+      'onTap': () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => CreateClanAdminScreen(),
+          ),
+        );
+      },
+    },
+    {
+      'icon': Icons.admin_panel_settings_outlined,
+      'title': 'إدارة المديرين',
+      'subtitle': 'عرض وإدارة مديري العشائر',
+      'color': Colors.indigo,
+      'onTap': () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ClanAdminsManagementScreen(),
+          ),
+        );
+      },
+    },
+    {
+      'icon': Icons.settings_outlined,
+      'title': 'الإعدادات',
+      'subtitle': 'إعدادات النظام العامة',
+      'color': Colors.grey,
+      'onTap': () {
+        // TODO: Navigate to settings
+      },
+    },
+  ];
 
-// Widget _buildModernActionCard({
-//   required IconData icon,
-//   required String title,
-//   required String subtitle,
-//   required Color color,
-//   required bool isTablet,
-//   required bool isDesktop,
-//   required VoidCallback onTap,
-// }) {
-//   return GestureDetector(
-//     onTap: onTap,
-//     child: Container(
-//       decoration: BoxDecoration(
-//         color: Colors.white,
-//         borderRadius: BorderRadius.circular(16),
-//         boxShadow: [
-//           BoxShadow(
-//             color: Colors.black.withOpacity(0.04),
-//             offset: Offset(0, 4),
-//             blurRadius: 16,
-//             spreadRadius: 0,
-//           ),
-//         ],
-//         border: Border.all(
-//           color: color.withOpacity(0.1),
-//           width: 1,
-//         ),
-//       ),
-//       child: Padding(
-//         padding: EdgeInsets.all(isDesktop ? 24 : isTablet ? 20 : 16),
-//         child: Column(
-//           mainAxisAlignment: MainAxisAlignment.center,
-//           children: [
-//             Container(
-//               width: isDesktop ? 64 : isTablet ? 60 : 50,
-//               height: isDesktop ? 64 : isTablet ? 60 : 50,
-//               decoration: BoxDecoration(
-//                 color: color.withOpacity(0.1),
-//                 borderRadius: BorderRadius.circular(16),
-//               ),
-//               child: Icon(
-//                 icon,
-//                 color: color,
-//                 size: isDesktop ? 36 : isTablet ? 32 : 28,
-//               ),
-//             ),
-//             SizedBox(height: 16),
-//             Text(
-//               title,
-//               style: TextStyle(
-//                 fontSize: isDesktop ? 18 : isTablet ? 16 : 14,
-//                 fontWeight: FontWeight.w700,
-//                 color: AppColors.textPrimary,
-//               ),
-//               textAlign: TextAlign.center,
-//             ),
-//             SizedBox(height: 4),
-//             Text(
-//               subtitle,
-//               style: TextStyle(
-//                 fontSize: isDesktop ? 14 : isTablet ? 13 : 12,
-//                 color: AppColors.textSecondary,
-//                 fontWeight: FontWeight.w500,
-//               ),
-//               textAlign: TextAlign.center,
-//               maxLines: 2,
-//               overflow: TextOverflow.ellipsis,
-//             ),
-//           ],
-//         ),
-//       ),
-//     ),
-//   );
-// }
+  // Responsive grid settings for actions
+  final crossAxisCount = isDesktop ? 4 : isTablet ? 3 : 2;
+  final childAspectRatio = isDesktop ? 1.15 : isTablet ? 1.0 : 0.95;
+  final spacing = isDesktop ? 20.0 : isTablet ? 16.0 : 12.0;
 
+  return GridView.builder(
+    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+      crossAxisCount: crossAxisCount,
+      mainAxisSpacing: spacing,
+      crossAxisSpacing: spacing,
+      childAspectRatio: childAspectRatio,
+    ),
+    shrinkWrap: true,
+    physics: NeverScrollableScrollPhysics(),
+    itemCount: actions.length,
+    itemBuilder: (context, index) {
+      final action = actions[index];
+      return _buildModernActionCard(
+        icon: action['icon'] as IconData,
+        title: action['title'] as String,
+        subtitle: action['subtitle'] as String,
+        color: action['color'] as Color,
+        onTap: action['onTap'] as VoidCallback,
+        isTablet: isTablet,
+        isDesktop: isDesktop,
+      );
+    },
+  );
+}
 
 // ADD THIS NEW METHOD FOR ACTION CARDS
   Widget _buildModernActionCard({
@@ -1087,12 +1059,14 @@ Widget _buildStatsGrid(bool isTablet, bool isDesktop) {
     required bool isTablet,
     required bool isDesktop,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: EdgeInsets.all(isDesktop ? 24 : isTablet ? 20 : 16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isDark ? Colors.grey[850] : Colors.white,
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
@@ -1128,7 +1102,7 @@ Widget _buildStatsGrid(bool isTablet, bool isDesktop) {
               style: TextStyle(
                 fontSize: isDesktop ? 18 : isTablet ? 16 : 14,
                 fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
+                color: isDark ?AppColors.darkTextPrimary : AppColors.textPrimary,
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -1167,11 +1141,12 @@ Widget _buildStatsGrid(bool isTablet, bool isDesktop) {
     final apiHealth = _dashboardStats['apiHealth'] ?? {};
     final isHealthy = apiHealth['status'] == 'healthy';
     final responseTime = apiHealth['response_time_ms'] ?? 0;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       padding: EdgeInsets.all(isDesktop ? 24 : isTablet ? 20 : 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? Colors.grey[850] : Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -1202,7 +1177,7 @@ Widget _buildStatsGrid(bool isTablet, bool isDesktop) {
                 style: TextStyle(
                   fontSize: isDesktop ? 20 : isTablet ? 18 : 16,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
+                  color: isDark ?AppColors.darkTextPrimary : AppColors.textPrimary,
                 ),
               ),
             ],
@@ -1267,6 +1242,8 @@ Widget _buildStatsGrid(bool isTablet, bool isDesktop) {
   }
 
   Widget _buildRecentActivity(bool isTablet, bool isDesktop) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     final reservationStats = _dashboardStats['reservations'] ?? {};
     final activities = [
       {
@@ -1292,7 +1269,7 @@ Widget _buildStatsGrid(bool isTablet, bool isDesktop) {
     return Container(
       padding: EdgeInsets.all(isDesktop ? 24 : isTablet ? 20 : 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? Colors.grey[850] : Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -1323,7 +1300,7 @@ Widget _buildStatsGrid(bool isTablet, bool isDesktop) {
                 style: TextStyle(
                   fontSize: isDesktop ? 20 : isTablet ? 18 : 16,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
+                  color: isDark ?AppColors.darkTextPrimary : AppColors.textPrimary,
                 ),
               ),
             ],
@@ -1351,7 +1328,7 @@ Widget _buildStatsGrid(bool isTablet, bool isDesktop) {
                     activity['title'] as String,
                     style: TextStyle(
                       fontSize: isDesktop ? 14 : 12,
-                      color: AppColors.textPrimary,
+                      color: isDark ?AppColors.darkTextPrimary : AppColors.textPrimary,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -1372,7 +1349,7 @@ Widget _buildStatsGrid(bool isTablet, bool isDesktop) {
     );
   }
 
-  Widget _buildProfileTab() {
+  Widget _buildProfileTab(bool isDark) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -1395,7 +1372,7 @@ Widget _buildStatsGrid(bool isTablet, bool isDesktop) {
             style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
+              color: isDark ?AppColors.darkTextPrimary : AppColors.textPrimary,
             ),
           ),
           SizedBox(height: 8),

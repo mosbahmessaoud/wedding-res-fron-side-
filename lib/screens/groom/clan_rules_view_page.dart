@@ -1,3 +1,4 @@
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:wedding_reservation_app/services/api_service.dart';
@@ -42,15 +43,80 @@ class GroomClanRulesPageState extends State<GroomClanRulesPage> {
     _initializeClanId();
   }
 
-  Future<void> _initializeClanId() async {
-    if (widget.clanId != null) {
-      _resolvedClanId = widget.clanId;
-      await _loadClanRules();
-      await _checkForClanRulesPdf();
-    } else {
-      await _fetchUserClanId();
-    }
+Future<void> _initializeClanId() async {
+  await _checkConnectivityAndLoad();
+}
+
+  void refreshData() {
+    _initializeClanId();
   }
+
+  
+Future<void> _checkConnectivityAndLoad() async {
+  setState(() {
+    _isLoading = true;
+  });
+  
+  // Show loading for 2 seconds
+  await Future.delayed(Duration(seconds: 2));
+  
+  final connectivityResult = await Connectivity().checkConnectivity();
+  
+  if (connectivityResult.contains(ConnectivityResult.none)) {
+    _showNoInternetDialog();
+    setState(() {
+      _isLoading = false;
+    });
+    return;
+  }
+  
+  await _loadInitialData();
+}
+
+Future<void> _loadInitialData() async {
+  if (widget.clanId != null) {
+    _resolvedClanId = widget.clanId;
+    await _loadClanRules();
+    await _checkForClanRulesPdf();
+  } else {
+    await _fetchUserClanId();
+  }
+}
+
+void _showNoInternetDialog() {
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: Row(
+        children: [
+          Icon(Icons.wifi_off, color: Colors.orange),
+          SizedBox(width: 10),
+          Text('لا يوجد اتصال'),
+        ],
+      ),
+      content: Text('يرجى التحقق من اتصالك بالإنترنت'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text('إلغاء'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            Navigator.pop(context);
+            _checkConnectivityAndLoad();
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Theme.of(context).primaryColor,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          child: Text('إعادة المحاولة', style: TextStyle(color: Colors.white)),
+        ),
+      ],
+    ),
+  );
+}
 
   Future<void> _fetchUserClanId() async {
     setState(() {
@@ -111,6 +177,24 @@ class GroomClanRulesPageState extends State<GroomClanRulesPage> {
   }
 
   Future<void> _loadClanRules() async {
+
+    setState(() {
+      _isLoading = true;
+    });
+    
+    // Show loading for 2 seconds
+    await Future.delayed(Duration(seconds: 2));
+    
+    final connectivityResult = await Connectivity().checkConnectivity();
+    
+    if (connectivityResult.contains(ConnectivityResult.none)) {
+      _showNoInternetDialog();
+      setState(() {
+        _isLoading = false;
+      });
+      return;
+    }
+
     if (_resolvedClanId == null) {
       setState(() {
         _hasError = true;
@@ -151,10 +235,7 @@ class GroomClanRulesPageState extends State<GroomClanRulesPage> {
     }
   }
 
-  void refreshData() {
-    _loadClanRules();
-    _checkForClanRulesPdf();
-  }
+
 
   /// Extract file ID from the full PDF URL
   String? _extractFileIdFromUrl(String pdfUrl) {
@@ -987,30 +1068,37 @@ Future<void> _downloadClanRulesPdf() async {
       return dateString.toString();
     }
   }
-@override
+
+  @override
 Widget build(BuildContext context) {
-  return Directionality(
-    textDirection: TextDirection.rtl,
-    child: Scaffold(
-      body: _isLoading
-          ? _buildLoadingState()
-          : _hasError
-              ? _buildErrorState()
-              : _buildContent(),
-      floatingActionButton: (!_isLoading && !_hasError)
-          ? Padding(
-              padding: const EdgeInsets.only(bottom: 70),
-              child: FloatingActionButton(
-                onPressed: () async {
-                  await _loadClanRules();
-                  await _checkForClanRulesPdf();
-                },
-                tooltip: 'تحديث',
-                child: const Icon(Icons.refresh),
-              ),
-            )
-          : null,
-    
+  return PopScope(
+    canPop: false, // Prevents back navigation
+    onPopInvokedWithResult: (bool didPop, dynamic result) {
+      // Do nothing - completely blocks all back button attempts
+      return;
+    },
+    child: Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        body: _isLoading
+            ? _buildLoadingState()
+            : _hasError
+                ? _buildErrorState()
+                : _buildContent(),
+        floatingActionButton: (!_isLoading && !_hasError)
+            ? Padding(
+                padding: const EdgeInsets.only(bottom: 70),
+                child: FloatingActionButton(
+                  onPressed: () async {
+                    await _loadClanRules();
+                    await _checkForClanRulesPdf();
+                  },
+                  tooltip: 'تحديث',
+                  child: const Icon(Icons.refresh),
+                ),
+              )
+            : null,
+      ),
     ),
   );
 }

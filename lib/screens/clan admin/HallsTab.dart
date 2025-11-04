@@ -1,6 +1,7 @@
 // lib/screens/home/tabs/halls_tab.dart
 import 'dart:convert';
 
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../services/api_service.dart';
@@ -25,15 +26,73 @@ class HallsTabState extends State<HallsTab> {
   @override
   void initState() {
     super.initState();
-    _loadHalls();
+    _checkConnectivityAndLoad();
   }
  void refreshData() {
 
-    _loadInitialData();
+    _checkConnectivityAndLoad();
     setState(() {
       
     });
   }
+// Add this method in HallsTabState class
+
+Future<void> _checkConnectivityAndLoad() async {
+  setState(() {
+    isLoading = true;
+  });
+  
+  // Show loading for 2 seconds
+  await Future.delayed(Duration(seconds: 2));
+  final connectivityResult = await Connectivity().checkConnectivity();
+  
+  if (connectivityResult.contains(ConnectivityResult.none)) {
+    _showNoInternetDialog();
+    setState(() {
+      isLoading = false;
+    });
+    return;
+  }
+  
+  try {
+    await _loadInitialData();
+  } catch (e) {
+    setState(() {
+      errorMessage = e.toString();
+      isLoading = false;
+    });
+  }
+}
+void _showNoInternetDialog() {
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: Row(
+        children: [
+          Icon(Icons.wifi_off, color: Colors.orange),
+          SizedBox(width: 10),
+          Text('لا يوجد اتصال'),
+        ],
+      ),
+      content: Text('يرجى التحقق من اتصالك بالإنترنت'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text('إلغاء'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            Navigator.pop(context);
+            _checkConnectivityAndLoad();
+          },
+          child: Text('إعادة المحاولة'),
+        ),
+      ],
+    ),
+  );
+}
 
 Future<void> _loadInitialData() async {
   await Future.wait([
@@ -581,7 +640,7 @@ Widget build(BuildContext context) {
             ),
             SizedBox(height: 20),
             ElevatedButton.icon(
-              onPressed: _loadHalls,
+              onPressed: _checkConnectivityAndLoad,
               icon: Icon(Icons.refresh),
               label: Text('إعادة المحاولة'),
               style: ElevatedButton.styleFrom(

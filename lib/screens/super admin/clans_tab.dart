@@ -4,6 +4,7 @@ import '../../models/clan.dart';
 import '../../models/county.dart';
 import '../../services/api_service.dart';
 import '../../utils/colors.dart';
+import 'package:wedding_reservation_app/widgets/theme_toggle_button.dart';
 
 class ClansTab extends StatefulWidget {
   const ClansTab({super.key});
@@ -196,139 +197,230 @@ class _ClansTabState extends State<ClansTab> with AutomaticKeepAliveClientMixin 
       }
     }
   }
+@override
+Widget build(BuildContext context) {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
 
-  @override
-  Widget build(BuildContext context) {
-    super.build(context); // Required for AutomaticKeepAliveClientMixin
-    
-    return Scaffold(
-      body: Column(
-        children: [
-          // Header Section
-          Container(
-            padding: EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  spreadRadius: 1,
-                  blurRadius: 4,
-                  offset: Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'إدارة العشائر',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      'اسحب للأسفل للتحديث',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                    ElevatedButton.icon(
-                      onPressed: _showCreateClanDialog,
-                      icon: Icon(Icons.add),
-                      label: Text('إضافة عشيرة'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 16),
-                // County Filter
-                Row(
-                  children: [
-                    Text(
-                      'فلترة حسب القصر:',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    SizedBox(width: 12),
-                    Expanded(
-                      child: DropdownButtonFormField<County>(
-                        value: selectedCounty,
-                        decoration: InputDecoration(
-                          hintText: 'اختر القصر',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+  super.build(context); // Required for AutomaticKeepAliveClientMixin
+  
+  return Scaffold(
+    body: Column(
+      children: [
+        // Header Section
+        Container(
+          padding: EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.textPrimary : AppColors.darkTextPrimary,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                spreadRadius: 1,
+                blurRadius: 4,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final isSmallScreen = constraints.maxWidth < 600;
+              final isMediumScreen = constraints.maxWidth >= 600 && constraints.maxWidth < 900;
+              
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Title and Button Row
+                  isSmallScreen
+                      ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'إدارة العشائر',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              'اسحب للأسفل للتحديث',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                            SizedBox(height: 12),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                onPressed: _showCreateClanDialog,
+                                icon: Icon(Icons.add, size: 18),
+                                label: Text('إضافة عشيرة'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.primary,
+                                  foregroundColor: isDark ? Colors.white : AppColors.textPrimary,
+                                  padding: EdgeInsets.symmetric(vertical: 12),
+                                ),
+                              ),
+                            ),
+                          ],
+                        )
+                      : Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'إدارة العشائر',
+                                    style: TextStyle(
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.bold,
+                                      color: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
+                                    ),
+                                  ),
+                                  SizedBox(height: 4),
+                                  Text(
+                                    'اسحب للأسفل للتحديث',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            ElevatedButton.icon(
+                              onPressed: _showCreateClanDialog,
+                              icon: Icon(Icons.add),
+                              label: Text('إضافة عشيرة'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                foregroundColor: isDark ? Colors.white : AppColors.textPrimary,
+                              ),
+                            ),
+                          ],
                         ),
-                        items: [
-                          DropdownMenuItem<County>(
-                            value: null,
-                            child: Text('جميع القصور'),
-                          ),
-                          ...counties.map((county) => DropdownMenuItem<County>(
-                            value: county,
-                            child: Text(county.name),
-                          )),
-                        ],
-                        onChanged: (County? value) {
-                          setState(() {
-                            selectedCounty = value;
-                          });
-                          if (value == null) {
-                            _loadAllClans();
-                          } else {
-                            _loadClansByCounty(value.id);
-                          }
-                        },
-                      ),
-                    ),
-                    SizedBox(width: 12),
-                    // ElevatedButton(
-                    //   onPressed: () {
-                    //     // Refresh both counties and clans
-                    //     _refreshDataIfNeeded();
-                    //   },
-                    //   child: Text('تحديث'),
-                    //   style: ElevatedButton.styleFrom(
-                    //     backgroundColor: AppColors.secondary,
-                    //     foregroundColor: Colors.white,
-                    //   ),
-                    // ),
-                  ],
-                ),
-              ],
-            ),
+                  
+                  SizedBox(height: 16),
+                  
+                  // County Filter Row
+                  isSmallScreen
+                      ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'فلترة حسب القصر:',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
+                              ),
+                            ),
+                            SizedBox(height: 8),
+                            DropdownButtonFormField<County>(
+                              value: selectedCounty,
+                              decoration: InputDecoration(
+                                hintText: 'اختر القصر',
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                              ),
+                              isExpanded: true,
+                              items: [
+                                DropdownMenuItem<County>(
+                                  value: null,
+                                  child: Text('جميع القصور'),
+                                ),
+                                ...counties.map((county) => DropdownMenuItem<County>(
+                                  value: county,
+                                  child: Text(county.name),
+                                )),
+                              ],
+                              onChanged: (County? value) {
+                                setState(() {
+                                  selectedCounty = value;
+                                });
+                                if (value == null) {
+                                  _loadAllClans();
+                                } else {
+                                  _loadClansByCounty(value.id);
+                                }
+                              },
+                            ),
+                          ],
+                        )
+                      : Row(
+                          children: [
+                            Text(
+                              'فلترة حسب القصر:',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                                color: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
+                              ),
+                            ),
+                            SizedBox(width: 12),
+                            Expanded(
+                              child: DropdownButtonFormField<County>(
+                                value: selectedCounty,
+                                decoration: InputDecoration(
+                                  hintText: 'اختر القصر',
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                ),
+                                items: [
+                                  DropdownMenuItem<County>(
+                                    value: null,
+                                    child: Text('جميع القصور'),
+                                  ),
+                                  ...counties.map((county) => DropdownMenuItem<County>(
+                                    value: county,
+                                    child: Text(county.name),
+                                  )),
+                                ],
+                                onChanged: (County? value) {
+                                  setState(() {
+                                    selectedCounty = value;
+                                  });
+                                  if (value == null) {
+                                    _loadAllClans();
+                                  } else {
+                                    _loadClansByCounty(value.id);
+                                  }
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                ],
+              );
+            },
           ),
+        ),
 
-          // Content Section with RefreshIndicator
-          Expanded(
-            child: RefreshIndicator(
-              onRefresh: _refreshDataIfNeeded,
-              color: AppColors.primary,
-              backgroundColor: Colors.white,
-              strokeWidth: 2.5,
-              child: _buildContent(),
-            ),
+        // Content Section with RefreshIndicator
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _refreshDataIfNeeded,
+            color: AppColors.primary,
+            backgroundColor: isDark ? Colors.white : AppColors.textPrimary,
+            strokeWidth: 2.5,
+            child: _buildContent(),
           ),
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+  );
+}
 
   Widget _buildContent() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     if (isLoading) {
       return Center(child: CircularProgressIndicator());
     }
@@ -378,7 +470,7 @@ class _ClansTabState extends State<ClansTab> with AutomaticKeepAliveClientMixin 
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
+                color: isDark ?Colors.white : AppColors.textPrimary,
               ),
             ),
             Text(
@@ -395,7 +487,7 @@ class _ClansTabState extends State<ClansTab> with AutomaticKeepAliveClientMixin 
               label: Text('إضافة عشيرة'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
+                foregroundColor: isDark ?Colors.white : AppColors.textPrimary,
               ),
             ),
           ],
@@ -414,6 +506,8 @@ class _ClansTabState extends State<ClansTab> with AutomaticKeepAliveClientMixin 
   }
 
   Widget _buildClanCard(Clan clan) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     // Find county name
     final county = counties.firstWhere(
       (c) => c.id == clan.countyId,
@@ -440,7 +534,7 @@ class _ClansTabState extends State<ClansTab> with AutomaticKeepAliveClientMixin 
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
+                          color: isDark ?AppColors.darkTextPrimary : AppColors.textPrimary,
                         ),
                       ),
                       SizedBox(height: 4),
@@ -603,6 +697,8 @@ class _ClanFormDialogState extends State<_ClanFormDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return AlertDialog(
       title: Text(isEditing ? 'تعديل العشيرة' : 'إضافة عشيرة جديدة'),
       content: SizedBox(
@@ -708,7 +804,7 @@ class _ClanFormDialogState extends State<_ClanFormDialog> {
           onPressed: (_isLoading || _currentCounties.isEmpty) ? null : _submitForm,
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.primary,
-            foregroundColor: Colors.white,
+            foregroundColor: isDark ?Colors.white : AppColors.textPrimary,
           ),
           child: _isLoading
               ? SizedBox(

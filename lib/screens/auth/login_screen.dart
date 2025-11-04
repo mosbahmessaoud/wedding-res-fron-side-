@@ -3,7 +3,10 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wedding_reservation_app/screens/auth/forgot_password_screen.dart';
 import 'package:wedding_reservation_app/screens/auth/sing_up_screen.dart';
 import 'package:wedding_reservation_app/screens/auth/welcome_screen.dart';
@@ -39,119 +42,150 @@ class _LoginScreenState extends State<LoginScreen>
   late Animation<double> _fadeAnimation;
   late Animation<double> _slideAnimation;
 
-  // Cache precached image
   late ImageProvider _backgroundImageProvider;
   bool _imageLoaded = false;
+
+  // Keys for SharedPreferences
+  static const String _keyPhone = 'saved_phone';
+  static const String _keyPassword = 'saved_password';
+  static const String _keyRole = 'saved_role';
+  static const String _keyToken = 'saved_token';
+  static const String _keyIsLoggedIn = 'is_logged_in';
 
   @override
   bool get wantKeepAlive => true;
 
-  // @override
-  // void initState() {
-  //   super.initState();
-    
-  //   // Initialize animations
-  //   _animationController = AnimationController(
-  //     duration: const Duration(milliseconds: 600), // Reduced from 800ms
-  //     vsync: this,
-  //   );
-
-  //   _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-  //     CurvedAnimation(
-  //       parent: _animationController,
-  //       curve: Curves.easeOut,
-  //     ),
-  //   );
-
-  //   _slideAnimation = Tween<double>(begin: 20.0, end: 0.0).animate( // Reduced from 30.0
-  //     CurvedAnimation(
-  //       parent: _animationController,
-  //       curve: Curves.easeOut,
-  //     ),
-  //   );
-
-  //   // Preload images
-  //   _preloadImages();
-    
-  //   _animationController.forward();
-  // }
-
-  // @override
-  // void didChangeDependencies() {
-  //   super.didChangeDependencies();
-  //   // Only clear on first load, not on every navigation
-  //   if (_phoneController.text.isEmpty) {
-  //     _phoneController.clear();
-  //     _passwordController.clear();
-  //     _formKey.currentState?.reset();
-  //   }
-  // }
-
   @override
-void initState() {
-  super.initState();
-  
-  // Initialize animations
-  _animationController = AnimationController(
-    duration: const Duration(milliseconds: 600),
-    vsync: this,
-  );
-
-  _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-    CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeOut,
-    ),
-  );
-
-  _slideAnimation = Tween<double>(begin: 20.0, end: 0.0).animate(
-    CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeOut,
-    ),
-  );
-  
-  // Remove _preloadImages() from here
-  _animationController.forward();
-}
-
-@override
-void didChangeDependencies() {
-  super.didChangeDependencies();
-  
-  // Preload images only once
-  if (!_imageLoaded) {
-    _preloadImages();
-  }
-  
-  // Only clear on first load, not on every navigation
-  if (_phoneController.text.isEmpty) {
-    _phoneController.clear();
-    _passwordController.clear();
-    _formKey.currentState?.reset();
-  }
-}
-
-
-  // Preload images for faster rendering
-  void _preloadImages() {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isLargeScreen = screenWidth >= 600;
+  void initState() {
+    super.initState();
     
-    _backgroundImageProvider = AssetImage(
-      isLargeScreen 
-        ? 'assets/images/FB_IMG_1760946209045.jpg'
-        : 'assets/images/IMG_2838.JPG'
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    );
+
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: Curves.easeOut,
+      ),
+    );
+
+    _slideAnimation = Tween<double>(begin: 20.0, end: 0.0).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: Curves.easeOut,
+      ),
     );
     
-    // Precache the image
+    _backgroundImageProvider = const AssetImage('assets/images/IMG_2838.JPG');
+    
+    _animationController.forward();
+    _loadSavedCredentials();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    
+    if (!_imageLoaded) {
+      _preloadImages();
+    }
+  }
+
+  void _preloadImages() {
     precacheImage(_backgroundImageProvider, context).then((_) {
       if (mounted) {
         setState(() {
           _imageLoaded = true;
         });
       }
+    }).catchError((error) {
+      print('Error loading image: $error');
+      if (mounted) {
+        setState(() {
+          _imageLoaded = true;
+        });
+      }
     });
+  }
+
+  // Load saved credentials from SharedPreferences
+  Future<void> _loadSavedCredentials() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedPhone = prefs.getString(_keyPhone);
+      
+      if (savedPhone != null) {
+        _phoneController.text = savedPhone;
+      }
+    } catch (e) {
+      print('Error loading saved credentials: $e');
+    }
+  }
+
+  // Save login credentials to SharedPreferences
+  Future<void> _saveLoginCredentials(String phone, String password, String role, String token) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_keyPhone, phone);
+      await prefs.setString(_keyPassword, password);
+      await prefs.setString(_keyRole, role);
+      await prefs.setString(_keyToken, token);
+      await prefs.setBool(_keyIsLoggedIn, true);
+      print('Login credentials saved successfully');
+    } catch (e) {
+      print('Error saving credentials: $e');
+    }
+  }
+
+  // Try offline login with saved credentials
+  Future<bool> _tryOfflineLogin(String phone, String password) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedPhone = prefs.getString(_keyPhone);
+      final savedPassword = prefs.getString(_keyPassword);
+      final savedRole = prefs.getString(_keyRole);
+      final isLoggedIn = prefs.getBool(_keyIsLoggedIn) ?? false;
+
+      // Check if credentials match
+      if (isLoggedIn && 
+          savedPhone == phone && 
+          savedPassword == password && 
+          savedRole != null) {
+        
+        // Navigate to appropriate screen based on saved role
+        Widget destination;
+        if (savedRole == 'groom') {
+          destination = GroomHomeScreen(initialTabIndex: 0);
+        } else if (savedRole == 'super_admin') {
+          destination = SuperAdminHomeScreen();
+        } else if (savedRole == 'clan_admin') {
+          destination = ClanAdminHomeScreen();
+        } else {
+          return false;
+        }
+
+        if (!mounted) return false;
+        
+        Navigator.of(context).pushReplacement(
+          PageRouteBuilder(
+            pageBuilder: (context, animation, secondaryAnimation) => destination,
+            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              return FadeTransition(opacity: animation, child: child);
+            },
+            transitionDuration: const Duration(milliseconds: 200),
+          ),
+        );
+        
+        return true;
+      }
+      
+      return false;
+    } catch (e) {
+      print('Error during offline login: $e');
+      return false;
+    }
   }
 
   String? _validatePhone(String? value) {
@@ -168,18 +202,15 @@ void didChangeDependencies() {
     return null;
   }
 
-  // Optimized internet check with timeout
   Future<bool> _checkInternetConnection() async {
     try {
-      final result = await InternetAddress.lookup('google.com')
-          .timeout(const Duration(seconds: 2)); // Reduced timeout
-      return result.isNotEmpty && result[0].rawAddress.isNotEmpty;
+      final connectivityResult = await Connectivity().checkConnectivity();
+      return !connectivityResult.contains(ConnectivityResult.none);
     } catch (_) {
       return false;
     }
   }
   
-  // Optimized dialog - extracted as widget
   void _showNoInternetDialog() {
     showDialog(
       context: context,
@@ -193,29 +224,41 @@ void didChangeDependencies() {
       return;
     }
 
-    // Show loading immediately for better UX
     if (!mounted) return;
     setState(() {
       _isLoading = true;
     });
 
-    // Check internet in parallel with preparing data
     final phoneText = _phoneController.text.trim();
     final passwordText = _passwordController.text;
-    
+
+    // Check internet connection
     final hasInternet = await _checkInternetConnection();
     
     if (!hasInternet) {
-      if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-      });
       _showNoInternetDialog();
-      return;
+      // // Try offline login with saved credentials
+      // final offlineLoginSuccess = await _tryOfflineLogin(phoneText, passwordText);
+      
+      // if (!mounted) return;
+      // setState(() {
+      //   _isLoading = false;
+      // });
+      
+      // if (offlineLoginSuccess) {
+      //   // Successfully logged in offline
+      //   _showSuccessDialog('تم تسجيل الدخول بوضع عدم الاتصال');
+      // } else {
+      //   // Show dialog about no internet and wrong credentials
+      //   _showOfflineLoginFailedDialog();
+      // }
+      // return;
     }
 
+    // Online login
     try {
-      final response = await ApiService.login(phoneText, passwordText);
+      final response = await ApiService.login(phoneText, passwordText)
+          .timeout(const Duration(seconds: 10));
 
       if (!mounted) return;
 
@@ -232,9 +275,11 @@ void didChangeDependencies() {
       
       final role = payload['role'];
     
+      // Save credentials for offline login
+      await _saveLoginCredentials(phoneText, passwordText, role, token);
+    
       if (!mounted) return;
       
-      // Use pushReplacement with custom transition for smoother navigation
       Widget destination;
       if (role == 'groom') {
         destination = GroomHomeScreen(initialTabIndex: 0);
@@ -248,7 +293,6 @@ void didChangeDependencies() {
         return;
       }
 
-      // Navigate with fade transition
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(
           pageBuilder: (context, animation, secondaryAnimation) => destination,
@@ -259,8 +303,17 @@ void didChangeDependencies() {
         ),
       );
       
+    } on SocketException catch (_) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      _showNoInternetDialog();
+    } on TimeoutException catch (_) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      _showErrorDialog('انتهت مهلة الاتصال. يرجى المحاولة مرة أخرى.');
     } catch (e) {
       if (!mounted) return;
+      setState(() => _isLoading = false);
       _showErrorDialog('$e');
     } finally {
       if (mounted) {
@@ -271,7 +324,20 @@ void didChangeDependencies() {
     }
   }
 
-  // Extracted error dialog for reusability
+  void _showSuccessDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (context) => _SuccessDialog(message: message),
+    );
+  }
+
+  void _showOfflineLoginFailedDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => _OfflineLoginFailedDialog(),
+    );
+  }
+
   void _showErrorDialog(String message) {
     showDialog(
       context: context,
@@ -281,27 +347,29 @@ void didChangeDependencies() {
 
   @override
   Widget build(BuildContext context) {
-    super.build(context); // Required for AutomaticKeepAliveClientMixin
+    super.build(context);
     
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
-    final isLargeScreen = screenWidth >= 600;
+    final isLargeScreen = screenWidth >= 750;
     
     return Scaffold(
       body: SizedBox.expand(
         child: Container(
           decoration: BoxDecoration(
-            image: _imageLoaded ? DecorationImage(
-              image: _backgroundImageProvider,
-              fit: BoxFit.cover,
-              colorFilter: ColorFilter.mode(
-                isDark 
-                  ? Color.fromARGB(120, 0, 0, 0) 
-                  : Color.fromARGB(55, 255, 255, 255),
-                BlendMode.overlay,
-              ),
-            ) : null,
+            image: (!isLargeScreen && _imageLoaded) 
+              ? DecorationImage(
+                  image: _backgroundImageProvider,
+                  fit: BoxFit.cover,
+                  colorFilter: ColorFilter.mode(
+                    isDark 
+                      ? const Color.fromARGB(120, 0, 0, 0) 
+                      : const Color.fromARGB(55, 255, 255, 255),
+                    BlendMode.overlay,
+                  ),
+                ) 
+              : null,
           ),
           child: Container(
             decoration: BoxDecoration(
@@ -309,37 +377,36 @@ void didChangeDependencies() {
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: isDark
-                  ? isLargeScreen
+                  ? (isLargeScreen
                         ? [
                             Colors.black.withOpacity(0.7),
                             Colors.green.shade900.withOpacity(0.1),
                             Colors.black.withOpacity(0.8),
-                          ] : [
+                          ] 
+                        : [
                             Colors.black.withOpacity(0.7),
-                            Colors.green.shade900.withOpacity(0.4),
+                            Colors.green.shade900.withOpacity(0.1),
                             Colors.black.withOpacity(0.8),
-                          ]
-                   
-                  :  isLargeScreen 
+                          ])
+                  : (isLargeScreen 
                       ? [
                           Colors.white.withOpacity(0),
-                          Colors.green.shade900.withOpacity(0.2),
+                          Colors.green.shade900.withOpacity(0.1),
                           Colors.white.withOpacity(0.4),
                         ]
-                        :[
+                      : [
                           Colors.white.withOpacity(0.8),
                           Colors.green.shade900.withOpacity(0.1),
                           Colors.white,
-                        ],
+                        ]),
                 stops: const [0.0, 0.5, 1.0],
               ),
             ),
             child: SafeArea(
               child: Stack(
                 children: [
-                  // Scrollable content
                   SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(), // Smoother scrolling
+                    physics: const BouncingScrollPhysics(),
                     padding: const EdgeInsets.symmetric(horizontal: 32.0),
                     child: ConstrainedBox(
                       constraints: BoxConstraints(
@@ -368,14 +435,12 @@ void didChangeDependencies() {
                     ),
                   ),
                   
-                  // Back button
                   Positioned(
                     top: 8,
                     right: 16,
                     child: _BackButton(isDark: isDark),
                   ),
                   
-                  // Theme Toggle Button
                   Positioned(
                     top: 8,
                     left: 16,
@@ -396,6 +461,177 @@ void didChangeDependencies() {
     _phoneController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+}
+
+// Keep all your existing widget classes (_LoginForm, _AnimatedWidget, etc.)
+// I'm only adding the new dialog widgets below:
+
+class _SuccessDialog extends StatelessWidget {
+  final String message;
+
+  const _SuccessDialog({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 360;
+    
+    return Dialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: screenWidth > 600 ? 400 : screenWidth * 0.85,
+        ),
+        child: Padding(
+          padding: EdgeInsets.all(isSmallScreen ? 16.0 : 20.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.check_circle_outline,
+                    color: Colors.green.shade600,
+                    size: isSmallScreen ? 24 : 28,
+                  ),
+                  SizedBox(width: isSmallScreen ? 8 : 12),
+                  Expanded(
+                    child: Text(
+                      'نجح تسجيل الدخول',
+                      style: TextStyle(
+                        fontSize: isSmallScreen ? 16 : 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: isSmallScreen ? 12 : 16),
+              
+              Text(
+                message,
+                style: TextStyle(
+                  fontSize: isSmallScreen ? 14 : 16,
+                  height: 1.5,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: isSmallScreen ? 16 : 20),
+              
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: isDark ? Colors.green.shade700 : Colors.green.shade600,
+                    foregroundColor: Colors.white,
+                    padding: EdgeInsets.symmetric(
+                      vertical: isSmallScreen ? 10 : 12,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text(
+                    'حسناً',
+                    style: TextStyle(
+                      fontSize: isSmallScreen ? 14 : 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _OfflineLoginFailedDialog extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 360;
+    
+    return Dialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: screenWidth > 600 ? 400 : screenWidth * 0.85,
+        ),
+        child: Padding(
+          padding: EdgeInsets.all(isSmallScreen ? 16.0 : 20.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.wifi_off,
+                    color: AppColors.error,
+                    size: isSmallScreen ? 24 : 28,
+                  ),
+                  SizedBox(width: isSmallScreen ? 8 : 12),
+                  Expanded(
+                    child: Text(
+                      'لا يوجد اتصال بالإنترنت',
+                      style: TextStyle(
+                        fontSize: isSmallScreen ? 16 : 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: isSmallScreen ? 12 : 16),
+              
+              Text(
+                'بيانات الاعتماد غير متطابقة أو لم تقم بتسجيل الدخول من قبل. يرجى الاتصال بالإنترنت لتسجيل الدخول.',
+                style: TextStyle(
+                  fontSize: isSmallScreen ? 14 : 16,
+                  height: 1.5,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: isSmallScreen ? 16 : 20),
+              
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: isDark ? Colors.green.shade700 : Colors.green.shade600,
+                    foregroundColor: Colors.white,
+                    padding: EdgeInsets.symmetric(
+                      vertical: isSmallScreen ? 10 : 12,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text(
+                    'حسناً',
+                    style: TextStyle(
+                      fontSize: isSmallScreen ? 14 : 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 

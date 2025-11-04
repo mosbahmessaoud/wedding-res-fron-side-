@@ -1,5 +1,7 @@
 // lib/screens/home/tabs/home_tab.dart
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../../services/api_service.dart';
@@ -16,14 +18,20 @@ class HomeTab extends StatefulWidget {
 }
 
 class HomeTabState extends State<HomeTab> with TickerProviderStateMixin {
-  bool _isLoading = true;
+  // bool _isLoading = true;
   Map<String, dynamic>? _userProfile;
   Map<String, dynamic>? _pendingReservation;
   Map<String, dynamic>? _validatedReservation;
-  Map<String, int> _reservationStats = {};
+
+    // Initialize with default data
+  Map<String, int> _reservationStats = {
+    'total': 0,
+    'validated': 0,
+    'cancelled': 0,
+    'pending': 0,
+  };
   List<Map<String, dynamic>> _recentReservations = [];
   
-  // Statistics data structure: {today: count, month: count, year: count, today_data: [], month_data: [], year_data: []}
   Map<String, dynamic> _clanStats = {
     'today': 0, 'month': 0, 'year': 0,
     'today_data': [], 'month_data': [], 'year_data': []
@@ -32,11 +40,11 @@ class HomeTabState extends State<HomeTab> with TickerProviderStateMixin {
     'today': 0, 'month': 0, 'year': 0,
     'today_data': [], 'month_data': [], 'year_data': []
   };
+  
   bool _isClanChartExpanded = true;
   bool _isCountyChartExpanded = false;
-
-  String _clanSelectedPeriod = 'month';
-  String _countySelectedPeriod = 'month';
+  String _clanSelectedPeriod = 'year';
+  String _countySelectedPeriod = 'year';
   
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
@@ -46,10 +54,12 @@ class HomeTabState extends State<HomeTab> with TickerProviderStateMixin {
   void initState() {
     super.initState();
     _initAnimations();
-    _loadDashboardData();
-    _loadReservationStats();
-    _loadChartStatistics();
+    _loadDataInBackground();
+  }
 
+  // New method to load data in background without showing loading state
+  void _loadDataInBackground() {
+    _checkConnectivityAndLoad();
   }
 
   @override
@@ -58,14 +68,122 @@ class HomeTabState extends State<HomeTab> with TickerProviderStateMixin {
     super.dispose();
   }
 
-  void refreshData() {
-    _loadDashboardData();
-    _loadReservationStats();
-    _loadChartStatistics();
-    _isClanChartExpanded = true;
-    _isCountyChartExpanded = false;
+  // void refreshData() {
+  //   _loadDashboardData();
+  //   _loadReservationStats();
+  //   _loadChartStatistics();
+  //   _isClanChartExpanded = true;
+  //   _isCountyChartExpanded = false;
 
+  // }
+void refreshData() async {
+    final connectivityResult = await Connectivity().checkConnectivity();
+    
+    if (connectivityResult.contains(ConnectivityResult.none)) {
+      _showNoInternetDialog();
+      return;
+    }
+    
+    _loadDashboardData();
   }
+
+  Future<void> _loadData() async {
+    try {
+      await Future.wait([
+        _loadUserProfile(),
+        _loadPendingReservation(),
+        _loadReservationStats(),
+        _loadChartStatistics(),
+      ]);
+      
+      if (mounted) {
+        _animationController.forward();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطأ في تحميل البيانات: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+      }
+    }
+  }
+
+
+
+
+  Future<void> _loadUserProfile() async {
+    try {
+      final profile = await ApiService.getProfile();
+      if (mounted) {
+        setState(() => _userProfile = profile);
+      }
+    } catch (e) {
+      _userProfile = null;
+    }
+  }
+
+  Future<void> _loadPendingReservation() async {
+    try {
+      final pending = await ApiService.getMyPendingReservation();
+      if (mounted) {
+        setState(() => _pendingReservation = pending);
+      }
+    } catch (e) {
+      _pendingReservation = null;
+    }
+  }
+
+
+  Future<void> _checkConnectivityAndLoad() async {
+    final connectivityResult = await Connectivity().checkConnectivity();
+    
+    if (connectivityResult.contains(ConnectivityResult.none)) {
+      _showNoInternetDialog();
+      return;
+    }
+    
+    await _loadData();
+  }
+
+void _showNoInternetDialog() {
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: Row(
+        children: [
+          Icon(Icons.wifi_off, color: Colors.orange),
+          SizedBox(width: 10),
+          Text('لا يوجد اتصال'),
+        ],
+      ),
+      content: Text('يرجى التحقق من اتصالك بالإنترنت'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text('إلغاء'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            Navigator.pop(context);
+            _checkConnectivityAndLoad();
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.blue,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          child: Text('إعادة المحاولة', style: TextStyle(color: Colors.white)),
+        ),
+      ],
+    ),
+  );
+}
 
   void _initAnimations() {
     _animationController = AnimationController(
@@ -83,142 +201,126 @@ class HomeTabState extends State<HomeTab> with TickerProviderStateMixin {
   }
 
   Future<void> _loadDashboardData() async {
-    setState(() => _isLoading = true);
+    final connectivityResult = await Connectivity().checkConnectivity();
     
-    try {
-      // Load user profile
-      _userProfile = await ApiService.getProfile();
-      
-      // Load pending reservation
-      try {
-        _pendingReservation = await ApiService.getMyPendingReservation();
-      } catch (e) {
-        _pendingReservation = null;
-      }
-
-      // Load reservation statistics
-      await _loadReservationStats();
-      
-      // Load chart statistics
-      await _loadChartStatistics();
-      
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('خطأ في تحميل البيانات: ${e.toString()}'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-        _animationController.forward();
-      }
+    if (connectivityResult.contains(ConnectivityResult.none)) {
+      _showNoInternetDialog();
+      return;
     }
+    
+    await _loadData();
   }
 
-  Future<void> _loadReservationStats() async {
-    try {
-      final allReservations = await ApiService.getMyAllReservations();
-      
-      Map<String, dynamic>? validatedReservation;
-      try {
-        validatedReservation = await ApiService.getMyValidatedReservation();
-        _validatedReservation = validatedReservation;
-      } catch (e) {
-        validatedReservation = null;
-      }
-      
-      final cancelledReservations = await ApiService.getMyCancelledReservations();
-      
-      _reservationStats = {
-        'total': allReservations.length,
-        'validated': validatedReservation != null ? 1 : 0,
-        'cancelled': cancelledReservations.length,
-        'pending': _pendingReservation != null ? 1 : 0,
-      };
 
-      if (allReservations.isNotEmpty) {
-        _recentReservations = allReservations
-            .take(3)
-            .map((r) => Map<String, dynamic>.from(r))
-            .toList();
+Future<void> _loadReservationStats() async {
+    try {
+      final results = await Future.wait([
+        ApiService.getMyAllReservations(),
+        ApiService.getMyValidatedReservation().catchError((_) => null),
+        ApiService.getMyCancelledReservations(),
+      ]);
+      
+      final allReservations = results[0] as List;
+      final validatedReservation = results[1] as Map<String, dynamic>?;
+      final cancelledReservations = results[2] as List;
+      
+      if (mounted) {
+        setState(() {
+          _validatedReservation = validatedReservation;
+          
+          _reservationStats = {
+            'total': allReservations.length,
+            'validated': validatedReservation != null ? 1 : 0,
+            'cancelled': cancelledReservations.length,
+            'pending': _pendingReservation != null ? 1 : 0,
+          };
+
+          if (allReservations.isNotEmpty) {
+            _recentReservations = allReservations
+                .take(3)
+                .map((r) => Map<String, dynamic>.from(r))
+                .toList();
+          }
+        });
       }
     } catch (e) {
       _reservationStats = {'total': 0, 'validated': 0, 'cancelled': 0, 'pending': 0};
     }
   }
 
-  Future<void> _loadChartStatistics() async {
+Future<void> _loadChartStatistics() async {
     try {
-      print('\n=== LOADING CHART STATISTICS ===');
+      final results = await Future.wait([
+        ApiService.getValidatedReservationsToday(),
+        ApiService.getValidatedReservationsMonth(),
+        ApiService.getValidatedReservationsYear(),
+        ApiService.getValidatedReservationsTodayCounty(),
+        ApiService.getValidatedReservationsMonthCounty(),
+        ApiService.getValidatedReservationsYearCounty(),
+      ]);
       
-      // Load clan statistics
-      print('Loading clan statistics...');
-      final clanToday = await ApiService.getValidatedReservationsToday();
-      print('Clan Today Response: $clanToday');
-      
-      final clanMonth = await ApiService.getValidatedReservationsMonth();
-      print('Clan Month Response: $clanMonth');
-      
-      final clanYear = await ApiService.getValidatedReservationsYear();
-      print('Clan Year Response: $clanYear');
-      
-      _clanStats = {
-        'today': clanToday['count'] ?? 0,
-        'month': clanMonth['count'] ?? 0,
-        'year': clanYear['count'] ?? 0,
-        'today_data': clanToday['reservations'] ?? [],
-        'month_data': clanMonth['reservations'] ?? [],
-        'year_data': clanYear['reservations'] ?? [],
-      };
-      print('Clan Stats Structured: $_clanStats');
-      
-      // Load county statistics
-      print('\nLoading county statistics...');
-      final countyToday = await ApiService.getValidatedReservationsTodayCounty();
-      print('County Today Response: $countyToday');
-      
-      final countyMonth = await ApiService.getValidatedReservationsMonthCounty();
-      print('County Month Response: $countyMonth');
-      
-      final countyYear = await ApiService.getValidatedReservationsYearCounty();
-      print('County Year Response: $countyYear');
-      
-      _countyStats = {
-        'today': countyToday['count'] ?? 0,
-        'month': countyMonth['count'] ?? 0,
-        'year': countyYear['count'] ?? 0,
-        'today_data': countyToday['reservations'] ?? [],
-        'month_data': countyMonth['reservations'] ?? [],
-        'year_data': countyYear['reservations'] ?? [],
-      };
-      print('County Stats Structured: $_countyStats');
-      print('=== STATISTICS LOADED SUCCESSFULLY ===\n');
-      
-    } catch (e, stackTrace) {
-      print('\n=== ERROR LOADING STATISTICS ===');
-      print('Error: $e');
-      print('Stack Trace: $stackTrace');
-      _clanStats = {'today': 0, 'month': 0, 'year': 0, 'today_data': [], 'month_data': [], 'year_data': []};
-      _countyStats = {'today': 0, 'month': 0, 'year': 0, 'today_data': [], 'month_data': [], 'year_data': []};
-    }
+      if (mounted) {
+        setState(() {
+          _clanStats = {
+            'today': results[0]['count'] ?? 0,
+            'month': results[1]['count'] ?? 0,
+            'year': results[2]['count'] ?? 0,
+            'today_data': results[0]['reservations'] ?? [],
+            'month_data': results[1]['reservations'] ?? [],
+            'year_data': results[2]['reservations'] ?? [],
+          };
+          
+          _countyStats = {
+            'today': results[3]['count'] ?? 0,
+            'month': results[4]['count'] ?? 0,
+            'year': results[5]['count'] ?? 0,
+            'today_data': results[3]['reservations'] ?? [],
+            'month_data': results[4]['reservations'] ?? [],
+            'year_data': results[5]['reservations'] ?? [],
+          };
+        });
+      }
+    } catch (e) {
+    _clanStats = {'today': 0, 'month': 0, 'year': 0, 'today_data': [], 'month_data': [], 'year_data': []};
+    _countyStats = {'today': 0, 'month': 0, 'year': 0, 'today_data': [], 'month_data': [], 'year_data': []};    }
   }
+Future<bool?> _showExitDialog() {
+  return showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('تأكيد الخروج'),
+      content: const Text('هل تريد الخروج من التطبيق؟'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('لا'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(context, true),
+          child: const Text('نعم'),
+        ),
+      ],
+    ),
+  );
+}
+@override
+Widget build(BuildContext context) {
+  final themeProvider = Provider.of<ThemeProvider>(context);
+  final isDark = themeProvider.isDarkMode;
 
-  @override
-  Widget build(BuildContext context) {
-    final themeProvider = Provider.of<ThemeProvider>(context);
-    final isDark = themeProvider.isDarkMode;
-
-    if (_isLoading) {
-      return _buildLoadingState(isDark);
-    }
-
-    return Container(
+  return PopScope(
+    canPop: false,
+    onPopInvokedWithResult: (bool didPop, Object? result) async {
+      if (didPop) {
+        return;
+      }
+      // Optionally show exit confirmation dialog
+      final shouldExit = await _showExitDialog();
+      if (shouldExit == true && context.mounted) {
+        SystemNavigator.pop();
+      }
+    },
+    child: Container(
       color: isDark ? const Color(0xFF121212) : const Color(0xFFF6F6F6),
       child: RefreshIndicator(
         onRefresh: _loadDashboardData,
@@ -242,38 +344,9 @@ class HomeTabState extends State<HomeTab> with TickerProviderStateMixin {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildLoadingState(bool isDark) {
-    return Container(
-      color: isDark ? const Color(0xFF121212) : const Color(0xFFF6F6F6),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            SizedBox(
-              width: 60,
-              height: 60,
-              child: CircularProgressIndicator(
-                strokeWidth: 3,
-                valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF1DB954)),
-              ),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              'جاري التحميل...',
-              style: TextStyle(
-                fontSize: 16,
-                color: isDark ? Colors.grey[400] : const Color(0xFF6A6A6A),
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildHeader(bool isDark) {
     final userName = _userProfile != null 
@@ -1055,113 +1128,124 @@ Widget _buildChartCard({
       duration: const Duration(milliseconds: 250),
     );
   }
+Widget _buildQuickActions(bool isDark) {
+  final actions = [
+    {
+      'icon': Icons.add_circle_rounded,
+      'title': 'حجز جديد',
+      'subtitle': 'احجز موعد زفافك',
+      'onTap': () => widget.onTabChanged!(1)
+    },
+    {
+      'icon': Icons.calendar_month_rounded,
+      'title': 'حجوزاتي',
+      'subtitle': 'عرض وإدارة الحجوزات',
+      'onTap': () => widget.onTabChanged!(2)
+    },
+    {
+      'icon': Icons.restaurant_menu_rounded,
+      'title': 'قائمة مقادير الوليمة',
+      'subtitle': 'اطلع على قائمة الطعام',
+      'onTap': () => widget.onTabChanged!(3)
+    },
+    {
+      'icon': Icons.person_rounded,
+      'title': 'الملف الشخصي',
+      'subtitle': 'إعدادات وتفضيلات',
+      'onTap': () => widget.onTabChanged!(4)
+    },
+    {
+      'icon': Icons.rule_outlined,
+      'title': 'قوانين العشيرة',
+      'subtitle': 'اطلع على القوانين والقواعد',
+      'onTap': () => widget.onTabChanged!(5)
+    },
+  ];
 
-  Widget _buildQuickActions(bool isDark) {
-    final actions = [
-      {
-        'icon': Icons.add_circle_rounded,
-        'title': 'حجز جديد',
-        'subtitle': 'احجز موعد زفافك',
-        'onTap': () => widget.onTabChanged!(1)
-      },
-      {
-        'icon': Icons.calendar_month_rounded,
-        'title': 'حجوزاتي',
-        'subtitle': 'عرض وإدارة الحجوزات',
-        'onTap': () => widget.onTabChanged!(2)
-      },
-      {
-        'icon': Icons.person_rounded,
-        'title': 'الملف الشخصي',
-        'subtitle': 'إعدادات وتفضيلات',
-        'onTap': () => widget.onTabChanged!(3)
-      },
-    ];
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'الإجراءات السريعة',
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-              color: isDark ? Colors.white : const Color(0xFF121212),
-            ),
+  return Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 16),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'الإجراءات السريعة',
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w900,
+            color: isDark ? Colors.white : const Color(0xFF121212),
           ),
-          const SizedBox(height: 16),
-          ...actions.map((action) => Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: GestureDetector(
-              onTap: action['onTap'] as VoidCallback,
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                  borderRadius: BorderRadius.circular(8),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.darkBorderFocus.withOpacity(isDark ? 0.15 : 0.15),
-                      blurRadius: 15,
-                      offset: const Offset(0, 0),
+        ),
+        const SizedBox(height: 16),
+        ...actions.map((action) => Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: GestureDetector(
+            onTap: action['onTap'] as VoidCallback,
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.darkBorderFocus.withOpacity(isDark ? 0.15 : 0.15),
+                    blurRadius: 15,
+                    offset: const Offset(0, 0),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1DB954).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(6),
                     ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1DB954).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Icon(
-                        action['icon'] as IconData,
-                        color: const Color(0xFF1DB954),
-                        size: 24,
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            action['title'] as String,
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: isDark ? Colors.white : const Color(0xFF121212),
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            action['subtitle'] as String,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: isDark ? Colors.grey[400] : const Color(0xFF6A6A6A),
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Icon(
-                      Icons.chevron_right_rounded,
-                      color: isDark ? Colors.grey[400] : const Color(0xFF6A6A6A),
+                    child: Icon(
+                      action['icon'] as IconData,
+                      color: const Color(0xFF1DB954),
                       size: 24,
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          action['title'] as String,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: isDark ? Colors.white : const Color(0xFF121212),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          action['subtitle'] as String,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isDark ? Colors.grey[400] : const Color(0xFF6A6A6A),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: isDark ? Colors.grey[400] : const Color(0xFF6A6A6A),
+                    size: 24,
+                  ),
+                ],
               ),
             ),
-          )),
-        ],
-      ),
-    );
-  }
+          ),
+        )),
+      ],
+    ),
+  );
+}
 
   Widget _buildRecentReservations(bool isDark) {
     return Padding(

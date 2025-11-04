@@ -33,6 +33,7 @@ class GroomHomeScreen extends StatefulWidget {
   @override
   _GroomHomeScreenState createState() => _GroomHomeScreenState();
 }
+
 class _GroomHomeScreenState extends State<GroomHomeScreen> {
   int _currentIndex = 0;
   late List<Widget> _tabs;
@@ -42,11 +43,7 @@ class _GroomHomeScreenState extends State<GroomHomeScreen> {
   String? _clanName;
   int selectBtn = 0;
 
-  // ADD THESE CACHE VARIABLES:
-  bool _isInitialLoad = true;
-  final Map<int, bool> _tabLoadingStatus = {};
-  final Map<int, DateTime> _lastFetchTime = {};
-
+  final GlobalKey<HomeTabState> _homeTabKey = GlobalKey<HomeTabState>();
   final GlobalKey<ReservationsTabState> _reservationsTabKey = GlobalKey<ReservationsTabState>();
   final GlobalKey<ProfileTabState> _profileTabKey = GlobalKey<ProfileTabState>();
   final GlobalKey<FoodMenuTabGState> _foodMenuTabKey = GlobalKey<FoodMenuTabGState>();
@@ -59,7 +56,10 @@ class _GroomHomeScreenState extends State<GroomHomeScreen> {
     _currentIndex = widget.initialTabIndex;
     
     _tabs = [
-      HomeTab(onTabChanged: _changeTab),
+      HomeTab(
+        key: _homeTabKey,
+        onTabChanged: _changeTab,
+      ),
       CreateReservationScreen(
         key: _creatResTabKey,
         onReservationCreated: () {
@@ -70,12 +70,8 @@ class _GroomHomeScreenState extends State<GroomHomeScreen> {
       FoodMenuTabG(key: _foodMenuTabKey),
       ProfileTab(key: _profileTabKey),
       GroomClanRulesPage(key: _rulesTabKey),
-    ];
 
-    // MODIFIED: Load initial tab data in background
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _refreshCurrentTabInBackground(_currentIndex);
-    });
+    ];
   }
 
 
@@ -231,95 +227,45 @@ void _showNoInternetDialog() {
 }
 
 
+// Update the _changeTab method
 void _changeTab(int index) async {
+  // final hasInternet = await _checkConnectivity();
+  // if (!hasInternet) {
+  //   _showNoInternetDialog();
+  //   return;
+  // }
+  
   setState(() {
     _currentIndex = index;
     _externalScreen = null;
     _externalScreenTitle = null;
   });
-  
-  // Check if data needs refresh (e.g., older than 5 minutes)
-  final needsRefresh = _shouldRefreshTab(index);
-  
-  if (needsRefresh) {
-    _refreshCurrentTabInBackground(index);
-  }
+  _refreshCurrentTab(index);
 }
 
 
-// ============================================
-// 3. ADD: Helper method to check if refresh is needed
-// ============================================
-
-bool _shouldRefreshTab(int index) {
-  // Always refresh on first load
-  if (!_lastFetchTime.containsKey(index)) {
-    return true;
-  }
-  
-  // Refresh if data is older than 5 minutes
-  final lastFetch = _lastFetchTime[index];
-  if (lastFetch == null) return true;
-  
-  final now = DateTime.now();
-  final difference = now.difference(lastFetch);
-  
-  return difference.inMinutes >= 5;
-}
-
-
-// ============================================
-// 4. ADD: Background refresh method (non-blocking)
-// ============================================
-
-void _refreshCurrentTabInBackground(int index) {
-  // Don't refresh if already loading
-  if (_tabLoadingStatus[index] == true) {
-    return;
-  }
-  
-  // Mark as loading
-  _tabLoadingStatus[index] = true;
-  
-  // Perform refresh in background without blocking UI
-  Future.microtask(() async {
-    try {
-      switch (index) {
-        case 1:
-          _creatResTabKey.currentState?.refreshData();
-          break;
-        case 2:
-          _reservationsTabKey.currentState?.refreshData();
-          break;
-        case 3:
-          _foodMenuTabKey.currentState?.refreshData();
-          break;
-        case 4:
-          _profileTabKey.currentState?.refreshData();
-          break;
-        case 5:
-          _rulesTabKey.currentState?.refreshData();
-          break;
-      }
-      
-      // Update last fetch time
-      _lastFetchTime[index] = DateTime.now();
-    } catch (e) {
-      print('Background refresh error for tab $index: $e');
-    } finally {
-      _tabLoadingStatus[index] = false;
+  void _refreshCurrentTab(int index) {
+    switch (index) {
+      case 0:
+        _homeTabKey.currentState?.refreshData();
+        break;
+      case 1:
+        _creatResTabKey.currentState?.refreshData();
+        break;
+      case 2:
+        _reservationsTabKey.currentState?.refreshData();
+        break;
+      case 3:
+        _foodMenuTabKey.currentState?.refreshData();
+        break;
+      case 4:
+        _profileTabKey.currentState?.refreshData();
+        break;
+      case 5:
+        _rulesTabKey.currentState?.refreshData();
+        break;
     }
-  });
-}
-
-
-void _refreshCurrentTab(int index) {
-  // This is now just for forced refresh (pull-to-refresh)
-  _lastFetchTime.remove(index); // Clear cache
-  _refreshCurrentTabInBackground(index);
-}
-
-
+  }
 
 // Update the _navigateToExternalScreen method
 void _navigateToExternalScreen(Widget screen, String title) async {
@@ -572,8 +518,6 @@ AnimatedContainer navigationBar(bool isDark) {
     ),
   );
 }
-
-
 
 // Helper method to calculate indicator position
 double _getIndicatorPosition(double itemWidth) {

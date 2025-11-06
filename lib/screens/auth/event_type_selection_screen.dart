@@ -2,7 +2,8 @@
 import 'package:flutter/material.dart';
 import '../auth/welcome_screen.dart';
 import 'religious_event_screen.dart';
-import '../../widgets/theme_toggle_button.dart';
+import 'package:wedding_reservation_app/widgets/theme_toggle_button.dart';
+import '../../utils/colors.dart';
 
 class EventTypeSelectionScreen extends StatefulWidget {
   const EventTypeSelectionScreen({super.key});
@@ -10,7 +11,7 @@ class EventTypeSelectionScreen extends StatefulWidget {
   @override
   State<EventTypeSelectionScreen> createState() => _EventTypeSelectionScreenState();
 }
-
+  
 class _EventTypeSelectionScreenState extends State<EventTypeSelectionScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
@@ -21,7 +22,7 @@ class _EventTypeSelectionScreenState extends State<EventTypeSelectionScreen>
   void initState() {
     super.initState();
     _animationController = AnimationController(
-      duration: const Duration(milliseconds: 500), // Reduced from 800ms
+      duration: const Duration(milliseconds: 500),
       vsync: this,
     );
 
@@ -32,7 +33,7 @@ class _EventTypeSelectionScreenState extends State<EventTypeSelectionScreen>
       ),
     );
 
-    _slideAnimation = Tween<double>(begin: 20.0, end: 0.0).animate( // Reduced from 30.0
+    _slideAnimation = Tween<double>(begin: 20.0, end: 0.0).animate(
       CurvedAnimation(
         parent: _animationController,
         curve: Curves.easeOut,
@@ -107,96 +108,111 @@ class _GradientBackground extends StatelessWidget {
         child: Stack(
           children: [
             // Theme Toggle
-            const Positioned(
+            Positioned(
               top: 8,
               left: 16,
               child: ThemeToggleButton(),
             ),
-            
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 32.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 60),
-                  
-                  // App Icon - Simplified
-                  _AppIcon(isDark: isDark),
-                  
-                  const SizedBox(height: 48),
-                  
-                  // Headings
-                  Text(
-                    'اختر نوع',
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w300,
-                      color: isDark ? Colors.white70 : Colors.black87,
-                      height: 1.2,
+            // Scrollable Content
+            LayoutBuilder(
+              builder: (context, constraints) {
+                return SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: constraints.maxHeight,
                     ),
-                  ),
-                  Text(
-                    'المناسبة',
-                    style: TextStyle(
-                      fontSize: 34,
-                      fontWeight: FontWeight.bold,
-                      color: isDark ? Colors.green.shade300 : Colors.green.shade800,
-                      height: 1.1,
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 16),
-                  
-                  // Subtitle
-                  Text(
-                    'يرجى تحديد نوع المناسبة المراد حجز تاريخها',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: isDark ? const Color.fromARGB(255, 217, 255, 218) : Colors.green.shade700,
-                      height: 1.5,
-                      fontWeight: FontWeight.w400,
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 48),
-                  
-                  // Event Cards
-                  _EventCard(
-                    icon: Icons.favorite_border,
-                    title: 'حفل زفاف',
-                    subtitle: 'إحياء حفل زفاف',
-                    isDark: isDark,
-                    onTap: () => onNavigate('wedding'),
-                  ),
-                  
-                  const SizedBox(height: 16),
-                  
-                  _EventCard(
-                    icon: Icons.favorite_outlined,
-                    title: 'حفل الله أكبر',
-                    subtitle: 'إحياء حفل الله أكبر',
-                    isDark: isDark,
-                    onTap: () => onNavigate('religious'),
-                  ),
-                  
-                  const Spacer(),
-                  
-                  // Footer
-                  Center(
-                    child: Text(
-                      'صَلُّوا عَلَى النَّبِيِّ ﷺ',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: isDark ? Colors.green.shade400 : Colors.green.shade800,
-                        height: 1.4,
+                    child: IntrinsicHeight(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 32.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 60),
+                          
+                          // App Icon
+                          _AppIcon(isDark: isDark),
+                          
+                          const SizedBox(height: 48),
+                          
+                          // Headings
+                          Text(
+                            'اختر نوع',
+                            style: TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.w300,
+                              color: isDark ? Colors.white70 : Colors.black87,
+                              height: 1.2,
+                            ),
+                          ),
+                          Text(
+                            'المناسبة',
+                            style: TextStyle(
+                              fontSize: 34,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? Colors.green.shade300 : Colors.green.shade800,
+                              height: 1.1,
+                            ),
+                          ),
+                          
+                          const SizedBox(height: 16),
+                          
+                          // Subtitle
+                          Text(
+                            'يرجى تحديد نوع المناسبة المراد حجز تاريخها',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: isDark ? const Color.fromARGB(255, 217, 255, 218) : Colors.green.shade700,
+                              height: 1.5,
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
+                          
+                          const SizedBox(height: 48),
+                          
+                          // Event Cards
+                          _EventCard(
+                            icon: Icons.favorite_border,
+                            title: 'حفل زفاف',
+                            subtitle: 'إحياء حفل زفاف',
+                            isDark: isDark,
+                            onTap: () => onNavigate('wedding'),
+                          ),
+                          
+                          const SizedBox(height: 16),
+                          
+                          _EventCard(
+                            icon: Icons.favorite_outlined,
+                            title: 'حفل الله أكبر',
+                            subtitle: 'إحياء حفل الله أكبر',
+                            isDark: isDark,
+                            onTap: () => onNavigate('religious'),
+                          ),
+                          
+                          const Spacer(),
+                          const SizedBox(height: 40),
+
+                          // Footer
+                          Center(
+                            child: Text(
+                              'صَلُّوا عَلَى النَّبِيِّ ﷺ',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: isDark ? Colors.green.shade400 : Colors.green.shade800,
+                                height: 1.4,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                          
+                          const SizedBox(height: 40),
+                        ],
                       ),
-                      textAlign: TextAlign.center,
+                      ),
                     ),
                   ),
-                  
-                  const SizedBox(height: 40),
-                ],
-              ),
+                );
+              },
             ),
           ],
         ),
@@ -228,9 +244,9 @@ class _AppIcon extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.green.shade300.withOpacity(0.3), // Reduced opacity
-            blurRadius: 8, // Reduced blur
-            offset: const Offset(0, 4), // Reduced offset
+            color: Colors.green.shade300.withOpacity(0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -275,10 +291,10 @@ class _EventCard extends StatelessWidget {
         boxShadow: [
           BoxShadow(
             color: isDark 
-              ? Colors.green.shade300.withOpacity(0.15) // Reduced opacity
-              : Colors.green.shade300.withOpacity(0.08), // Reduced opacity
-            blurRadius: isDark ? 6 : 12, // Reduced blur
-            offset: const Offset(0, 3), // Reduced offset
+              ? Colors.green.shade300.withOpacity(0.15)
+              : Colors.green.shade300.withOpacity(0.08),
+            blurRadius: isDark ? 6 : 12,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
@@ -358,9 +374,9 @@ class _EventIcon extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.green.shade300.withOpacity(0.2), // Reduced opacity
-            blurRadius: 6, // Reduced blur
-            offset: const Offset(0, 3), // Reduced offset
+            color: Colors.green.shade300.withOpacity(0.2),
+            blurRadius: 6,
+            offset: const Offset(0, 3),
           ),
         ],
       ),

@@ -8,6 +8,7 @@ import 'package:wedding_reservation_app/screens/auth/signup_screen%20copy%20.dar
 import 'package:wedding_reservation_app/screens/auth/sing_up_screen.dart';
 import 'package:wedding_reservation_app/screens/super%20admin/otp_verification_screen.dart';
 import 'package:wedding_reservation_app/services/api_service.dart';
+import 'package:wedding_reservation_app/utils/colors.dart';
 // Add your AdminOTPScreen import here
 // import 'admin_otp_screen.dart';
  
@@ -84,7 +85,7 @@ void _showNoInternetDialog() {
             _checkConnectivityAndLoad();
           },
           style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.blue.shade700,
+            backgroundColor: AppColors.primary,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
           child: Text('إعادة المحاولة', style: TextStyle(color: Colors.white)),
@@ -380,6 +381,8 @@ Widget _buildGroomCard(Map<String, dynamic> groom) {
                   SizedBox(height: isSmallScreen ? 16 : 20),
                   
                   _buildActionButtons(groom, status, isActive, isSmallScreen, isTablet),
+                  
+
                 ],
               ),
             ),
@@ -602,7 +605,7 @@ Widget _buildInformationGrid(Map<String, dynamic> groom, bool isSmallScreen, boo
       _buildInfoSection(
         title: 'المعلومات الأساسية',
         icon: Icons.person_outline,
-        color: Colors.blue,
+        color: Colors.green,
         items: basicInfo,
         isSmallScreen: isSmallScreen,
       ),
@@ -746,7 +749,7 @@ Widget _buildMobileActionButtons(Map<String, dynamic> groom, String status, bool
           _buildModernButton(
             icon: Icons.edit,
             label: 'تعديل',
-            colors: [Colors.blue, Colors.blue.shade700],
+            colors: [Colors.green, AppColors.primary],
             onPressed: () => _showEditGroomDialog(groom),
           ),
         ],
@@ -801,7 +804,7 @@ Widget _buildDesktopActionButtons(
       _buildModernButton(
         icon: Icons.edit,
         label: 'تعديل',
-        colors: [Colors.blue, Colors.blue.shade700],
+        colors: [Colors.green, AppColors.primary],
         onPressed: () => _showEditGroomDialog(groom),
         isCompact: isTablet,
       ),
@@ -923,14 +926,14 @@ Widget build(BuildContext context) {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            Colors.blue.shade50,
+            Colors.green.shade50,
             Colors.white,
           ],
         ),
       ),
       child: RefreshIndicator(
         onRefresh: _loadGrooms,
-        color: Colors.blue.shade700,
+        color: AppColors.primary,
         child: _buildBody(),
         
       ),
@@ -946,7 +949,7 @@ PreferredSizeWidget _buildModernAppBar() {
     flexibleSpace: Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [Colors.blue.shade700, Colors.blue.shade900],
+          colors: [AppColors.primary, Colors.green.shade900],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -1047,7 +1050,7 @@ Widget _buildBody() {
           top: isSmallScreen ? 12 : 16,
           left: 2,
           right: 2,
-          bottom: isSmallScreen ? 60 : 75,
+          bottom: isSmallScreen ? 150 : 120,
         ),
         itemCount: grooms.length,
         itemBuilder: (context, index) => _buildGroomCard(grooms[index]),
@@ -1074,7 +1077,7 @@ Widget _buildLoadingState() {
             ],
           ),
           child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(Colors.blue.shade700),
+            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
             strokeWidth: 3,
           ),
         ),
@@ -1176,13 +1179,13 @@ Widget _buildEmptyState() {
           Container(
             padding: EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: Colors.blue.withOpacity(0.1),
+              color: Colors.green.withOpacity(0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(
               Icons.people_outline, 
               size: 64, 
-              color: Colors.blue.shade700,
+              color: AppColors.primary,
             ),
           ),
           SizedBox(height: 20),
@@ -1757,7 +1760,7 @@ void _showModernErrorDialog(String message) {
                       // Basic Information Section
                       Text(
                         'المعلومات الأساسية',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.blue[800]),
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.green[800]),
                       ),
                       _buildTextField(_firstNameController, 'الاسم الأول', required: true),
                       _buildTextField(_lastNameController, 'اسم العائلة', required: true),
@@ -1773,7 +1776,7 @@ void _showModernErrorDialog(String message) {
                       // Guardian Information Section
                       Text(
                         'معلومات الولي',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.blue[800]),
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.green[800]),
                       ),
                       _buildTextField(_guardianNameController, 'اسم الولي'),
                       _buildTextField(_guardianPhoneController, 'هاتف الولي'),
@@ -1896,7 +1899,7 @@ static Future<Map<String, dynamic>?> _getGroomReservationStatus(int groomId) asy
         style: TextStyle(
           fontSize: 16,
           fontWeight: FontWeight.bold,
-          color: Colors.blue[800],
+          color: Colors.green[800],
         ),
       ),
     );
@@ -2050,7 +2053,7 @@ static Future<Map<String, dynamic>?> _getGroomReservationStatus(int groomId) asy
               onPressed: () => Navigator.pop(context),
               child: Text('إغلاق'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue[800],
+                backgroundColor: Colors.green[800],
                 foregroundColor: Colors.white,
                 minimumSize: Size(double.infinity, 45),
               ),

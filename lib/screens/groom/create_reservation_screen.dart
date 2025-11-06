@@ -346,80 +346,80 @@ bool _isCrossClanReservation() {
          _userProfile!['clan_id'] != _selectedClan!['id'];
 }
 
-Map<String, String> _getClanAcceptanceTime(bool isOriginClan) {
-  Map<String, dynamic>? settings =isOriginClan ?  _originClanSettings :_selectedClanSettings ;
-  
-  if (settings == null) {
-    return {'day': 'يوم غير محدد', 'time': 'وقت غير محدد'};
-  }
-  
+  Map<String, String> _getClanAcceptanceTime(bool isOriginClan) {
+    Map<String, dynamic>? settings =isOriginClan ?  _originClanSettings :_selectedClanSettings ;
+    
+    if (settings == null) {
+      return {'day': 'يوم غير محدد', 'time': 'وقت غير محدد'};
+    }
+    
 
-// Parse acceptance day
-// Parse acceptance days (can be multiple days)
-String dayKey = 'days_to_accept_invites';
-dynamic dayValue = settings[dayKey];
-List<String> arabicDays = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+  // Parse acceptance day
+  // Parse acceptance days (can be multiple days)
+  String dayKey = 'days_to_accept_invites';
+  dynamic dayValue = settings[dayKey];
+  List<String> arabicDays = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
 
-String day = 'يوم غير محدد'; // Default value
+  String day = 'يوم غير محدد'; // Default value
 
-if (dayValue != null && dayValue.toString().isNotEmpty) {
-  String dayString = dayValue.toString().trim();
-  
-  // Split by comma to handle multiple days
-  List<String> dayIndices = dayString.split(',')
-      .map((s) => s.trim())
-      .where((s) => s.isNotEmpty)
-      .toList();
-  
-  List<String> validDays = [];
-  
-  for (String indexStr in dayIndices) {
-    int? dayIndex = int.tryParse(indexStr);
-    if (dayIndex != null && dayIndex >= 0 && dayIndex < 7) {
-      validDays.add(arabicDays[dayIndex]);
+  if (dayValue != null && dayValue.toString().isNotEmpty) {
+    String dayString = dayValue.toString().trim();
+    
+    // Split by comma to handle multiple days
+    List<String> dayIndices = dayString.split(',')
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
+    
+    List<String> validDays = [];
+    
+    for (String indexStr in dayIndices) {
+      int? dayIndex = int.tryParse(indexStr);
+      if (dayIndex != null && dayIndex >= 0 && dayIndex < 7) {
+        validDays.add(arabicDays[dayIndex]);
+      }
+    }
+    
+    if (validDays.isNotEmpty) {
+      // Join multiple days with " و " (Arabic "and")
+      day = validDays.join(' و ');
     }
   }
-  
-  if (validDays.isNotEmpty) {
-    // Join multiple days with " و " (Arabic "and")
-    day = validDays.join(' و ');
-  }
-}
 
-// Parse acceptance times (can be multiple times)
-String timeKey = 'accept_invites_times';
-dynamic timeValue = settings[timeKey];
+  // Parse acceptance times (can be multiple times)
+  String timeKey = 'accept_invites_times';
+  dynamic timeValue = settings[timeKey];
 
-String time = 'وقت غير محدد'; // Default value
+  String time = 'وقت غير محدد'; // Default value
 
-if (timeValue != null && timeValue.toString().isNotEmpty) {
-  String timeString = timeValue.toString().trim();
-  
-  // Split by comma and clean up empty values
-  List<String> timeSlots = timeString.split(',')
-      .map((s) => s.trim())
-      .where((s) => s.isNotEmpty)
-      .toList();
-  
-  List<String> validTimes = [];
-  
-  for (String timeSlot in timeSlots) {
-    // Basic validation for time format (HH:MM)
-    RegExp timeRegex = RegExp(r'^([01]?[0-9]|2[0-3]):[0-5][0-9]$');
-    if (timeRegex.hasMatch(timeSlot)) {
-      validTimes.add(timeSlot);
+  if (timeValue != null && timeValue.toString().isNotEmpty) {
+    String timeString = timeValue.toString().trim();
+    
+    // Split by comma and clean up empty values
+    List<String> timeSlots = timeString.split(',')
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
+    
+    List<String> validTimes = [];
+    
+    for (String timeSlot in timeSlots) {
+      // Basic validation for time format (HH:MM)
+      RegExp timeRegex = RegExp(r'^([01]?[0-9]|2[0-3]):[0-5][0-9]$');
+      if (timeRegex.hasMatch(timeSlot)) {
+        validTimes.add(timeSlot);
+      }
+    }
+    
+    if (validTimes.isNotEmpty) {
+      // Join multiple times with " و " (Arabic "and")
+      time = validTimes.join(' و ');
     }
   }
-  
-  if (validTimes.isNotEmpty) {
-    // Join multiple times with " و " (Arabic "and")
-    time = validTimes.join(' و ');
+
+    return {'day': day, 'time': time};
+
   }
-}
-
-  return {'day': day, 'time': time};
-
-}
 
 String _getSelectedClanName() {
   return _selectedClan?['name']?.toString() ?? 'العشيرة المختارة';
@@ -1725,8 +1725,10 @@ Widget _buildReservationDetailsStep() {
         TextFormField(
           controller: _date1Controller,
           readOnly: true,
+          
           onTap: () => _selectDate(_date1Controller, 'تاريخ الحجز'),
           decoration: InputDecoration(
+            
             labelText: 'تاريخ الحجز *',
             prefixIcon: const Icon(Icons.calendar_today),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),

@@ -1,5 +1,6 @@
 // lib/main.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
@@ -17,7 +18,25 @@ import 'utils/colors.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Initialize date formatting for Arabic locale
+
+  //   // Hide only navigation bar, keep notification bar
+  // SystemChrome.setEnabledSystemUIMode(
+  //   SystemUiMode.immersiveSticky,
+  //   overlays: [SystemUiOverlay.top],
+  // );
+  
+SystemChrome.setEnabledSystemUIMode(
+  SystemUiMode.manual,
+  overlays: [SystemUiOverlay.top],
+);
+
+// Optional: Make the bottom bar transparent/immersive when it does appear
+SystemChrome.setSystemUIOverlayStyle(
+  const SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    systemNavigationBarColor: Colors.transparent,
+  ),
+);  // Initialize date formatting for Arabic locale
   await initializeDateFormatting('ar');
   ConnectivityService().initialize();
   await ApiService.initializeToken(); // Add this line

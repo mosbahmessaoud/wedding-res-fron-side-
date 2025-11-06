@@ -402,13 +402,7 @@ Widget build(BuildContext context) {
               'هاتف ولي الأمر',
               _userProfile?['guardian_phone'] ?? 'غير محدد',
             ),
-            const SizedBox(height: 12),
-            
-            _buildInfoRow(
-              Icons.family_restroom,
-              'صلة القرابة',
-              _userProfile?['guardian_relation'] ?? 'غير محدد',
-            ),
+
           ],
         ),
       ),
@@ -805,17 +799,6 @@ void _showCannotDeleteDialog() {
         TextButton(
           onPressed: () => Navigator.pop(context),
           child: const Text('حسناً'),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            Navigator.pop(context);
-            // Navigate to reservations tab (assuming index 1)
-            DefaultTabController.of(context).animateTo(1);
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
-          ),
-          child: const Text('عرض الحجوزات'),
         ),
       ],
     ),

@@ -403,79 +403,79 @@ void _navigateToExternalScreen(Widget screen, String title) async {
         appBar: _buildSpotifyAppBar(isDark),
         drawer: _buildSpotifyDrawer(isDark),
         body: Stack(
-          children: [
-            // Main content - FULL SCREEN (including bottom nav area)
-            Positioned.fill(
-              child: _externalScreen != null
-                  ? Column(
-                      children: [
-                        // Custom app bar for external screen
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
-                                blurRadius: 10,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            children: [
-                              IconButton(
-                                icon: Icon(
-                                  Icons.arrow_back,
-                                  size: 22,
-                                  color: isDark ? Colors.white : Colors.black87,
-                                ),
-                                onPressed: _closeExternalScreen,
-                              ),
-                              Expanded(
-                                child: Text(
-                                  _externalScreenTitle ?? '',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w600,
-                                    color: isDark ? Colors.white : Colors.black87,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                              ),
-                              const SizedBox(width: 48),
-                            ],
-                          ),
-                        ),
-                        // External screen content - FULL SCREEN
-                        Expanded(
-                          child: _externalScreen!,
+  children: [
+    // Main content with bottom padding for nav bar
+    Positioned.fill(
+      child: Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).size.width < 360 ? 65.0 : 70.0,
+        ),
+        child: _externalScreen != null
+            ? Column(
+                children: [
+                  // Custom app bar for external screen
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
+                          blurRadius: 10,
+                          offset: const Offset(0, 2),
                         ),
                       ],
-                    )
-                  // : IndexedStack(
-                  //     index: _currentIndex,
-                  //     children: _tabs,
-                  //   ),
-                  : _tabs[_currentIndex],
-
-            ),
-            
-
-            
-            // Bottom Navigation Bar - FLOATING ON TOP
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: navigationBar(isDark),
-              // child: _buildSpotifyBottomNav(isDark),
-            ),
-          ],
-        ),
+                    ),
+                    child: Row(
+                      children: [
+                        IconButton(
+                          icon: Icon(
+                            Icons.arrow_back,
+                            size: 22,
+                            color: isDark ? Colors.white : Colors.black87,
+                          ),
+                          onPressed: _closeExternalScreen,
+                        ),
+                        Expanded(
+                          child: Text(
+                            _externalScreenTitle ?? '',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                              color: isDark ? Colors.white : Colors.black87,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                        const SizedBox(width: 48),
+                      ],
+                    ),
+                  ),
+                  // External screen content
+                  Expanded(
+                    child: _externalScreen!,
+                  ),
+                ],
+              )
+            : _tabs[_currentIndex],
+      ),
+    ),
+    
+    // Bottom Navigation Bar - FLOATING ON TOP
+    Positioned(
+      left: 0,
+      right: 0,
+      bottom: 0,
+      child: SafeArea(
+        top: false,
+        child: navigationBar(isDark),
+      ),
+    ),
+  ],
+),
       ),
     );
   }
@@ -492,6 +492,7 @@ AnimatedContainer navigationBar(bool isDark) {
   final borderRadius = isSmallScreen ? 15.0 : 20.0;
   
   return AnimatedContainer(
+
     height: navHeight,
     duration: const Duration(milliseconds: 400),
     curve: Curves.easeInOutCubic,
@@ -514,7 +515,7 @@ AnimatedContainer navigationBar(bool isDark) {
         topRight: Radius.circular(_currentIndex == 5 ? 0.0 : borderRadius),
       ),
       child: SafeArea(
-        bottom: true,
+        bottom: false,
         top: false,
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 1.5, sigmaY: 1.5),
@@ -722,37 +723,37 @@ Widget buildNavigationWithSafeArea(bool isDark) {
         ),
       ),
       actions: [
-        IconButton(
-          icon: Stack(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: isDark ? Colors.grey[800] : Colors.grey[100],
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  Icons.notifications_outlined,
-                  size: 20,
-                  color: isDark ? Colors.white : Colors.black87,
-                ),
-              ),
-              Positioned(
-                right: 4,
-                top: 4,
-                child: Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          onPressed: () => _showNotifications(isDark),
-        ),
+        // IconButton(
+        //   icon: Stack(
+        //     children: [
+        //       Container(
+        //         padding: const EdgeInsets.all(6),
+        //         decoration: BoxDecoration(
+        //           color: isDark ? Colors.grey[800] : Colors.grey[100],
+        //           borderRadius: BorderRadius.circular(8),
+        //         ),
+        //         child: Icon(
+        //           Icons.notifications_outlined,
+        //           size: 20,
+        //           color: isDark ? Colors.white : Colors.black87,
+        //         ),
+        //       ),
+        //       Positioned(
+        //         right: 4,
+        //         top: 4,
+        //         child: Container(
+        //           width: 8,
+        //           height: 8,
+        //           decoration: BoxDecoration(
+        //             color: AppColors.primary,
+        //             shape: BoxShape.circle,
+        //           ),
+        //         ),
+        //       ),
+        //     ],
+        //   ),
+        //   onPressed: () => _showNotifications(isDark),
+        // ),
         const SizedBox(width: 4),
         IconButton(
           icon: Container(

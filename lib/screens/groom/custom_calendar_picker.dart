@@ -95,7 +95,6 @@ class _BeautifulCustomCalendarPickerState extends State<BeautifulCustomCalendarP
   
   Set<String> _specialReservationDates = {};
 
-  // ADD THESE
   bool _showYearPicker = false;
   late int _maxYearsAllowed;
   late DateTime _effectiveLastDate;
@@ -110,6 +109,14 @@ class _BeautifulCustomCalendarPickerState extends State<BeautifulCustomCalendarP
   late Animation<double> _pulseAnimation;
   late Animation<double> _shimmerAnimation;
   late Animation<double> _bounceAnimation;
+
+
+
+  // ADD THESE TWO NEW ONES
+  bool _showDayPickerDialog = false;
+  DateTime? _tempSelectedDate;
+
+
 
 @override
 void initState() {
@@ -317,6 +324,8 @@ Future<void> _loadMonthData() async {
         String note;
         bool allowMassWedding = false;
 
+
+
         if (validatedCount > 0 && pendingCount > 0) {
           if (isFullyBooked) {
             status = DateStatus.reserved;
@@ -391,25 +400,21 @@ Future<void> _loadMonthData() async {
     }
   }
 
-  String _getMonthYearText(DateTime date) {
-    if (!_isLocaleInitialized) {
-      const months = [
-        '', 'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
-        'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
-      ];
-      return '${months[date.month]} ${date.year}';
-    }
+String _getMonthYearText(DateTime date) {
+  // Algerian Arabic month names (ar_DZ)
+  const monthsDZ = [
+    '', 'جانفي', 'فيفري', 'مارس', 'أفريل', 'ماي', 'جوان',
+    'جويلية', 'أوت', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
+  ];
 
-    try {
-      return DateFormat('MMMM yyyy', 'ar').format(date);
-    } catch (e) {
-      const months = [
-        '', 'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
-        'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
-      ];
-      return '${months[date.month]} ${date.year}';
-    }
+  try {
+    // Try formatting using the 'ar_DZ' locale
+    return DateFormat('MMMM yyyy', 'ar_DZ').format(date);
+  } catch (e) {
+    // Fallback to custom Algerian month names if locale not initialized
+    return '${monthsDZ[date.month]} ${date.year}';
   }
+}
 DateAvailability _getDateAvailability(DateTime date) {
   final key = DateFormat('yyyy-MM-dd').format(date);
   
@@ -596,9 +601,8 @@ DateAvailability _getDateAvailability(DateTime date) {
     return true;
   }
 
-
-// Replace _buildCalendarDay method with this modern version:
-Widget _buildCalendarDay(DateTime date) {
+// / Update _buildCalendarDay to handle dialog context
+Widget _buildCalendarDay(DateTime date, {BuildContext? dialogContext}) {
   final availability = _getDateAvailability(date);
   final isCurrentMonth = date.month == _currentMonth.month && date.year == _currentMonth.year;
   final isToday = _isSameDay(date, DateTime.now());
@@ -637,6 +641,11 @@ Widget _buildCalendarDay(DateTime date) {
         _selectedDate = date;
       });
       _bounceController.forward().then((_) => _bounceController.reverse());
+      
+      // Close dialog if it's open
+      if (dialogContext != null) {
+        Navigator.of(dialogContext).pop();
+      }
     } : null,
     onLongPress: isCurrentMonth && availability.reservations.isNotEmpty ? () {
       _showReservationDetails(date, availability);
@@ -705,7 +714,7 @@ Widget _buildCalendarDay(DateTime date) {
                   ),
                 ),
                 
-                // Capacity badge
+                // Rest of the Stack children remain the same...
                 if (isCurrentMonth && availability.currentCount > 0)
                   Positioned(
                     top: 2,
@@ -735,52 +744,7 @@ Widget _buildCalendarDay(DateTime date) {
                       ),
                     ),
                   ),
-
-                // Multi-day indicator
-                if (isCurrentMonth && isConnectedRange && isFirst && connectedDates != null)
-                  Positioned(
-                    top: 2,
-                    left: 2,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        '${connectedDates.length}d',
-                        style: TextStyle(
-                          fontSize: 8,
-                          fontWeight: FontWeight.bold,
-                          color: _getDateColor(date, availability),
-                        ),
-                      ),
-                    ),
-                  ),
-
-                // Status icon
-                if (isCurrentMonth && (availability.status == DateStatus.massWeddingOpen || 
-                    availability.status == DateStatus.mixed))
-                  Positioned(
-                    bottom: 2,
-                    right: 2,
-                    child: Container(
-                      padding: const EdgeInsets.all(2),
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        availability.status == DateStatus.mixed 
-                            ? Icons.group_rounded 
-                            : Icons.people_alt_rounded,
-                        size: 10,
-                        color: availability.status == DateStatus.mixed
-                            ? const Color(0xFF0EA5E9)
-                            : const Color(0xFF00BCD4),
-                      ),
-                    ),
-                  ),
+                // ... rest of indicators
               ],
             ),
           ),
@@ -789,7 +753,6 @@ Widget _buildCalendarDay(DateTime date) {
     ),
   );
 }
-
 
   void _showReservationDetails(DateTime date, DateAvailability availability) {
     showModalBottomSheet(
@@ -1399,17 +1362,13 @@ Widget _buildCalendarDay(DateTime date) {
   }
 
 List<Widget> _buildWeekDays() {
-  final screenWidth = MediaQuery.of(context).size.width;
   final isDark = Theme.of(context).brightness == Brightness.dark;
   
   const weekDays = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
   
   return weekDays.map((day) => Expanded(
     child: Container(
-      padding: EdgeInsets.symmetric(
-        vertical: screenWidth * 0.02,
-        horizontal: screenWidth * 0.01,
-      ),
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
       child: Text(
         day,
         textAlign: TextAlign.center,
@@ -1418,7 +1377,7 @@ List<Widget> _buildWeekDays() {
           color: isDark 
             ? Colors.green.shade300.withOpacity(0.7)
             : const Color(0xFF757575),
-          fontSize: screenWidth * 0.032,
+          fontSize: 13,
         ),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
@@ -1426,37 +1385,67 @@ List<Widget> _buildWeekDays() {
     ),
   )).toList();
 }
+// Update the original _buildCalendarDays to pass dialogContext when needed
+List<Widget> _buildCalendarDays({BuildContext? dialogContext}) {
+  final daysInMonth = DateTime(_currentMonth.year, _currentMonth.month + 1, 0).day;
+  final firstDayOfMonth = DateTime(_currentMonth.year, _currentMonth.month, 1);
+  final firstWeekday = firstDayOfMonth.weekday % 7;
 
-  List<Widget> _buildCalendarDays() {
-    final daysInMonth = DateTime(_currentMonth.year, _currentMonth.month + 1, 0).day;
-    final firstDayOfMonth = DateTime(_currentMonth.year, _currentMonth.month, 1);
-    final firstWeekday = firstDayOfMonth.weekday % 7;
+  List<Widget> days = [];
 
-    List<Widget> days = [];
-
-    for (int i = 0; i < firstWeekday; i++) {
-      final prevMonthDay = DateTime(_currentMonth.year, _currentMonth.month, 1 - firstWeekday + i);
-      days.add(_buildCalendarDay(prevMonthDay));
-    }
-
-    for (int day = 1; day <= daysInMonth; day++) {
-      final date = DateTime(_currentMonth.year, _currentMonth.month, day);
-      days.add(_buildCalendarDay(date));
-    }
-
-    final totalCells = 42;
-    final remainingCells = totalCells - days.length;
-    for (int i = 1; i <= remainingCells; i++) {
-      final nextMonthDay = DateTime(_currentMonth.year, _currentMonth.month + 1, i);
-      days.add(_buildCalendarDay(nextMonthDay));
-    }
-
-    return days;
+  for (int i = 0; i < firstWeekday; i++) {
+    final prevMonthDay = DateTime(_currentMonth.year, _currentMonth.month, 1 - firstWeekday + i);
+    days.add(_buildCalendarDay(prevMonthDay, dialogContext: dialogContext));
   }
-@override
-Widget build(BuildContext context) {
-  final screenHeight = MediaQuery.of(context).size.height;
+
+  for (int day = 1; day <= daysInMonth; day++) {
+    final date = DateTime(_currentMonth.year, _currentMonth.month, day);
+    days.add(_buildCalendarDay(date, dialogContext: dialogContext));
+  }
+
+  final totalCells = 42;
+  final remainingCells = totalCells - days.length;
+  for (int i = 1; i <= remainingCells; i++) {
+    final nextMonthDay = DateTime(_currentMonth.year, _currentMonth.month + 1, i);
+    days.add(_buildCalendarDay(nextMonthDay, dialogContext: dialogContext));
+  }
+
+  return days;
+}
+
+Widget _buildDayPickerGrid(StateSetter setDialogState, BuildContext dialogContext) {
   final screenWidth = MediaQuery.of(context).size.width;
+  
+  double spacing;
+  double aspectRatio;
+  // if (screenWidth > 1200) {
+  //   spacing = 100;
+  //   aspectRatio = 2;
+
+  // }else if (screenWidth > 900) {
+  //   spacing = 50;
+  //   aspectRatio = 0.9;
+  // } else if (screenWidth > 600) {
+  //   spacing = 50;
+  //   aspectRatio = 0.9;
+  // } else {
+    spacing = 10;
+    aspectRatio = 0.9;
+  // }
+  
+  return GridView.count(
+    shrinkWrap: true,
+    physics: const NeverScrollableScrollPhysics(),
+    crossAxisCount: 7,
+    crossAxisSpacing: spacing,
+    mainAxisSpacing: spacing,
+    childAspectRatio: aspectRatio,
+    children: _buildCalendarDays(dialogContext: dialogContext),
+  );
+}
+
+  @override
+Widget build(BuildContext context) {
   final safeAreaPadding = MediaQuery.of(context).padding;
   final isDark = Theme.of(context).brightness == Brightness.dark;
   
@@ -1464,13 +1453,10 @@ Widget build(BuildContext context) {
     position: _slideAnimation,
     child: Dialog(
       backgroundColor: Colors.transparent,
-      insetPadding: EdgeInsets.symmetric(
-        horizontal: screenWidth * 0.04,
-        vertical: screenHeight * 0.03,
-      ),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       child: Container(
         constraints: BoxConstraints(
-          maxHeight: screenHeight - safeAreaPadding.top - safeAreaPadding.bottom - 40,
+          maxHeight: MediaQuery.of(context).size.height - safeAreaPadding.top - safeAreaPadding.bottom - 40,
         ),
         decoration: BoxDecoration(
           color: isDark 
@@ -1496,27 +1482,21 @@ Widget build(BuildContext context) {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _buildModernHeader(screenWidth, screenHeight, isDark),
-            _buildMonthNavigation(screenWidth, screenHeight, isDark),
+            _buildModernHeader(isDark),
+            _buildMonthNavigation(isDark),
             Flexible(
-              child: _buildCalendarGrid(screenWidth, screenHeight),
+              child: _buildCalendarGrid(),
             ),
-            _buildBottomSection(screenWidth, screenHeight, isDark),
+            _buildBottomSection(isDark),
           ],
         ),
       ),
     ),
   );
 }
-
-Widget _buildModernHeader(double screenWidth, double screenHeight, bool isDark) {
+Widget _buildModernHeader(bool isDark) {
   return Container(
-    padding: EdgeInsets.fromLTRB(
-      screenWidth * 0.05,
-      screenHeight * 0.02,
-      screenWidth * 0.05,
-      screenHeight * 0.015,
-    ),
+    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
     decoration: BoxDecoration(
       gradient: LinearGradient(
         begin: Alignment.topLeft,
@@ -1537,8 +1517,8 @@ Widget _buildModernHeader(double screenWidth, double screenHeight, bool isDark) 
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Container(
-            width: screenWidth * 0.1,
-            height: screenWidth * 0.1,
+            width: 30,
+            height: 25,
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.2),
               borderRadius: BorderRadius.circular(12),
@@ -1546,7 +1526,7 @@ Widget _buildModernHeader(double screenWidth, double screenHeight, bool isDark) 
             child: IconButton(
               onPressed: widget.onCancel,
               icon: const Icon(Icons.close, color: Colors.white),
-              iconSize: screenWidth * 0.05,
+              iconSize: 12,
               padding: EdgeInsets.zero,
             ),
           ),
@@ -1554,23 +1534,23 @@ Widget _buildModernHeader(double screenWidth, double screenHeight, bool isDark) 
             child: Text(
               widget.title,
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                 color: Colors.white,
-                fontSize: screenWidth * 0.05,
+                fontSize: 20,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 0.5,
               ),
             ),
           ),
           SizedBox(
-            width: screenWidth * 0.1,
-            height: screenWidth * 0.1,
+            width: 40,
+            height: 20,
             child: _isLoading
-              ? Center(
+              ? const Center(
                   child: SizedBox(
-                    width: screenWidth * 0.05,
-                    height: screenWidth * 0.05,
-                    child: const CircularProgressIndicator(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
                       strokeWidth: 2,
                       valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                     ),
@@ -1583,12 +1563,10 @@ Widget _buildModernHeader(double screenWidth, double screenHeight, bool isDark) 
     ),
   );
 }
-Widget _buildMonthNavigation(double screenWidth, double screenHeight, bool isDark) {
+
+Widget _buildMonthNavigation(bool isDark) {
   return Container(
-    padding: EdgeInsets.symmetric(
-      horizontal: screenWidth * 0.04,
-      vertical: screenHeight * 0.015,
-    ),
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
     decoration: BoxDecoration(
       color: isDark 
         ? Colors.black.withOpacity(0.3)
@@ -1613,11 +1591,9 @@ Widget _buildMonthNavigation(double screenWidth, double screenHeight, bool isDar
             });
             _loadMonthData();
           },
-          screenWidth,
           isDark,
         ),
         
-        // UPDATED: Make month/year text clickable
         InkWell(
           onTap: () {
             setState(() {
@@ -1626,10 +1602,7 @@ Widget _buildMonthNavigation(double screenWidth, double screenHeight, bool isDar
           },
           borderRadius: BorderRadius.circular(12),
           child: Container(
-            padding: EdgeInsets.symmetric(
-              horizontal: screenWidth * 0.04,
-              vertical: screenHeight * 0.01,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
               color: _showYearPicker 
                   ? (isDark ? Colors.green.shade800.withOpacity(0.3) : Colors.green.shade50)
@@ -1650,17 +1623,17 @@ Widget _buildMonthNavigation(double screenWidth, double screenHeight, bool isDar
                 Text(
                   _getMonthYearText(_currentMonth),
                   style: TextStyle(
-                    fontSize: screenWidth * 0.045,
+                    fontSize: 18,
                     fontWeight: FontWeight.bold,
                     color: isDark ? Colors.green.shade300 : Colors.green.shade800,
                     letterSpacing: 0.3,
                   ),
                 ),
-                SizedBox(width: screenWidth * 0.02),
+                const SizedBox(width: 8),
                 Icon(
                   _showYearPicker ? Icons.expand_less : Icons.expand_more,
                   color: isDark ? Colors.green.shade300 : Colors.green.shade800,
-                  size: screenWidth * 0.05,
+                  size: 20,
                 ),
               ],
             ),
@@ -1675,15 +1648,13 @@ Widget _buildMonthNavigation(double screenWidth, double screenHeight, bool isDar
             });
             _loadMonthData();
           },
-          screenWidth,
           isDark,
         ),
       ],
     ),
   );
 }
-
-Widget _buildYearPicker(double screenWidth, double screenHeight, bool isDark) {
+Widget _buildYearPicker(bool isDark) {
   final today = DateTime.now();
   final currentYear = today.year;
   final List<int> availableYears = List.generate(
@@ -1692,8 +1663,8 @@ Widget _buildYearPicker(double screenWidth, double screenHeight, bool isDark) {
   );
 
   return Container(
-    height: screenHeight * 0.15,
-    padding: EdgeInsets.symmetric(vertical: screenHeight * 0.01),
+    height: 120,
+    padding: const EdgeInsets.symmetric(vertical: 8),
     decoration: BoxDecoration(
       color: isDark 
         ? Colors.black.withOpacity(0.3)
@@ -1710,14 +1681,14 @@ Widget _buildYearPicker(double screenWidth, double screenHeight, bool isDark) {
     child: Column(
       children: [
         Padding(
-          padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.04),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
                 'اختر السنة',
                 style: TextStyle(
-                  fontSize: screenWidth * 0.04,
+                  fontSize: 16,
                   fontWeight: FontWeight.w600,
                   color: isDark ? Colors.green.shade300 : Colors.green.shade700,
                 ),
@@ -1727,7 +1698,7 @@ Widget _buildYearPicker(double screenWidth, double screenHeight, bool isDark) {
                     ? 'متاح حتى $_maxYearsAllowed ${_maxYearsAllowed == 1 ? "سنة" : "سنوات"}'
                     : 'متاح حتى $_maxYearsAllowed سنوات',
                 style: TextStyle(
-                  fontSize: screenWidth * 0.03,
+                  fontSize: 12,
                   color: isDark 
                     ? Colors.green.shade400.withOpacity(0.7)
                     : Colors.green.shade600.withOpacity(0.7),
@@ -1736,19 +1707,19 @@ Widget _buildYearPicker(double screenWidth, double screenHeight, bool isDark) {
             ],
           ),
         ),
-        SizedBox(height: screenHeight * 0.01),
+        const SizedBox(height: 8),
         Expanded(
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             reverse: true,
-            padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.04),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             itemCount: availableYears.length,
             itemBuilder: (context, index) {
               final year = availableYears[index];
               final isSelected = year == _currentMonth.year;
               
               return Padding(
-                padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.01),
+                padding: const EdgeInsets.symmetric(horizontal: 4),
                 child: InkWell(
                   onTap: () {
                     setState(() {
@@ -1759,7 +1730,7 @@ Widget _buildYearPicker(double screenWidth, double screenHeight, bool isDark) {
                   },
                   borderRadius: BorderRadius.circular(12),
                   child: Container(
-                    width: screenWidth * 0.2,
+                    width: 80,
                     decoration: BoxDecoration(
                       gradient: isSelected
                           ? LinearGradient(
@@ -1799,7 +1770,7 @@ Widget _buildYearPicker(double screenWidth, double screenHeight, bool isDark) {
                       child: Text(
                         year.toString(),
                         style: TextStyle(
-                          fontSize: screenWidth * 0.04,
+                          fontSize: 16,
                           fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
                           color: isSelected 
                               ? Colors.white
@@ -1818,8 +1789,7 @@ Widget _buildYearPicker(double screenWidth, double screenHeight, bool isDark) {
   );
 }
 
-
-Widget _buildModernNavButton(IconData icon, VoidCallback onPressed, double screenWidth, bool isDark) {
+Widget _buildModernNavButton(IconData icon, VoidCallback onPressed, bool isDark) {
   return Container(
     decoration: BoxDecoration(
       color: isDark 
@@ -1839,11 +1809,11 @@ Widget _buildModernNavButton(IconData icon, VoidCallback onPressed, double scree
         borderRadius: BorderRadius.circular(12),
         onTap: onPressed,
         child: Padding(
-          padding: EdgeInsets.all(screenWidth * 0.02),
+          padding: const EdgeInsets.all(8),
           child: Icon(
             icon,
             color: isDark ? Colors.green.shade300 : Colors.green.shade700,
-            size: screenWidth * 0.06,
+            size: 24,
           ),
         ),
       ),
@@ -1851,31 +1821,100 @@ Widget _buildModernNavButton(IconData icon, VoidCallback onPressed, double scree
   );
 }
 
-Widget _buildCalendarGrid(double screenWidth, double screenHeight) {
+// Update _buildCalendarGrid method
+Widget _buildCalendarGrid() {
+  final screenwidth = MediaQuery.of(context).size.width;
+  
+  // For screens > 400, show a button to open day picker dialog
+  if (screenwidth > 600) {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+
+
+          
+          if (_showYearPicker)
+            _buildYearPicker(Theme.of(context).brightness == Brightness.dark),
+          
+          const SizedBox(height: 16),
+          
+          // Button to open day picker dialog
+          InkWell(
+            onTap: () {
+              setState(() {
+                _showDayPickerDialog = true;
+              });
+              _showDayPickerPopup();
+            },
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Colors.green.shade600,
+                    Colors.green.shade800,
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.green.shade300.withOpacity(0.4),
+                    blurRadius: 12,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.calendar_month_rounded,
+                    color: Colors.white,
+                    size: 28,
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    _selectedDate != null 
+                        ? 'التاريخ المختار: ${DateFormat('dd/MM/yyyy').format(_selectedDate!)}'
+                        : 'اختر تاريخ من التقويم',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  // For screens <= 400, show inline calendar
   return LayoutBuilder(
     builder: (context, constraints) {
       return SingleChildScrollView(
         child: Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: screenWidth * 0.02,
-            vertical: screenHeight * 0.01,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // ADD YEAR PICKER HERE
               if (_showYearPicker)
-                _buildYearPicker(screenWidth, screenHeight, 
-                  Theme.of(context).brightness == Brightness.dark),
+                _buildYearPicker(Theme.of(context).brightness == Brightness.dark),
               
-              // Week headers
               Row(
                 children: _buildWeekDays(),
               ),
               
               const SizedBox(height: 8),
               
-              // Calendar days
               GridView.count(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
@@ -1894,11 +1933,120 @@ Widget _buildCalendarGrid(double screenWidth, double screenHeight) {
 }
 
 
-Widget _buildBottomSection(double screenWidth, double screenHeight, bool isDark) {
+// Add this new method to show the day picker popup
+void _showDayPickerPopup() {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  
+  showDialog(
+    context: context,
+    barrierDismissible: true,
+    builder: (BuildContext dialogContext) {
+      return StatefulBuilder(
+        builder: (context, setDialogState) {
+          return Dialog(
+            backgroundColor: Colors.transparent,
+            insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
+            child: Container(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.8,
+                maxWidth: 600,
+              ),
+              decoration: BoxDecoration(
+                color: isDark 
+                  ? Colors.black.withOpacity(0.95)
+                  : Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: isDark 
+                    ? Colors.green.shade400.withOpacity(0.3)
+                    : Colors.green.shade300.withOpacity(0.5),
+                  width: 1.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: isDark 
+                      ? Colors.green.shade300.withOpacity(0.2)
+                      : Colors.green.shade300.withOpacity(0.3),
+                    blurRadius: 24,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Header
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Colors.green.shade600,
+                          Colors.green.shade800,
+                        ],
+                      ),
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(24),
+                        topRight: Radius.circular(24),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        IconButton(
+                          onPressed: () => Navigator.of(dialogContext).pop(),
+                          icon: const Icon(Icons.close, color: Colors.white),
+                        ),
+                        const Text(
+                          'اختر اليوم',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(width: 48),
+                      ],
+                    ),
+                  ),
+                  
+                  // Calendar content
+                  Flexible(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        children: [
+                          Row(
+                            children: _buildWeekDays(),
+                          ),
+                          const SizedBox(height: 12),
+                          _buildDayPickerGrid(setDialogState, dialogContext),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    },
+  ).then((_) {
+    setState(() {
+      _showDayPickerDialog = false;
+    });
+  });
+}
+
+
+
+
+Widget _buildBottomSection(bool isDark) {
   return Container(
-    constraints: BoxConstraints(
-      maxHeight: screenHeight * 0.28,
-    ),
+    constraints: const BoxConstraints(maxHeight: 220),
     decoration: BoxDecoration(
       color: isDark 
         ? Colors.black.withOpacity(0.4)
@@ -1909,16 +2057,13 @@ Widget _buildBottomSection(double screenWidth, double screenHeight, bool isDark)
       ),
     ),
     child: SingleChildScrollView(
-      padding: EdgeInsets.all(screenWidth * 0.04),
+      padding: const EdgeInsets.all(8),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: EdgeInsets.symmetric(
-              horizontal: screenWidth * 0.04,
-              vertical: screenHeight * 0.012,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
             decoration: BoxDecoration(
               color: isDark 
                 ? Colors.green.shade900.withOpacity(0.3)
@@ -1935,15 +2080,15 @@ Widget _buildBottomSection(double screenWidth, double screenHeight, bool isDark)
               children: [
                 Icon(
                   Icons.info_outline_rounded,
-                  size: screenWidth * 0.045,
+                  size: 18,
                   color: isDark ? Colors.green.shade300 : Colors.green.shade700,
                 ),
-                SizedBox(width: screenWidth * 0.025),
+                const SizedBox(width: 7),
                 Expanded(
                   child: Text(
                     'اضغط مطولاً لرؤية التفاصيل',
                     style: TextStyle(
-                      fontSize: screenWidth * 0.032,
+                      fontSize: 13,
                       color: isDark ? Colors.green.shade300 : Colors.green.shade700,
                       fontWeight: FontWeight.w500,
                     ),
@@ -1953,35 +2098,28 @@ Widget _buildBottomSection(double screenWidth, double screenHeight, bool isDark)
             ),
           ),
           
-          SizedBox(height: screenHeight * 0.015),
+          const SizedBox(height: 7),
           
           Wrap(
-            spacing: screenWidth * 0.02,
-            runSpacing: screenHeight * 0.008,
+            spacing: 8,
+            runSpacing: 6,
             children: [
-              _buildCompactLegend('متاح', const Color(0xFF4CAF50), screenWidth, isDark),
-              _buildCompactLegend('معلق', const Color(0xFFFFB74D), screenWidth, isDark),
-              _buildCompactLegend('محجوز', const Color(0xFFEF4444), screenWidth, isDark),
-              _buildCompactLegend('جماعي', const Color(0xFF00BCD4), screenWidth, isDark),
-              _buildCompactLegend('يوم غير قابل للحجز', const Color(0xFFBDBDBD), screenWidth, isDark), // ADD THIS
+              _buildCompactLegend('متاح', const Color(0xFF4CAF50), isDark),
+              _buildCompactLegend('معلق', const Color(0xFFFFB74D), isDark),
+              _buildCompactLegend('محجوز', const Color(0xFFEF4444), isDark),
+              _buildCompactLegend('جماعي', const Color(0xFF00BCD4), isDark),
+              _buildCompactLegend('يوم غير قابل للحجز', const Color(0xFFBDBDBD), isDark),
             ],
           ),
           
-          SizedBox(height: screenHeight * 0.02),
+          const SizedBox(height: 9),
           
           Row(
             children: [
               Expanded(
-                child: _buildActionButton(
-                  'إلغاء',
-                  false,
-                  widget.onCancel,
-                  screenWidth,
-                  screenHeight,
-                  isDark,
-                ),
+                child: _buildActionButton('إلغاء', false, widget.onCancel, isDark),
               ),
-              SizedBox(width: screenWidth * 0.03),
+              const SizedBox(width: 12),
               Expanded(
                 flex: 2,
                 child: _buildActionButton(
@@ -1991,8 +2129,6 @@ Widget _buildBottomSection(double screenWidth, double screenHeight, bool isDark)
                     final availability = _getDateAvailability(_selectedDate!);
                     widget.onDateSelected(_selectedDate!, availability);
                   } : null,
-                  screenWidth,
-                  screenHeight,
                   isDark,
                 ),
               ),
@@ -2004,7 +2140,8 @@ Widget _buildBottomSection(double screenWidth, double screenHeight, bool isDark)
   );
 }
 
-Widget _buildCompactLegend(String label, Color color, double screenWidth, bool isDark) {
+Widget _buildCompactLegend(String label, Color color, bool isDark) {
+  final screenWidth = 360.0;
   return Container(
     padding: EdgeInsets.symmetric(
       horizontal: screenWidth * 0.03,
@@ -2049,11 +2186,10 @@ Widget _buildActionButton(
   String label,
   bool isPrimary,
   VoidCallback? onTap,
-  double screenWidth,
-  double screenHeight,
   bool isDark,
 ) {
   final isEnabled = onTap != null;
+  final screenHeight = MediaQuery.of(context).size.height;
   
   return Container(
     decoration: BoxDecoration(
@@ -2103,7 +2239,7 @@ Widget _buildActionButton(
                 color: isPrimary
                     ? Colors.white
                     : (isDark ? Colors.green.shade300 : Colors.green.shade700),
-                fontSize: screenWidth * 0.038,
+                fontSize: 360.0 * 0.038,
                 fontWeight: FontWeight.w600,
                 letterSpacing: 0.3,
               ),

@@ -2529,6 +2529,25 @@ static Future<String> getOtpCode(String phoneNumber) async {
     throw Exception('خطأ في الحصول على رمز التحقق: $e');
   }
 }
+// Get OTP Code for Admin
+static Future<String> getOtpCodeClanAdmin(String phoneNumber) async {
+  try {
+    final response = await http.get(
+      Uri.parse('$baseUrl/auth/clan_admin/get_otp/$phoneNumber'),
+      headers: await _headers,
+    );
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return data['otp_code'];
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل في الحصول على رمز التحقق');
+    }
+  } catch (e) {
+    throw Exception('خطأ في الحصول على رمز التحقق: $e');
+  }
+}
 
 // ==================== GROOM STATUS MANAGEMENT ENDPOINTS ====================
 

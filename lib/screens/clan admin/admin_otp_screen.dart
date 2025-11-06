@@ -81,7 +81,7 @@ class AdminOTPScreenState extends State<AdminOTPScreen>
     });
 
     try {
-      final otpCode = await ApiService.getOtpCode(_phoneController.text.trim());
+      final otpCode = await ApiService.getOtpCodeClanAdmin(_phoneController.text.trim());
       setState(() {
         _otpCode = otpCode;
         _successMessage = 'تم الحصول على رمز التحقق بنجاح';

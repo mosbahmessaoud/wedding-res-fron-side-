@@ -284,25 +284,49 @@ Future<void> _loadChartStatistics() async {
     _clanStats = {'today': 0, 'month': 0, 'year': 0, 'today_data': [], 'month_data': [], 'year_data': []};
     _countyStats = {'today': 0, 'month': 0, 'year': 0, 'today_data': [], 'month_data': [], 'year_data': []};    }
   }
-Future<bool?> _showExitDialog() {
-  return showDialog<bool>(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: const Text('تأكيد الخروج'),
-      content: const Text('هل تريد الخروج من التطبيق؟'),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context, false),
-          child: const Text('لا'),
+
+void _showExitDialog(bool isDark) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'تسجيل الخروج',
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            color: isDark ? Colors.white : Colors.black87,
+          ),
         ),
-        TextButton(
-          onPressed: () => Navigator.pop(context, true),
-          child: const Text('نعم'),
+        content: Text(
+          'هل أنت متأكد من رغبتك في تسجيل الخروج؟',
+          style: TextStyle(color: isDark ? Colors.white70 : Colors.black87),
         ),
-      ],
-    ),
-  );
-}
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'إلغاء',
+              style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[700]),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              ApiService.clearToken();
+              Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+            ),
+            child: const Text('تسجيل الخروج'),
+          ),
+        ],
+      ),
+    );
+  }
+
 @override
 Widget build(BuildContext context) {
   final themeProvider = Provider.of<ThemeProvider>(context);
@@ -314,11 +338,7 @@ Widget build(BuildContext context) {
       if (didPop) {
         return;
       }
-      // Optionally show exit confirmation dialog
-      final shouldExit = await _showExitDialog();
-      if (shouldExit == true && context.mounted) {
-        SystemNavigator.pop();
-      }
+      _showExitDialog(isDark);
     },
     child: Container(
       color: isDark ? const Color(0xFF121212) : const Color(0xFFF6F6F6),

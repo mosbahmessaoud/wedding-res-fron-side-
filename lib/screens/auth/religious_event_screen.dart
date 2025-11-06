@@ -120,26 +120,9 @@ class _ReligiousEventScreenState extends State<ReligiousEventScreen>
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 // Icon Container
-                                Container(
-                                  width: iconSize.clamp(80.0, 120.0),
-                                  height: iconSize.clamp(80.0, 120.0),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.2),
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: Colors.white.withOpacity(0.4),
-                                      width: 3,
-                                    ),
-                                  ),
-                                  child: Icon(
-                                    Icons.mosque,
-                                    size: (iconSize * 0.5).clamp(40.0, 60.0),
-                                    color: Colors.white,
-                                  ),
-                                ),
                                 
                                 SizedBox(height: screenHeight * 0.03),
-                                
+                                  
                                 // Main Message Card
                                 Container(
                                   padding: EdgeInsets.symmetric(

@@ -547,235 +547,162 @@ void _showNoInternetDialog() {
         ),
       ],
     );
-  }
+  }Widget _buildReservationCard(
+  Map<String, dynamic> reservation,
+  bool isDark,
+  bool isPhone,
+) {
+  final isValidated = reservation['status'] == 'validated';
+  final date = reservation['date'] ?? '';
+  final name = reservation['reserv_name'] ?? 'بدون اسم';
+  // final description = reservation['reserv_desctiption'] ?? '';
+  final fullName = reservation['full_name'] ?? '';
+  final phoneNumber = reservation['phone_number'] ?? '';
 
-  Widget _buildReservationCard(
-    Map<String, dynamic> reservation,
-    bool isDark,
-    bool isPhone,
-  ) {
-    final isValidated = reservation['status'] == 'validated';
-    final date = reservation['date'] ?? '';
-    final name = reservation['reserv_name'] ?? 'بدون اسم';
-    final description = reservation['reserv_desctiption'] ?? '';
-    final fullName = reservation['full_name'] ?? '';
-    final homeAddress = reservation['home_address'] ?? '';
-    final phoneNumber = reservation['phone_number'] ?? '';
+  final screenWidth = MediaQuery.of(context).size.width;
+  final isTablet = screenWidth >= 600 && screenWidth < 1150;
+  final isDesktop = screenWidth >= 1150;
+  final isSmallPhone = screenWidth < 360;
+  
+  double scaleFactor = isSmallPhone ? 0.85 : (isTablet ? 0.95 : (isDesktop ? 1.1 : 1.0));
+  double size(double base) => base * scaleFactor;
 
-    return InkWell(
+  return LayoutBuilder(
+    builder: (context, constraints) => InkWell(
       onTap: () => _showReservationDetailsDialog(reservation, isDark),
       child: Container(
+        width: double.infinity,
+        constraints: BoxConstraints(minHeight: size(180)),
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF2D2D2D) : Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(size(16)),
           border: Border.all(
-            color: isValidated
-                ? AppColors.primary.withOpacity(0.3)
-                : Colors.red.withOpacity(0.3),
+            color: isValidated ? AppColors.primary.withOpacity(0.3) : Colors.red.withOpacity(0.3),
             width: 2,
           ),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
+              blurRadius: size(10),
+              offset: Offset(0, size(4)),
             ),
           ],
         ),
         child: Stack(
           children: [
-            // Status Badge
             Positioned(
-              top: 12,
-              left: 12,
+              top: size(12),
+              left: size(12),
               child: Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: isPhone ? 10 : 12,
-                  vertical: isPhone ? 5 : 6,
-                ),
+                padding: EdgeInsets.symmetric(horizontal: size(10), vertical: size(5)),
                 decoration: BoxDecoration(
-                  color: isValidated
-                      ? Colors.green.withOpacity(0.1)
-                      : Colors.red.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: isValidated ? Colors.green : Colors.red,
-                    width: 1.5,
-                  ),
+                  color: isValidated ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(size(20)),
+                  border: Border.all(color: isValidated ? Colors.green : Colors.red, width: 1.5),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      isValidated ? Icons.check_circle : Icons.cancel,
-                      color: isValidated ? Colors.green : Colors.red,
-                      size: isPhone ? 12 : 14,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      isValidated ? 'مفعّل' : 'ملغي',
-                      style: TextStyle(
-                        color: isValidated ? Colors.green : Colors.red,
-                        fontWeight: FontWeight.w600,
-                        fontSize: isPhone ? 10 : 11,
-                      ),
-                    ),
+                    Icon(isValidated ? Icons.check_circle : Icons.cancel, 
+                      color: isValidated ? Colors.green : Colors.red, size: size(12)),
+                    SizedBox(width: size(4)),
+                    Text(isValidated ? 'مفعّل' : 'ملغي',
+                      style: TextStyle(color: isValidated ? Colors.green : Colors.red,
+                        fontWeight: FontWeight.w600, fontSize: size(10))),
                   ],
                 ),
               ),
             ),
-
             Padding(
-              padding: EdgeInsets.all(isPhone ? 12 : 16),
+              padding: EdgeInsets.all(size(12)),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  SizedBox(height: isPhone ? 28 : 32),
-
-                  // Date Section
+                  SizedBox(height: size(35)),
                   Container(
-                    padding: EdgeInsets.all(isPhone ? 10 : 12),
+                    padding: EdgeInsets.all(size(10)),
                     decoration: BoxDecoration(
                       color: AppColors.primary.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(size(12)),
                     ),
                     child: Row(
                       children: [
-                        Icon(
-                          Icons.calendar_today,
-                          color: AppColors.primary,
-                          size: isPhone ? 18 : 20,
-                        ),
-                        const SizedBox(width: 8),
+                        Icon(Icons.calendar_today, color: AppColors.primary, size: size(18)),
+                        SizedBox(width: size(8)),
                         Expanded(
-                          child: Text(
-                            _formatDate(date),
-                            style: TextStyle(
-                              fontSize: isPhone ? 14 : 16,
-                              fontWeight: FontWeight.w600,
-                              color: isDark ? Colors.white : Colors.black87,
-                            ),
-                          ),
+                          child: Text(_formatDate(date),
+                            style: TextStyle(fontSize: size(14), fontWeight: FontWeight.w600,
+                              color: isDark ? Colors.white : Colors.black87),
+                            overflow: TextOverflow.ellipsis),
                         ),
                       ],
                     ),
                   ),
-
-                  SizedBox(height: isPhone ? 10 : 12),
-
-                  // Name
-                  Text(
-                    name,
-                    style: TextStyle(
-                      fontSize: isPhone ? 16 : 18,
-                      fontWeight: FontWeight.w700,
-                      color: isDark ? Colors.white : Colors.black87,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-
-                  // Full Name
+                  SizedBox(height: size(10)),
+                  Text(name,
+                    style: TextStyle(fontSize: size(16), fontWeight: FontWeight.w700,
+                      color: isDark ? Colors.white : Colors.black87),
+                    maxLines: 2, overflow: TextOverflow.ellipsis),
                   if (fullName.isNotEmpty) ...[
-                    const SizedBox(height: 6),
+                    SizedBox(height: size(6)),
                     Row(
                       children: [
-                        Icon(
-                          Icons.person_outline,
-                          size: isPhone ? 14 : 16,
-                          color: isDark ? Colors.white60 : Colors.grey,
-                        ),
-                        const SizedBox(width: 6),
+                        Icon(Icons.person_outline, size: size(14), 
+                          color: isDark ? Colors.white60 : Colors.grey),
+                        SizedBox(width: size(6)),
                         Expanded(
-                          child: Text(
-                            fullName,
-                            style: TextStyle(
-                              fontSize: isPhone ? 12 : 13,
-                              color: isDark ? Colors.white60 : Colors.grey,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                          child: Text(fullName,
+                            style: TextStyle(fontSize: size(12), 
+                              color: isDark ? Colors.white60 : Colors.grey),
+                            maxLines: 1, overflow: TextOverflow.ellipsis),
                         ),
                       ],
                     ),
                   ],
-
-                  // Phone Number
                   if (phoneNumber.isNotEmpty) ...[
-                    const SizedBox(height: 6),
+                    SizedBox(height: size(6)),
                     Row(
                       children: [
-                        Icon(
-                          Icons.phone_outlined,
-                          size: isPhone ? 14 : 16,
-                          color: isDark ? Colors.white60 : Colors.grey,
-                        ),
-                        const SizedBox(width: 6),
+                        Icon(Icons.phone_outlined, size: size(14), 
+                          color: isDark ? Colors.white60 : Colors.grey),
+                        SizedBox(width: size(6)),
                         Expanded(
-                          child: Text(
-                            phoneNumber,
-                            style: TextStyle(
-                              fontSize: isPhone ? 12 : 13,
-                              color: isDark ? Colors.white60 : Colors.grey,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                          child: Text(phoneNumber,
+                            style: TextStyle(fontSize: size(12), 
+                              color: isDark ? Colors.white60 : Colors.grey),
+                            maxLines: 1, overflow: TextOverflow.ellipsis),
                         ),
                       ],
                     ),
                   ],
-
-                  if (description.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      description,
-                      style: TextStyle(
-                        fontSize: isPhone ? 12 : 13,
-                        color: isDark ? Colors.white60 : Colors.grey,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-
-                  SizedBox(height: isPhone ? 10 : 12),
-
-                  // Actions
+                  // if (description.isNotEmpty) ...[
+                  //   SizedBox(height: size(8)),
+                  //   Text(description,
+                  //     style: TextStyle(fontSize: size(12), 
+                  //       color: isDark ? Colors.white60 : Colors.grey),
+                  //     maxLines: 2, overflow: TextOverflow.ellipsis),
+                  // ],
+                  SizedBox(height: size(10)),
                   Row(
                     children: [
                       Expanded(
                         child: ElevatedButton.icon(
                           onPressed: () => _toggleReservationStatus(reservation),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: isValidated
-                                ? Colors.red.withOpacity(0.1)
-                                : Colors.green.withOpacity(0.1),
+                            backgroundColor: isValidated ? Colors.red.withOpacity(0.1) 
+                              : Colors.green.withOpacity(0.1),
                             foregroundColor: isValidated ? Colors.red : Colors.green,
                             elevation: 0,
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              side: BorderSide(
-                                color: isValidated ? Colors.red : Colors.green,
-                              ),
+                              borderRadius: BorderRadius.circular(size(12)),
+                              side: BorderSide(color: isValidated ? Colors.red : Colors.green, width: 1.5),
                             ),
-                            padding: EdgeInsets.symmetric(
-                              vertical: isPhone ? 10 : 12,
-                            ),
+                            padding: EdgeInsets.symmetric(vertical: size(10), horizontal: size(8)),
                           ),
-                          icon: Icon(
-                            isValidated ? Icons.block : Icons.check_circle,
-                            size: isPhone ? 16 : 18,
-                          ),
-                          label: Text(
-                            isValidated ? 'إلغاء' : 'تفعيل',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: isPhone ? 12 : 13,
-                            ),
-                          ),
+                          icon: Icon(isValidated ? Icons.block : Icons.check_circle, size: size(16)),
+                          label: Text(isValidated ? 'إلغاء' : 'تفعيل',
+                            style: TextStyle(fontWeight: FontWeight.w600, fontSize: size(12))),
                         ),
                       ),
                     ],
@@ -786,8 +713,9 @@ void _showNoInternetDialog() {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildEmptyState(bool isDark, bool isPhone) {
     final isArchive = _filterStatus == 'archive';

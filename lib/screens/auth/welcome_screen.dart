@@ -121,33 +121,42 @@ class _GradientOverlay extends StatelessWidget {
   final bool isDark;
 
   const _GradientOverlay({required this.isDark});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: isDark
-            ? [
-                Colors.black.withOpacity(0.7),
-                Colors.green.shade900.withOpacity(0.6),
-                Colors.black.withOpacity(0.8),
-              ]
-            : [
-                Colors.white,
-                Colors.white.withOpacity(0.85),
-                Colors.white,
-              ],
-          stops: const [0.0, 0.5, 1.0],
+@override
+Widget build(BuildContext context) {
+  return Container(
+    decoration: BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: isDark
+          ? [
+              Colors.black.withOpacity(0.7),
+              Colors.green.shade900.withOpacity(0.6),
+              Colors.black.withOpacity(0.8),
+            ]
+          : [
+              Colors.white,
+              Colors.white.withOpacity(0.85),
+              Colors.white,
+            ],
+        stops: const [0.0, 0.5, 1.0],
+      ),
+    ),
+    child: SafeArea(
+      child: SingleChildScrollView(  // Add this
+        physics: const ClampingScrollPhysics(),  // Add this
+        child: ConstrainedBox(  // Add this
+          constraints: BoxConstraints(
+            minHeight: MediaQuery.of(context).size.height - MediaQuery.of(context).padding.top - MediaQuery.of(context).padding.bottom,
+          ),
+          child: IntrinsicHeight(  // Add this
+            child: _WelcomeContent(isDark: isDark),
+          ),
         ),
       ),
-      child: SafeArea(
-        child: _WelcomeContent(isDark: isDark),
-      ),
-    );
-  }
+    ),
+  );
+}
 }
 
 class _WelcomeContent extends StatelessWidget {
@@ -194,114 +203,114 @@ class _WelcomeContent extends StatelessWidget {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        // Back button
-        Positioned(
-          top: 8,
-          right: 16,
-          child: IconButton(
-            onPressed: () => _navigateBack(context),
-            icon: Icon(
-              Icons.arrow_back,
-              color: isDark ? Colors.green.shade300 : Colors.green.shade700,
-              size: 24,
-            ),
-            style: IconButton.styleFrom(
-              padding: const EdgeInsets.all(12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+@override
+Widget build(BuildContext context) {
+  return Stack(
+    children: [
+      // Back button
+      Positioned(
+        top: 8,
+        right: 16,
+        child: IconButton(
+          onPressed: () => _navigateBack(context),
+          icon: Icon(
+            Icons.arrow_back,
+            color: isDark ? Colors.green.shade300 : Colors.green.shade700,
+            size: 24,
+          ),
+          style: IconButton.styleFrom(
+            padding: const EdgeInsets.all(12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
             ),
           ),
         ),
-        
-        // Theme Toggle
-        const Positioned(
-          top: 8,
-          left: 16,
-          child: ThemeToggleButton(),
-        ),
-        
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 70),
-              
-              // App Icon - Simplified shadow
-              _AppIcon(isDark: isDark),
-              
-              const SizedBox(height: 48),
-              
-              // Headings
-              Text(
-                'مرحباً بك في',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w300,
-                  color: isDark ? Colors.white70 : Colors.black87,
-                  height: 1.2,
-                ),
+      ),
+      
+      // Theme Toggle
+      const Positioned(
+        top: 8,
+        left: 16,
+        child: ThemeToggleButton(),
+      ),
+      
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 70),
+            
+            // App Icon - Simplified shadow
+            _AppIcon(isDark: isDark),
+            
+            const SizedBox(height: 48),
+            
+            // Headings
+            Text(
+              'مرحباً بك في',
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.w300,
+                color: isDark ? Colors.white70 : Colors.black87,
+                height: 1.2,
               ),
-              const SizedBox(height: 16),
-              Text(
-                'تطبيق الأعراس',
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'تطبيق الأعراس',
+              style: TextStyle(
+                fontSize: 34,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.green.shade300 : Colors.green.shade800,
+                height: 1.1,
+              ),
+            ),
+            
+            const SizedBox(height: 18),
+            
+            // Subtitle
+            Text(
+              'يسرنا أن نرحب بكم في تطبيق الأعراس \nوسيلتكم الميسرة لتنطيم و حجز عرسكم',
+              style: TextStyle(
+                fontSize: 15,
+                color: isDark ? const Color.fromARGB(255, 217, 255, 218) : const Color.fromARGB(255, 0, 93, 5),
+                height: 1.9,
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+            
+            const Spacer(),
+            
+            // Buttons
+            _ActionButtons(
+              isDark: isDark,
+              onSignup: () => _navigateToSignup(context),
+              onLogin: () => _navigateToLogin(context),
+            ),
+            
+            const SizedBox(height: 32),
+            
+            // Footer
+            Center(
+              child: Text(
+                ' برعاية عشيرة آت الشيخ الحاج مسعود © 2025',
                 style: TextStyle(
-                  fontSize: 34,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
                   color: isDark ? Colors.green.shade300 : Colors.green.shade800,
-                  height: 1.1,
+                  height: 1.4,
                 ),
+                textAlign: TextAlign.center,
               ),
-              
-              const SizedBox(height: 18),
-              
-              // Subtitle
-              Text(
-                'يسرنا أن نرحب بكم في تطبيق الأعراس \nوسيلتكم الميسرة لتنطيم و حجز عرسكم',
-                style: TextStyle(
-                  fontSize: 15,
-                  color: isDark ? const Color.fromARGB(255, 217, 255, 218) : const Color.fromARGB(255, 0, 93, 5),
-                  height: 1.9,
-                  fontWeight: FontWeight.w400,
-                ),
-              ),
-              
-              const Spacer(),
-              
-              // Buttons
-              _ActionButtons(
-                isDark: isDark,
-                onSignup: () => _navigateToSignup(context),
-                onLogin: () => _navigateToLogin(context),
-              ),
-              
-              const SizedBox(height: 32),
-              
-              // Footer
-              Center(
-                child: Text(
-                  ' برعاية عشيرة آت الشيخ الحاج مسعود © 2025',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: isDark ? Colors.green.shade300 : Colors.green.shade800,
-                    height: 1.4,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-              
-              const SizedBox(height: 40),
-            ],
-          ),
+            ),
+            
+            const SizedBox(height: 40),
+          ],
         ),
-      ],
-    );
-  }
+      ),
+    ],
+  );
+}
 }
 
 // Separate widget for app icon to cache decoration

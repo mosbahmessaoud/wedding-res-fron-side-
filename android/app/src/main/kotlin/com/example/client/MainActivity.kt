@@ -1,4 +1,4 @@
-package app.MeDev.ASULI
+package com.iTriDev.ASULI
 
 import io.flutter.embedding.android.FlutterActivity
 

@@ -380,23 +380,24 @@ class _LoginScreenState extends State<LoginScreen>
                   ? (isLargeScreen
                         ? [
                             Colors.black.withOpacity(0.7),
-                            Colors.green.shade900.withOpacity(0.1),
+                            Colors.green.shade500.withOpacity(0.1),
                             Colors.black.withOpacity(0.8),
                           ] 
                         : [
                             Colors.black.withOpacity(0.7),
-                            Colors.green.shade900.withOpacity(0.1),
-                            Colors.black.withOpacity(0.8),
-                          ])
+                            Colors.green.shade900.withOpacity(0.6),
+                            Colors.black.withOpacity(1),
+                          ])  
+                            
                   : (isLargeScreen 
                       ? [
                           Colors.white.withOpacity(0),
-                          Colors.green.shade900.withOpacity(0.1),
+                          Colors.green.shade300.withOpacity(0.06),
                           Colors.white.withOpacity(0.4),
                         ]
                       : [
-                          Colors.white.withOpacity(0.8),
-                          Colors.green.shade900.withOpacity(0.1),
+                          Colors.white,
+                          Colors.white.withOpacity(0.85),
                           Colors.white,
                         ]),
                 stops: const [0.0, 0.5, 1.0],

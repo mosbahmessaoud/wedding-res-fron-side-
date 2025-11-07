@@ -1,6 +1,7 @@
 // lib/screens/religious_event_screen.dart
 import 'package:flutter/material.dart';
 import 'package:wedding_reservation_app/widgets/custom_dropdown_with_sufix.dart';
+import 'package:wedding_reservation_app/widgets/theme_toggle_button.dart';
 import '../../utils/colors.dart';
 import '../../services/api_service.dart';
 import '../../models/county.dart';
@@ -18,7 +19,7 @@ class _ReligiousEventScreenState extends State<ReligiousEventScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
-  late Animation<double> _scaleAnimation;
+  late Animation<double> _slideAnimation;
 
   // Location data
   List<County> _counties = [];
@@ -38,7 +39,7 @@ class _ReligiousEventScreenState extends State<ReligiousEventScreen>
     super.initState();
     
     _animationController = AnimationController(
-      duration: Duration(milliseconds: 1000),
+      duration: const Duration(milliseconds: 500),
       vsync: this,
     );
 
@@ -47,15 +48,15 @@ class _ReligiousEventScreenState extends State<ReligiousEventScreen>
       end: 1.0,
     ).animate(CurvedAnimation(
       parent: _animationController,
-      curve: Curves.easeInOut,
+      curve: Curves.easeOut,
     ));
 
-    _scaleAnimation = Tween<double>(
-      begin: 0.8,
-      end: 1.0,
+    _slideAnimation = Tween<double>(
+      begin: 20.0,
+      end: 0.0,
     ).animate(CurvedAnimation(
       parent: _animationController,
-      curve: Curves.easeOutBack,
+      curve: Curves.easeOut,
     ));
 
     _animationController.forward();
@@ -172,95 +173,109 @@ class _ReligiousEventScreenState extends State<ReligiousEventScreen>
     }
   }
 
- // Get clan acceptance time from settings
-Map<String, String> _getClanAcceptanceTime() {
-  if (_clanSettings == null) {
-    return {'day': 'يوم غير محدد', 'time': 'وقت غير محدد'};
-  }
+  // Get clan acceptance time from settings
+  Map<String, String> _getClanAcceptanceTime() {
+    if (_clanSettings == null) {
+      return {'day': 'يوم غير محدد', 'time': 'وقت غير محدد'};
+    }
 
-  // Parse acceptance days
-  dynamic dayValue = _clanSettings!['days_to_accept_invites'];
-  List<String> arabicDays = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+    // Parse acceptance days
+    dynamic dayValue = _clanSettings!['days_to_accept_invites'];
+    List<String> arabicDays = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
 
-  String day = 'يوم غير محدد';
+    String day = 'يوم غير محدد';
 
-  if (dayValue != null && dayValue.toString().isNotEmpty) {
-    String dayString = dayValue.toString().trim();
-    
-    List<String> dayIndices = dayString.split(',')
-        .map((s) => s.trim())
-        .where((s) => s.isNotEmpty)
-        .toList();
-    
-    List<String> validDays = [];
-    
-    for (String indexStr in dayIndices) {
-      int? dayIndex = int.tryParse(indexStr);
-      if (dayIndex != null && dayIndex >= 0 && dayIndex < 7) {
-        validDays.add(arabicDays[dayIndex]);
+    if (dayValue != null && dayValue.toString().isNotEmpty) {
+      String dayString = dayValue.toString().trim();
+      
+      List<String> dayIndices = dayString.split(',')
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
+      
+      List<String> validDays = [];
+      
+      for (String indexStr in dayIndices) {
+        int? dayIndex = int.tryParse(indexStr);
+        if (dayIndex != null && dayIndex >= 0 && dayIndex < 7) {
+          validDays.add(arabicDays[dayIndex]);
+        }
+      }
+      
+      if (validDays.isNotEmpty) {
+        day = validDays.join(' و ');
       }
     }
-    
-    if (validDays.isNotEmpty) {
-      day = validDays.join(' و ');
-    }
-  }
 
-  // Parse acceptance times (can be multiple times)
-  dynamic timeValue = _clanSettings!['accept_invites_times'];
-  String time = 'وقت غير محدد';
+    // Parse acceptance times
+    dynamic timeValue = _clanSettings!['accept_invites_times'];
+    String time = 'وقت غير محدد';
 
-  if (timeValue != null && timeValue.toString().isNotEmpty) {
-    String timeString = timeValue.toString().trim();
-    
-    // Split by comma and clean up empty values
-    List<String> timeSlots = timeString.split(',')
-        .map((s) => s.trim())
-        .where((s) => s.isNotEmpty)
-        .toList();
-    
-    List<String> validTimes = [];
-    
-    for (String timeSlot in timeSlots) {
-      // Basic validation for time format (HH:MM)
-      RegExp timeRegex = RegExp(r'^([01]?[0-9]|2[0-3]):[0-5][0-9]$');
-      if (timeRegex.hasMatch(timeSlot)) {
-        validTimes.add(timeSlot);
+    if (timeValue != null && timeValue.toString().isNotEmpty) {
+      String timeString = timeValue.toString().trim();
+      
+      List<String> timeSlots = timeString.split(',')
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
+      
+      List<String> validTimes = [];
+      
+      for (String timeSlot in timeSlots) {
+        RegExp timeRegex = RegExp(r'^([01]?[0-9]|2[0-3]):[0-5][0-9]$');
+        if (timeRegex.hasMatch(timeSlot)) {
+          validTimes.add(timeSlot);
+        }
+      }
+      
+      if (validTimes.isNotEmpty) {
+        time = validTimes.join(' و ');
       }
     }
-    
-    if (validTimes.isNotEmpty) {
-      // Join multiple times with " و " (Arabic "and")
-      time = validTimes.join(' و ');
-    }
+
+    return {'day': day, 'time': time};
   }
 
-  return {'day': day, 'time': time};
-}
-
-// Show error dialog
-void _showErrorDialog(String message) {
-  showDialog(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: Text('خطأ'),
-      content: Text(
-        "يرجى التأكد من اتصالك بالإنترنت وحاول مرة أخرى.",
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text('حسناً'),
+  // Show error dialog
+  void _showErrorDialog(String message) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: isDark ? Colors.grey.shade900 : Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
         ),
-      ],
-    ),
-  );
-}
-
-
+        title: Text(
+          'خطأ',
+          style: TextStyle(
+            color: isDark ? Colors.green.shade300 : Colors.green.shade800,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: Text(
+          "يرجى التأكد من اتصالك بالإنترنت وحاول مرة أخرى.",
+          style: TextStyle(
+            color: isDark ? Colors.white70 : Colors.black87,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            style: TextButton.styleFrom(
+              foregroundColor: isDark ? Colors.green.shade300 : Colors.green.shade700,
+            ),
+            child: const Text('حسناً'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final screenHeight = MediaQuery.of(context).size.height;
     final screenWidth = MediaQuery.of(context).size.width;
     
@@ -274,76 +289,107 @@ void _showErrorDialog(String message) {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              Colors.teal.shade700,
-              Colors.teal.shade600,
-              Colors.teal.shade500,
-            ],
+            colors: isDark
+                ? [
+                    Colors.black.withOpacity(0.9),
+                    Colors.green.shade900.withOpacity(0.7),
+                    Colors.black.withOpacity(0.9),
+                  ]
+                : [
+                    Colors.white,
+                    Colors.green.shade50.withOpacity(0.3),
+                    Colors.white,
+                  ],
+            stops: const [0.0, 0.5, 1.0],
           ),
         ),
         child: SafeArea(
-          child: Column(
+          child: Stack(
             children: [
-              // App Bar
-              Padding(
-                padding: EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: Icon(Icons.arrow_back, color: Colors.white),
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                    Expanded(
-                      child: Text(
-                        'إحياء حفل الله أكبر',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: titleFontSize.clamp(18.0, 24.0),
-                          fontWeight: FontWeight.bold,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                    SizedBox(width: 48),
-                  ],
-                ),
-              ),
-              
               // Main Content
-              Expanded(
-                child: FadeTransition(
-                  opacity: _fadeAnimation,
-                  child: ScaleTransition(
-                    scale: _scaleAnimation,
-                    child: SingleChildScrollView(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: screenWidth * 0.05,
-                        vertical: screenHeight * 0.02,
-                      ),
-                      child: Column(
-                        children: [
-                          // Location Selection Card
-                          _buildLocationSelectionCard(
-                            screenWidth,
-                            screenHeight,
-                            messageFontSize,
-                            infoFontSize,
+              Column(
+                children: [
+                  // App Bar
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        IconButton(
+                          icon: Icon(
+                            Icons.arrow_back,
+                            color: isDark ? Colors.green.shade300 : Colors.green.shade700,
                           ),
-                          
-                          // Acceptance Time Card (only show when clan is selected)
-                          if (_selectedClan != null && _clanSettings != null)
-                            _buildAcceptanceTimeCard(
-                              screenWidth,
-                              screenHeight,
-                              titleFontSize,
-                              messageFontSize,
-                              infoFontSize,
+                          onPressed: () => Navigator.of(context).pop(),
+                          style: IconButton.styleFrom(
+                            padding: const EdgeInsets.all(12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                        ],
+                          ),
+                        ),
+                        Expanded(
+                          child: Text(
+                            'إِحْياء حَفْل اللَّه أَكْبَر',
+                            style: TextStyle(
+                              color: isDark ? Colors.green.shade300 : Colors.green.shade800,
+                              fontSize: titleFontSize.clamp(18.0, 24.0),
+                              fontWeight: FontWeight.bold,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                        const SizedBox(width: 48),
+                      ],
+                    ),
+                  ),
+                  
+                  // Animated Content
+                  Expanded(
+                    child: FadeTransition(
+                      opacity: _fadeAnimation,
+                      child: Transform.translate(
+                        offset: Offset(0, _slideAnimation.value),
+                        child: SingleChildScrollView(
+                          physics: const ClampingScrollPhysics(),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: screenWidth * 0.05,
+                            vertical: screenHeight * 0.02,
+                          ),
+                          child: Column(
+                            children: [
+                              // Location Selection Card
+                              _buildLocationSelectionCard(
+                                isDark,
+                                screenWidth,
+                                screenHeight,
+                                messageFontSize,
+                                infoFontSize,
+                              ),
+                              
+                              // Acceptance Time Card
+                              if (_selectedClan != null && _clanSettings != null)
+                                _buildAcceptanceTimeCard(
+                                  isDark,
+                                  screenWidth,
+                                  screenHeight,
+                                  titleFontSize,
+                                  messageFontSize,
+                                  infoFontSize,
+                                ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                ),
+                ],
+              ),
+              
+              // Theme Toggle Button
+              const Positioned(
+                top: 8,
+                left: 16,
+                child: ThemeToggleButton(),
               ),
             ],
           ),
@@ -354,6 +400,7 @@ void _showErrorDialog(String message) {
 
   // Build location selection card
   Widget _buildLocationSelectionCard(
+    bool isDark,
     double screenWidth,
     double screenHeight,
     double messageFontSize,
@@ -363,101 +410,137 @@ void _showErrorDialog(String message) {
       margin: EdgeInsets.only(bottom: screenHeight * 0.03),
       padding: EdgeInsets.all(screenWidth * 0.05),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? Colors.grey.shade900 : Colors.white,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.15),
+            color: isDark 
+                ? Colors.green.shade900.withOpacity(0.3)
+                : Colors.black.withOpacity(0.1),
             blurRadius: 20,
-            offset: Offset(0, 10),
+            offset: const Offset(0, 10),
           ),
         ],
+        border: isDark 
+            ? Border.all(color: Colors.green.shade800.withOpacity(0.3), width: 1)
+            : null,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Title
           Text(
-            'اختر القصر والعشيرة التي ستقيم فيها حفل الله اكبر ',
+            'اختر القصر والعشيرة التي ستقيم فيها حفل اللَّهُ اكبر',
             style: TextStyle(
-              color: Colors.teal.shade700,
+              color: isDark ? Colors.green.shade300 : Colors.green.shade800,
               fontSize: messageFontSize.clamp(16.0, 20.0),
               fontWeight: FontWeight.bold,
             ),
           ),
           
           SizedBox(height: screenHeight * 0.02),
-           Theme(
-  data: Theme.of(context).copyWith(
-    hintColor: Colors.grey.shade600,
-    canvasColor: Colors.white,
-  ),
-  child: CustomDropdownSufix<County>(
-    label: '',
-    value: _selectedCounty,
-    hint: 'اختر القصر',
-    items: _counties.map((county) => DropdownMenuItem<County>(
-      value: county,
-      child: Text(
-        county.name,
-        style: TextStyle(color: Colors.black87),
-      ),
-    )).toList(),
-    onChanged: _onCountyChanged,
-    prefixIcon: Icons.location_city,
-    isLoading: _isLoadingCounties, // Use the new isLoading parameter
-  ),
-),
+          
+          // County Dropdown
+          Container(
+            decoration: BoxDecoration(
+              color: isDark ? Colors.grey.shade900 : Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(12),
+              // border: Border.all(
+              //   color: isDark ? Colors.green.shade700.withOpacity(0.5) : Colors.grey.shade300,
+              //   width: 1.5,
+              // ),
+            ),
+            child: Theme(
+              data: Theme.of(context).copyWith(
+                hintColor: isDark ? Colors.green.shade900 : Colors.grey.shade600,
+                canvasColor: isDark ? Colors.grey.shade900 : Colors.white,
+              ),
+              child: CustomDropdownSufix<County>(
+                label: '',
+                value: _selectedCounty,
+                hint: 'اختر القصر',
+                items: _counties.map((county) => DropdownMenuItem<County>(
+                  value: county,
+                  child: Text(
+                    county.name,
+                    style: TextStyle(
+                      color:  Colors.black87,
+                    ),
+                  ),
+                )).toList(),
+                onChanged: _onCountyChanged,
+                prefixIcon: Icons.location_city,
+                isLoading: _isLoadingCounties,
+              ),
+            ),
+          ),
 
-SizedBox(height: screenHeight * 0.02),
+          SizedBox(height: screenHeight * 0.02),
 
-// Clan Dropdown
-Theme(
-  data: Theme.of(context).copyWith(
-    hintColor: Colors.grey.shade600,
-    canvasColor: Colors.white,
-  ),
-  child: CustomDropdownSufix<Clan>(
-    label: '',
-    value: _selectedClan,
-    hint: 'اختر العشيرة',
-    items: _filteredClans.map((clan) => DropdownMenuItem<Clan>(
-      value: clan,
-      child: Text(
-        clan.name,
-        style: TextStyle(color: Colors.black87),
-      ),
-    )).toList(),
-    onChanged: _onClanChanged,
-    prefixIcon: Icons.groups,
-    enabled: _filteredClans.isNotEmpty,
-    isLoading: _isLoadingClans, // Use the new isLoading parameter
-  ),
-),
+          // Clan Dropdown
+          Container(
+            decoration: BoxDecoration(
+              color: isDark ? Colors.grey.shade900 : Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(12),
+              // border: Border.all(
+              //   color: isDark ? Colors.green.shade700.withOpacity(0.5) : Colors.grey.shade300,
+              //   width: 1.5,
+              // ),
+            ),
+            child: Theme(
+              data: Theme.of(context).copyWith(
+                hintColor: isDark ? Colors.green.shade900 : Colors.grey.shade600,
+                canvasColor: isDark ? Colors.grey.shade900 : Colors.white,
+
+              ),
+              child: CustomDropdownSufix<Clan>(
+                label: '',
+                value: _selectedClan,
+                hint: 'اختر العشيرة',
+                items: _filteredClans.map((clan) => DropdownMenuItem<Clan>(
+                  value: clan,
+                  child: Text(
+                    clan.name,
+                    style: TextStyle(
+                      color:  Colors.black87,
+                    ),
+                  ),
+                )).toList(),
+                onChanged: _onClanChanged,
+                prefixIcon: Icons.groups,
+                enabled: _filteredClans.isNotEmpty,
+                isLoading: _isLoadingClans,
+              ),
+            ),
+          ),
           
           // No clans message
           if (_selectedCounty != null && _filteredClans.isEmpty) ...[
             SizedBox(height: screenHeight * 0.02),
             Container(
-              padding: EdgeInsets.all(12),
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.grey.shade100,
+                color: isDark 
+                    ? Colors.grey.shade800.withOpacity(0.5)
+                    : Colors.grey.shade100,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade300),
+                border: Border.all(
+                  color: isDark ? Colors.grey.shade700 : Colors.grey.shade300,
+                ),
               ),
               child: Row(
                 children: [
                   Icon(
                     Icons.info_outline,
-                    color: Colors.grey.shade700,
+                    color: isDark ? Colors.green.shade400 : Colors.grey.shade700,
                     size: infoFontSize.clamp(16.0, 20.0),
                   ),
-                  SizedBox(width: 12),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       'لا توجد عشائر مسجلة في هذا القصر حالياً',
                       style: TextStyle(
-                        color: Colors.grey.shade800,
+                        color: isDark ? Colors.white70 : Colors.grey.shade800,
                         fontSize: infoFontSize.clamp(12.0, 14.0),
                       ),
                     ),
@@ -473,7 +556,7 @@ Theme(
               child: Padding(
                 padding: EdgeInsets.symmetric(vertical: screenHeight * 0.02),
                 child: CircularProgressIndicator(
-                  color: Colors.teal.shade700,
+                  color: isDark ? Colors.green.shade400 : Colors.green.shade700,
                 ),
               ),
             ),
@@ -484,6 +567,7 @@ Theme(
 
   // Build acceptance time card
   Widget _buildAcceptanceTimeCard(
+    bool isDark,
     double screenWidth,
     double screenHeight,
     double titleFontSize,
@@ -495,29 +579,53 @@ Theme(
     return Container(
       padding: EdgeInsets.all(screenWidth * 0.05),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? Colors.grey.shade900 : Colors.white,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.15),
+            color: isDark 
+                ? Colors.green.shade900.withOpacity(0.3)
+                : Colors.black.withOpacity(0.1),
             blurRadius: 20,
-            offset: Offset(0, 10),
+            offset: const Offset(0, 10),
           ),
         ],
+        border: isDark 
+            ? Border.all(color: Colors.green.shade800.withOpacity(0.3), width: 1)
+            : null,
       ),
       child: Column(
         children: [
           // Icon
           Container(
-            padding: EdgeInsets.all(20),
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: Colors.teal.shade50,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: isDark
+                    ? [
+                        Colors.green.shade800,
+                        Colors.green.shade900,
+                      ]
+                    : [
+                        Colors.green.shade600,
+                        Colors.green.shade800,
+                      ],
+              ),
               shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.green.shade300.withOpacity(0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
-            child: Icon(
+            child: const Icon(
               Icons.access_time,
               size: 40,
-              color: Colors.teal.shade700,
+              color: Colors.white,
             ),
           ),
           
@@ -527,7 +635,7 @@ Theme(
           Text(
             'أوقات الاستقبال في العشيرة',
             style: TextStyle(
-              color: Colors.teal.shade700,
+              color: isDark ? Colors.green.shade300 : Colors.green.shade800,
               fontSize: titleFontSize.clamp(16.0, 20.0),
               fontWeight: FontWeight.bold,
             ),
@@ -541,7 +649,11 @@ Theme(
             width: screenWidth * 0.15,
             height: 3,
             decoration: BoxDecoration(
-              color: Colors.teal.shade300,
+              gradient: LinearGradient(
+                colors: isDark
+                    ? [Colors.green.shade700, Colors.green.shade500]
+                    : [Colors.green.shade400, Colors.green.shade600],
+              ),
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -552,7 +664,7 @@ Theme(
           Text(
             _selectedClan!.name,
             style: TextStyle(
-              color: Colors.grey.shade800,
+              color: isDark ? Colors.white : Colors.grey.shade800,
               fontSize: messageFontSize.clamp(14.0, 18.0),
               fontWeight: FontWeight.w600,
             ),
@@ -563,6 +675,7 @@ Theme(
           
           // Day info
           _buildInfoRow(
+            isDark,
             Icons.calendar_today,
             'اليوم',
             acceptanceInfo['day']!,
@@ -573,6 +686,7 @@ Theme(
           
           // Time info
           _buildInfoRow(
+            isDark,
             Icons.access_time,
             'الوقت',
             acceptanceInfo['time']!,
@@ -581,27 +695,67 @@ Theme(
           
           SizedBox(height: screenHeight * 0.025),
           
-          // Note
+          // Contact Note
           Container(
-            padding: EdgeInsets.all(12),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.amber.shade50,
+              color: isDark 
+                  ? Colors.amber.shade900.withOpacity(0.2)
+                  : Colors.amber.shade50,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.amber.shade200),
+              border: Border.all(
+                color: isDark ? Colors.amber.shade700 : Colors.amber.shade200,
+              ),
             ),
             child: Row(
               children: [
                 Icon(
                   Icons.info_outline,
-                  color: Colors.amber.shade700,
+                  color: isDark ? Colors.amber.shade400 : Colors.amber.shade700,
                   size: infoFontSize.clamp(16.0, 20.0),
                 ),
-                SizedBox(width: 12),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'يرجى التواصل مع عشيرتك في الأوقات المحددة للحجز',
+                    'للحجز يرجى التواصل مع عشيرتك',
                     style: TextStyle(
-                      color: Colors.amber.shade900,
+                      color: isDark ? Colors.amber.shade200 : Colors.amber.shade900,
+                      fontSize: infoFontSize.clamp(12.0, 14.0),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          SizedBox(height: screenHeight * 0.015),
+          
+          // Development Note
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: isDark 
+                  ? Colors.blue.shade900.withOpacity(0.2)
+                  : Colors.blue.shade50,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isDark ? Colors.blue.shade700 : Colors.blue.shade200,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.construction_outlined,
+                  color: isDark ? Colors.blue.shade400 : Colors.blue.shade700,
+                  size: infoFontSize.clamp(16.0, 20.0),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'نعمل على تطوير هذه الميزة',
+                    style: TextStyle(
+                      color: isDark ? Colors.blue.shade200 : Colors.blue.shade900,
                       fontSize: infoFontSize.clamp(12.0, 14.0),
                       fontWeight: FontWeight.w500,
                     ),
@@ -617,30 +771,35 @@ Theme(
 
   // Build info row
   Widget _buildInfoRow(
+    bool isDark,
     IconData icon,
     String label,
     String value,
     double fontSize,
   ) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.grey.shade50,
+        color: isDark 
+            ? Colors.grey.shade800.withOpacity(0.5)
+            : Colors.grey.shade50,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(
+          color: isDark ? Colors.grey.shade700 : Colors.grey.shade200,
+        ),
       ),
       child: Row(
         children: [
           Icon(
             icon,
-            color: Colors.teal.shade700,
+            color: isDark ? Colors.green.shade400 : Colors.green.shade700,
             size: fontSize.clamp(18.0, 22.0),
           ),
-          SizedBox(width: 12),
+          const SizedBox(width: 12),
           Text(
             '$label: ',
             style: TextStyle(
-              color: Colors.grey.shade600,
+              color: isDark ? Colors.green.shade300 : Colors.grey.shade600,
               fontSize: fontSize.clamp(13.0, 15.0),
               fontWeight: FontWeight.w500,
             ),
@@ -649,7 +808,7 @@ Theme(
             child: Text(
               value,
               style: TextStyle(
-                color: Colors.grey.shade800,
+                color: isDark ? Colors.white : Colors.grey.shade800,
                 fontSize: fontSize.clamp(14.0, 16.0),
                 fontWeight: FontWeight.bold,
               ),

@@ -17,7 +17,7 @@ if (keystorePropertiesFile.exists()) {
 
 
 android {
-    namespace = "app.MeDev.ASULI"
+    namespace = "com.iTriDev.ASULI"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -37,9 +37,9 @@ android {
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
 
-        applicationId = "app.MeDev.ASULI"
+        applicationId = "com.iTriDev.ASULI"
         minSdk = flutter.minSdkVersion
-        targetSdk = 35
+        targetSdk = 34
         //versionCode = 1
         //versionName = "1.0.0"
 
@@ -68,8 +68,10 @@ android {
         release {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
-            // signingConfig = signingConfigs.getByName("release")
+            // signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
+            // signingConfig signingConfigs.release
+
 
         }
     }

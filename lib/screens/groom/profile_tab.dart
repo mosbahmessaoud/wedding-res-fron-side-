@@ -582,7 +582,7 @@ void _showNewsClan() {
               const Divider(),
               const SizedBox(height: 8),
               const Text(
-                'معلومات المطور:',
+                ' معلومات فريق التطوير:',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
@@ -591,7 +591,7 @@ void _showNewsClan() {
                   const Icon(Icons.email, size: 18),
                   const SizedBox(width: 8),
                   const Expanded(
-                    child: Text('mosbah07messaoud@gmail.com'),
+                    child: Text('itridev.soft@gmail.com'),
                   ),
                 ],
               ),
@@ -651,7 +651,7 @@ void _showNewsClan() {
             children: [
               
               // const Text(
-              //   'معلومات المطور:',
+              //   'معلومات فريق  التطوير:',
               //   style: TextStyle(fontWeight: FontWeight.bold),
               // ),
               // const SizedBox(height: 8),
@@ -660,7 +660,7 @@ void _showNewsClan() {
                   const Icon(Icons.email, size: 18),
                   const SizedBox(width: 8),
                   const Expanded(
-                    child: Text('mosbah07messaoud@gmail.com'),
+                    child: Text('itridev.soft@gmail.com'),
                   ),
                 ],
               ),

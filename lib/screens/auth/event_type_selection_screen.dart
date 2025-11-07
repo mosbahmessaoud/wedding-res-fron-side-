@@ -166,7 +166,7 @@ class _GradientBackground extends StatelessWidget {
                           // Event Cards
                           _EventCard(
                             icon: Icons.favorite_border,
-                            title: 'حفل زفاف',
+                            title: 'حفل أيْرِيضْ',
                             subtitle: 'إحياء حفل زفاف',
                             isDark: isDark,
                             onTap: () => onNavigate('wedding'),
@@ -176,8 +176,8 @@ class _GradientBackground extends StatelessWidget {
                           
                           _EventCard(
                             icon: Icons.favorite_outlined,
-                            title: 'حفل الله أكبر',
-                            subtitle: 'إحياء حفل الله أكبر',
+                            title: 'حفل اللَّه أَكْبَر',
+                            subtitle: 'إحياء حفل اللَّه أَكْبَر',
                             isDark: isDark,
                             onTap: () => onNavigate('religious'),
                           ),

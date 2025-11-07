@@ -104,17 +104,10 @@ class _GradientBackground extends StatelessWidget {
           stops: const [0.0, 0.5, 1.0],
         ),
       ),
-      child: SafeArea(
-        child: Stack(
-          children: [
-            // Theme Toggle
-            Positioned(
-              top: 8,
-              left: 16,
-              child: ThemeToggleButton(),
-            ),
-            // Scrollable Content
-            LayoutBuilder(
+      child: Stack(
+        children: [
+          SafeArea(
+            child: LayoutBuilder(
               builder: (context, constraints) {
                 return SingleChildScrollView(
                   physics: const BouncingScrollPhysics(),
@@ -214,8 +207,15 @@ class _GradientBackground extends StatelessWidget {
                 );
               },
             ),
-          ],
-        ),
+          ),
+          
+          // Theme Toggle - Outside SafeArea for better accessibility
+          const Positioned(
+            top: 48,
+            left: 16,
+            child: ThemeToggleButton(),
+          ),
+        ],
       ),
     );
   }

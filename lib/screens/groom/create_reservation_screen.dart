@@ -71,6 +71,8 @@ class CreateReservationScreenState extends State<CreateReservationScreen> {
   Map<String, dynamic>? _originClanSettings;
   Map<String, dynamic>? _selectedClanSettings;  
 
+  bool _isLoadingClans = false;
+  bool _isLoadingHalls = false;
 
   @override
   void initState() {
@@ -985,8 +987,10 @@ Future<void> _checkConnectivityAndLoad() async {
   
   await _loadData();
 }
-
+// 3. Update _loadData method (add loading state for clans)
 Future<void> _loadData() async {
+  setState(() => _isLoadingClans = true);
+  
   try {
     print('Loading user profile...');
     final profile = await ApiService.getProfile();
@@ -1020,6 +1024,7 @@ Future<void> _loadData() async {
       
       _haiaCommittees = haiaCommittees;
       _madaehCommittees = madaehCommittees;
+      _isLoadingClans = false;
     });
     
     print('All data loaded successfully');
@@ -1027,6 +1032,9 @@ Future<void> _loadData() async {
   } catch (e, stackTrace) {
     print('Error in _loadData: $e');
     print('Stack trace: $stackTrace');
+    
+    setState(() => _isLoadingClans = false);
+    
     if (mounted) {
       _showMessageDialog(
         title: 'خطأ في تحميل البيانات',
@@ -1079,14 +1087,19 @@ void _showNoInternetDialog() {
 
 
 
- Future<void> _loadHallsForClan(int clanId) async {
+Future<void> _loadHallsForClan(int clanId) async {
+  setState(() => _isLoadingHalls = true);
+  
   try {
     final halls = await ApiService.getHallsByClan(clanId);
     setState(() {
       _halls = halls;
       _selectedHall = null;
+      _isLoadingHalls = false;
     });
   } catch (e) {
+    setState(() => _isLoadingHalls = false);
+    
     if (mounted) {
       _showMessageDialog(
         title: 'خطأ في تحميل القاعات',
@@ -1545,7 +1558,7 @@ Widget _buildClanAndHallSelectionStep() {
         // Clan Selection
 DropdownButtonFormField<Map<String, dynamic>>(
   value: _selectedClan,
-  isExpanded: true, // Added to prevent overflow
+  isExpanded: true,
   decoration: InputDecoration(
     labelText: 'العشيرة *',
     prefixIcon: const Icon(Icons.group),
@@ -1572,10 +1585,21 @@ DropdownButtonFormField<Map<String, dynamic>>(
   }).toList(),
   onChanged: _onClanSelected,
   validator: (value) => value == null ? 'العشيرة مطلوبة' : null,
+  icon: _isLoadingClans 
+      ? SizedBox(
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(
+            strokeWidth: 2.5,
+            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+          ),
+        )
+      : const Icon(Icons.keyboard_arrow_down),
 ),
 
 const SizedBox(height: 24),
-// Hall Selection
+
+// 5. Updated Hall Dropdown with loading icon
 if (_selectedClan != null) ...[
   DropdownButtonFormField<Map<String, dynamic>>(
     value: _selectedHall,
@@ -1586,7 +1610,6 @@ if (_selectedClan != null) ...[
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
       helperText: _halls.isEmpty ? 'لا توجد قاعات متاحة لهذه العشيرة' : 'القاعات المتاحة للعشيرة المختارة',
     ),
-    // This shows when dropdown is closed (selected value)
     selectedItemBuilder: (BuildContext context) {
       return _halls.map<Widget>((hall) {
         return LayoutBuilder(
@@ -1604,7 +1627,6 @@ if (_selectedClan != null) ...[
         );
       }).toList();
     },
-    // This shows when dropdown is open (menu items)
     items: _halls.map((hall) {
       return DropdownMenuItem<Map<String, dynamic>>(
         value: hall,
@@ -1640,6 +1662,16 @@ if (_selectedClan != null) ...[
     }).toList(),
     onChanged: (value) => setState(() => _selectedHall = value),
     validator: (value) => value == null ? 'القاعة مطلوبة' : null,
+    icon: _isLoadingHalls 
+        ? SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(
+              strokeWidth: 2.5,
+              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+            ),
+          )
+        : const Icon(Icons.keyboard_arrow_down),
   ),
 ],
         

@@ -2,8 +2,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:wedding_reservation_app/screens/auth/event_type_selection_screen.dart';
-import '../../utils/colors.dart';
-import '../../utils/constants.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -17,13 +15,14 @@ class _SplashScreenState extends State<SplashScreen>
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
+  late Animation<double> _lightAnimation;
 
   @override
   void initState() {
     super.initState();
     
     _animationController = AnimationController(
-      duration: const Duration(milliseconds: 1200), // Reduced from 2000ms
+      duration: const Duration(milliseconds: 3000),
       vsync: this,
     );
 
@@ -32,21 +31,29 @@ class _SplashScreenState extends State<SplashScreen>
       end: 1.0,
     ).animate(CurvedAnimation(
       parent: _animationController,
-      curve: Curves.easeInOut,
+      curve: const Interval(0.0, 0.3, curve: Curves.easeInOut),
     ));
 
     _scaleAnimation = Tween<double>(
-      begin: 0.85, // Reduced from 0.8 for less dramatic effect
+      begin: 0.85,
       end: 1.0,
     ).animate(CurvedAnimation(
       parent: _animationController,
-      curve: Curves.easeOut, // Changed from elasticOut for smoother animation
+      curve: const Interval(0.0, 0.3, curve: Curves.easeOut),
     ));
 
+    _lightAnimation = Tween<double>(
+      begin: -2.0,
+      end: 2.0,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeInOut,
+    ));
+
+    // Start animation only once (no repeat)
     _animationController.forward();
 
-    // Reduced delay from 8000ms to 3000ms
-    Future.delayed(const Duration(milliseconds: 3000), () {
+    Future.delayed(const Duration(milliseconds: 9000), () {
       if (mounted) {
         Navigator.of(context).pushReplacement(
           PageRouteBuilder(
@@ -73,11 +80,14 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Scaffold(
-      backgroundColor: AppColors.primary,
       body: _SplashContent(
         fadeAnimation: _fadeAnimation,
         scaleAnimation: _scaleAnimation,
+        lightAnimation: _lightAnimation,
+        isDark: isDark,
       ),
     );
   }
@@ -87,124 +97,259 @@ class _SplashScreenState extends State<SplashScreen>
 class _SplashContent extends StatelessWidget {
   final Animation<double> fadeAnimation;
   final Animation<double> scaleAnimation;
+  final Animation<double> lightAnimation;
+  final bool isDark;
 
   const _SplashContent({
     required this.fadeAnimation,
     required this.scaleAnimation,
+    required this.lightAnimation,
+    required this.isDark,
   });
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: fadeAnimation,
-      builder: (context, child) {
-        return Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                AppColors.primary,
-                AppColors.primary.withOpacity(0.8),
-                AppColors.secondary.withOpacity(0.6),
-              ],
-            ),
-          ),
-          child: Center(
-            child: FadeTransition(
-              opacity: fadeAnimation,
-              child: ScaleTransition(
-                scale: scaleAnimation,
-                child: const _SplashLogo(),
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: isDark
+              ? [
+                  Colors.black.withOpacity(0.7),
+                  Colors.green.shade900.withOpacity(0.6),
+                  Colors.black.withOpacity(0.8),
+                ]
+              : [
+                  Colors.white,
+                  Colors.white.withOpacity(0.85),
+                  Colors.white,
+                ],
+          stops: const [0.0, 0.5, 1.0],
+        ),
+      ),
+      child: SafeArea(
+        child: Stack(
+          children: [
+            // Theme Toggle Button
+            // const Positioned(
+            //   top: 8,
+            //   left: 16,
+            //   child: ThemeToggleButton(),
+            // ),
+            
+            // Scrollable Main Content
+            SingleChildScrollView(
+              physics: const ClampingScrollPhysics(),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: MediaQuery.of(context).size.height - 
+                      MediaQuery.of(context).padding.top - 
+                      MediaQuery.of(context).padding.bottom,
+                ),
+                child: IntrinsicHeight(
+                  child: Center(
+                    child: FadeTransition(
+                      opacity: fadeAnimation,
+                      child: ScaleTransition(
+                        scale: scaleAnimation,
+                        child: _SplashLogo(
+                          lightAnimation: lightAnimation,
+                          isDark: isDark,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ),
-          ),
-        );
-      },
+          ],
+        ),
+      ),
     );
   }
 }
 
-// Separate const widget for logo content
+// Separate widget for logo content with light animation using ShaderMask
 class _SplashLogo extends StatelessWidget {
-  const _SplashLogo();
+  final Animation<double> lightAnimation;
+  final bool isDark;
+  
+  const _SplashLogo({
+    required this.lightAnimation,
+    required this.isDark,
+  });
+
+  // Helper method to create shader gradient with customizable parameters
+  Shader _createLightShader(
+    Rect bounds, 
+    double animValue, 
+    bool isDark, {
+    double spreadWidth = 0.3,
+    double brightnessIntensity = 1.0,
+  }) {
+    return LinearGradient(
+      begin: Alignment.centerLeft,
+      end: Alignment.centerRight,
+      colors: isDark
+          ? [
+              Colors.green.shade300,
+              Colors.green.shade300,
+              Colors.green.shade100,
+              Colors.white,
+              Colors.green.shade100,
+              Colors.green.shade300,
+              Colors.green.shade300,
+            ]
+          : [
+              Colors.green.shade800,
+              Colors.green.shade800,
+              Colors.green.shade400,
+              Colors.green.shade200,
+              Colors.green.shade400,
+              Colors.green.shade800,
+              Colors.green.shade800,
+            ],
+      stops: [
+        0.0,
+        (animValue - spreadWidth).clamp(0.0, 1.0),
+        (animValue - spreadWidth / 2).clamp(0.0, 1.0),
+        animValue.clamp(0.0, 1.0),
+        (animValue + spreadWidth / 2).clamp(0.0, 1.0),
+        (animValue + spreadWidth).clamp(0.0, 1.0),
+        1.0,
+      ],
+    ).createShader(bounds);
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        // Wedding Icon with simplified shadow
-        Container(
-          width: 120,
-          height: 120,
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.15),
-            borderRadius: BorderRadius.circular(60),
-            border: Border.all(
-              color: Colors.white.withOpacity(0.3),
-              width: 2,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.white.withOpacity(0.1),
-                blurRadius: 8, // Reduced blur
-                offset: const Offset(0, 4),
+    return AnimatedBuilder(
+      animation: lightAnimation,
+      builder: (context, child) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 20.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Brand Name - Arabic with Light Sweep Effect
+              ShaderMask(
+                blendMode: BlendMode.srcIn,
+                shaderCallback: (bounds) => _createLightShader(
+                  bounds,
+                  lightAnimation.value,
+                  isDark,
+                  spreadWidth: 0.35,
+                  brightnessIntensity: 1.2,
+                ),
+                child: Text(
+                  'أسُولِي',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 56,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 2,
+                    height: 1.5,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              
+              const SizedBox(height: 12),
+              
+              // Brand Name - English with Light Sweep Effect (slightly delayed)
+              ShaderMask(
+                blendMode: BlendMode.srcIn,
+                shaderCallback: (bounds) => _createLightShader(
+                  bounds,
+                  (lightAnimation.value + 0.15).clamp(-2.0, 2.0),
+                  isDark,
+                  spreadWidth: 0.28,
+                  brightnessIntensity: 1.1,
+                ),
+                child: Text(
+                  'ASULI',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 28,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 6,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              
+              const SizedBox(height: 24),
+              
+              // Subtitle with Light Sweep Effect (offset animation for cascade effect)
+              ShaderMask(
+                blendMode: BlendMode.srcIn,
+                shaderCallback: (bounds) => _createLightShader(
+                  bounds,
+                  (lightAnimation.value - 0.2).clamp(-2.0, 2.0),
+                  isDark,
+                  spreadWidth: 0.32,
+                  brightnessIntensity: 1.0,
+                ),
+                child: Text(
+                  'نظام متكامل لحجز مواعيد الأعراس',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w400,
+                    height: 1.5,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              
+              const SizedBox(height: 60),
+              
+              // Loading Indicator with subtle glow effect
+              Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    // BoxShadow(
+                    //   color: (isDark ? Colors.green.shade300 : Colors.green.shade700)
+                    //       .withOpacity(0.3),
+                    //   blurRadius: 20,
+                    //   spreadRadius: 2,
+                    // ),
+                  ],
+                ),
+                child: SpinKitFadingCircle(
+                  color: isDark ? Colors.green.shade300 : Colors.green.shade700,
+                  size: 45.0,
+                ),
+              ),
+              
+              const SizedBox(height: 24),
+              
+              // Loading text with light sweep (faster animation)
+              ShaderMask(
+                blendMode: BlendMode.srcIn,
+                shaderCallback: (bounds) => _createLightShader(
+                  bounds,
+                  (lightAnimation.value + 0.3).clamp(-2.0, 2.0),
+                  isDark,
+                  spreadWidth: 0.25,
+                  brightnessIntensity: 0.95,
+                ),
+                child: Text(
+                  'جاري التحميل...',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 0.5,
+                  ),
+                ),
               ),
             ],
           ),
-          child: const Icon(
-            Icons.favorite,
-            size: 60,
-            color: Colors.white,
-          ),
-        ),
-        
-        const SizedBox(height: 30),
-        
-        // App Title
-        Text(
-          AppConstants.appName,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 28,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 0.5,
-          ),
-          textAlign: TextAlign.center,
-        ),
-        
-        const SizedBox(height: 10),
-        
-        // Subtitle
-        Text(
-          'نظام متكامل لحجز مواعيد الأعراس',
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.9),
-            fontSize: 16,
-            fontWeight: FontWeight.w400,
-          ),
-          textAlign: TextAlign.center,
-        ),
-        
-        const SizedBox(height: 50),
-        
-        // Loading Indicator - Optimized
-        const SpinKitFadingCircle(
-          color: Colors.white,
-          size: 45.0, // Slightly reduced size
-        ),
-        
-        const SizedBox(height: 20),
-        
-        Text(
-          'جاري التحميل...',
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.8),
-            fontSize: 14,
-          ),
-        ),
-      ],
+        );
+      },
     );
   }
 }

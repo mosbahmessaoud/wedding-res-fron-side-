@@ -6,12 +6,14 @@ import 'package:wedding_reservation_app/screens/super%20admin/clans_tab.dart';
 import 'package:wedding_reservation_app/screens/super%20admin/create_clan_admin_screen.dart';
 import 'package:wedding_reservation_app/screens/super%20admin/haia_tab.dart';
 import 'package:wedding_reservation_app/screens/super%20admin/madaih_tab.dart';
+import 'package:wedding_reservation_app/screens/super%20admin/notifications_tab.dart';
 import 'package:wedding_reservation_app/screens/super%20admin/otp_verification_screen.dart';
 import 'package:wedding_reservation_app/services/api_service.dart';
+import 'package:wedding_reservation_app/widgets/theme_toggle_button.dart';
+
 import '../../utils/colors.dart';
 import '../../utils/constants.dart';
 import '../super admin/counties_tab.dart';
-import 'package:wedding_reservation_app/widgets/theme_toggle_button.dart';
 
 class SuperAdminHomeScreen extends StatefulWidget {
   const SuperAdminHomeScreen({super.key});
@@ -214,6 +216,8 @@ Widget build(BuildContext context) {
           ClansTab(),
           MadaihTab(),
           HaiaTab(),
+          NotificationsTab(), // ← Add this line
+
           _buildProfileTab(isDark),
         ],
       ),
@@ -337,6 +341,8 @@ Widget _buildModernBottomNav(bool isTablet, bool isDesktop) {
             _buildNavItem(2, Icons.groups_outlined, Icons.groups, 'العشائر', isTablet),
             _buildNavItem(3, Icons.business_outlined, Icons.business, 'المدايح', isTablet),
             _buildNavItem(4, Icons.group_work_outlined, Icons.group_work, 'الهيئات', isTablet),
+            _buildNavItem(5, Icons.notifications_outlined, Icons.notifications, 'إشعارات', isTablet), // ← Add this line
+
             _buildNavItem(5, Icons.person_outline, Icons.person, 'الملف', isTablet),
           ],
         ),
@@ -964,6 +970,19 @@ Widget _buildActionGrid(bool isTablet, bool isDesktop) {
         });
       },
     },
+        // ← Add this new action card
+    {
+      'icon': Icons.notifications_active_outlined,
+      'title': 'إرسال إشعارات',
+      'subtitle': 'إرسال إشعارات للمستخدمين',
+      'color': Colors.red,
+      'onTap': () {
+        setState(() {
+          _currentIndex = 5;
+        });
+      },
+    },
+    // ← End of new action card
     {
       'icon': Icons.phone_android,
       'title': 'التحقق من الهاتف',

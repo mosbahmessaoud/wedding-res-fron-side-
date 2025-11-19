@@ -1,29 +1,22 @@
 // lib/screens/home/groom_home_screen.dart
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:wedding_reservation_app/screens/groom/food_menu_tab.dart';
-import 'package:wedding_reservation_app/screens/groom/food_menu_tab_Groom.dart';
 import 'package:wedding_reservation_app/screens/groom/clan_rules_view_page.dart';
+import 'package:wedding_reservation_app/screens/groom/food_menu_tab_Groom.dart';
 import 'package:wedding_reservation_app/services/api_service.dart';
+
+import '../../providers/theme_provider.dart';
 import '../../utils/colors.dart';
 import '../../utils/constants.dart';
-import '../../providers/theme_provider.dart';
-import '../../widgets/theme_toggle_button.dart';
+import '../../widgets/custom_paint.dart';
 import 'create_reservation_screen.dart';
 import 'home_tab.dart';
-import 'reservations_tab.dart';
 import 'profile_tab.dart';
-// 
-import 'dart:ui';
-
-import 'package:flutter/material.dart';
-import '../../constants/color.dart';
-import '../../constants/text_style.dart';
-import '../../data/model.dart';
-import '../../widgets/custom_paint.dart';
+import 'reservations_tab.dart';
 
 class GroomHomeScreen extends StatefulWidget {
   final int initialTabIndex;
@@ -46,6 +39,10 @@ class _GroomHomeScreenState extends State<GroomHomeScreen> {
   bool _isInitialLoad = true;
   final Map<int, bool> _tabLoadingStatus = {};
   final Map<int, DateTime> _lastFetchTime = {};
+
+  int _unreadNotificationCount = 0;
+  Timer? _notificationPollTimer;
+  bool _isLoadingNotifications = false;
 
   final GlobalKey<ReservationsTabState> _reservationsTabKey = GlobalKey<ReservationsTabState>();
   final GlobalKey<ProfileTabState> _profileTabKey = GlobalKey<ProfileTabState>();
@@ -75,7 +72,434 @@ class _GroomHomeScreenState extends State<GroomHomeScreen> {
     // MODIFIED: Load initial tab data in background
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _refreshCurrentTabInBackground(_currentIndex);
+      _loadUnreadNotificationCount(); // Load initial notification count
+      _startNotificationPolling(); // Start polling for new notifications
+      
     });
+  }
+
+
+  /// Load unread notification count
+  Future<void> _loadUnreadNotificationCount() async {
+    if (_isLoadingNotifications) return;
+    
+    setState(() {
+      _isLoadingNotifications = true;
+    });
+
+    try {
+      final count = await ApiService.getUnreadNotificationCount();
+      if (mounted) {
+        setState(() {
+          _unreadNotificationCount = count;
+        });
+      }
+    } catch (e) {
+      print('Error loading notification count: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingNotifications = false;
+        });
+      }
+    }
+  }
+
+  /// Start polling for new notifications every 30 seconds
+  void _startNotificationPolling() {
+    _notificationPollTimer?.cancel();
+    _notificationPollTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (timer) {
+        if (mounted) {
+          _loadUnreadNotificationCount();
+        } else {
+          timer.cancel();
+        }
+      },
+    );
+  }
+
+  /// Navigate to notifications screen
+  void _navigateToNotifications() {
+    // Navigate to a notifications screen (you'll need to create this)
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => NotificationsScreen(
+          onNotificationRead: () {
+            // Refresh count when notification is read
+            _loadUnreadNotificationCount();
+          },
+        ),
+      ),
+    );
+  }
+
+  /// Show notifications dialog (alternative to full screen)
+  Future<void> _showNotificationsDialog(bool isDark) async {
+    try {
+      // Load notifications
+      final notifications = await ApiService.getNotifications(
+        unreadOnly: false,
+        limit: 20,
+      );
+
+      if (!mounted) return;
+
+      showDialog(
+        context: context,
+        builder: (context) => Dialog(
+          backgroundColor: Colors.transparent,
+          child: Container(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.7,
+              maxWidth: 500,
+            ),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: isDark 
+                        ? Colors.grey[850] 
+                        : Colors.grey[100],
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(20),
+                      topRight: Radius.circular(20),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.notifications_rounded,
+                        color: AppColors.primary,
+                        size: 24,
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        'الإشعارات',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 18,
+                          color: isDark ? Colors.white : Colors.black87,
+                        ),
+                      ),
+                      const Spacer(),
+                      if (_unreadNotificationCount > 0)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            '$_unreadNotificationCount جديد',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      IconButton(
+                        icon: Icon(
+                          Icons.close,
+                          color: isDark ? Colors.white70 : Colors.black54,
+                        ),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                ),
+                
+                // Notifications List
+                Flexible(
+                  child: notifications.isEmpty
+                      ? Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(32),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.notifications_none_rounded,
+                                  size: 64,
+                                  color: isDark 
+                                      ? Colors.grey[700] 
+                                      : Colors.grey[300],
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'لا توجد إشعارات',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: isDark 
+                                        ? Colors.grey[400] 
+                                        : Colors.grey[600],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      : ListView.separated(
+                          padding: const EdgeInsets.all(16),
+                          shrinkWrap: true,
+                          itemCount: notifications.length,
+                          separatorBuilder: (context, index) => const SizedBox(height: 12),
+                          itemBuilder: (context, index) {
+                            final notification = notifications[index];
+                            return _buildNotificationItem(
+                              notification: notification,
+                              isDark: isDark,
+                              onTap: () async {
+                                // Mark as read
+                                if (notification['is_read'] == false) {
+                                  try {
+                                    await ApiService.markNotificationAsRead(
+                                      notification['id'],
+                                    );
+                                    _loadUnreadNotificationCount();
+                                  } catch (e) {
+                                    print('Error marking notification as read: $e');
+                                  }
+                                }
+                              },
+                            );
+                          },
+                        ),
+                ),
+                
+                // Mark All as Read Button
+                if (_unreadNotificationCount > 0)
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: isDark 
+                          ? Colors.grey[850] 
+                          : Colors.grey[100],
+                      borderRadius: const BorderRadius.only(
+                        bottomLeft: Radius.circular(20),
+                        bottomRight: Radius.circular(20),
+                      ),
+                    ),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          try {
+                            await ApiService.markAllNotificationsAsRead();
+                            _loadUnreadNotificationCount();
+                            Navigator.pop(context);
+                          } catch (e) {
+                            print('Error marking all as read: $e');
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          'تعليم الكل كمقروء',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      );
+    } catch (e) {
+      print('Error loading notifications: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('فشل في تحميل الإشعارات: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Build notification item widget
+  Widget _buildNotificationItem({
+    required Map<String, dynamic> notification,
+    required bool isDark,
+    required VoidCallback onTap,
+  }) {
+    final isUnread = notification['is_read'] == false;
+    final notificationType = notification['notification_type'] ?? 'general_announcement';
+    
+    // Get icon and color based on notification type
+    IconData icon;
+    Color iconColor;
+    
+    switch (notificationType) {
+      case 'reservation_approved':
+        icon = Icons.check_circle_outline;
+        iconColor = Colors.green;
+        break;
+      case 'reservation_rejected':
+        icon = Icons.cancel_outlined;
+        iconColor = Colors.red;
+        break;
+      case 'reservation_cancelled':
+        icon = Icons.event_busy_outlined;
+        iconColor = Colors.orange;
+        break;
+      case 'payment_reminder':
+        icon = Icons.payment_outlined;
+        iconColor = Colors.blue;
+        break;
+      case 'reservation_reminder':
+        icon = Icons.alarm_outlined;
+        iconColor = Colors.purple;
+        break;
+      case 'system_update':
+        icon = Icons.system_update_outlined;
+        iconColor = Colors.teal;
+        break;
+      default:
+        icon = Icons.info_outline;
+        iconColor = AppColors.primary;
+    }
+
+    final createdAt = DateTime.tryParse(notification['created_at'] ?? '');
+    final timeAgo = createdAt != null ? _getTimeAgo(createdAt) : '';
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isUnread
+              ? (isDark 
+                  ? AppColors.primary.withOpacity(0.1) 
+                  : AppColors.primary.withOpacity(0.05))
+              : (isDark ? Colors.grey[850] : Colors.grey[50]),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isUnread
+                ? AppColors.primary.withOpacity(0.3)
+                : (isDark ? Colors.grey[800]! : Colors.grey[200]!),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: iconColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                icon,
+                color: iconColor,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          notification['title'] ?? 'إشعار',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                            color: isDark ? Colors.white : Colors.black87,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (isUnread)
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    notification['message'] ?? '',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isDark ? Colors.grey[400] : Colors.grey[600],
+                      height: 1.3,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (timeAgo.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      timeAgo,
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: isDark ? Colors.grey[500] : Colors.grey[500],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Helper method to get relative time string
+  String _getTimeAgo(DateTime dateTime) {
+    final now = DateTime.now();
+    final difference = now.difference(dateTime);
+    
+    if (difference.inDays > 365) {
+      final years = (difference.inDays / 365).floor();
+      return 'منذ $years ${years == 1 ? 'سنة' : 'سنوات'}';
+    } else if (difference.inDays > 30) {
+      final months = (difference.inDays / 30).floor();
+      return 'منذ $months ${months == 1 ? 'شهر' : 'أشهر'}';
+    } else if (difference.inDays > 0) {
+      return 'منذ ${difference.inDays} ${difference.inDays == 1 ? 'يوم' : 'أيام'}';
+    } else if (difference.inHours > 0) {
+      return 'منذ ${difference.inHours} ${difference.inHours == 1 ? 'ساعة' : 'ساعات'}';
+    } else if (difference.inMinutes > 0) {
+      return 'منذ ${difference.inMinutes} ${difference.inMinutes == 1 ? 'دقيقة' : 'دقائق'}';
+    } else {
+      return 'الآن';
+    }
   }
 
 
@@ -341,7 +765,7 @@ void _navigateToExternalScreen(Widget screen, String title) async {
       _externalScreenTitle = null;
     });
   }
-
+   
   void _showLogoutDialog(bool isDark) {
     showDialog(
       context: context,
@@ -688,7 +1112,8 @@ Widget buildNavigationWithSafeArea(bool isDark) {
     child: navigationBar(isDark),
   );
 }
-  PreferredSizeWidget _buildSpotifyAppBar(bool isDark) {
+
+PreferredSizeWidget _buildSpotifyAppBar(bool isDark) {
     return AppBar(
       title: Text(
         _getAppBarTitle(),
@@ -723,37 +1148,62 @@ Widget buildNavigationWithSafeArea(bool isDark) {
         ),
       ),
       actions: [
-        // IconButton(
-        //   icon: Stack(
-        //     children: [
-        //       Container(
-        //         padding: const EdgeInsets.all(6),
-        //         decoration: BoxDecoration(
-        //           color: isDark ? Colors.grey[800] : Colors.grey[100],
-        //           borderRadius: BorderRadius.circular(8),
-        //         ),
-        //         child: Icon(
-        //           Icons.notifications_outlined,
-        //           size: 20,
-        //           color: isDark ? Colors.white : Colors.black87,
-        //         ),
-        //       ),
-        //       Positioned(
-        //         right: 4,
-        //         top: 4,
-        //         child: Container(
-        //           width: 8,
-        //           height: 8,
-        //           decoration: BoxDecoration(
-        //             color: AppColors.primary,
-        //             shape: BoxShape.circle,
-        //           ),
-        //         ),
-        //       ),
-        //     ],
-        //   ),
-        //   onPressed: () => _showNotifications(isDark),
-        // ),
+        // Notification Button with Badge
+        IconButton(
+          icon: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.grey[800] : Colors.grey[100],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.notifications_outlined,
+                  size: 20,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+              ),
+              if (_unreadNotificationCount > 0)
+                Positioned(
+                  right: 2,
+                  top: 2,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: isDark 
+                            ? const Color(0xFF1E1E1E) 
+                            : Colors.white,
+                        width: 1.5,
+                      ),
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 18,
+                      minHeight: 18,
+                    ),
+                    child: Center(
+                      child: Text(
+                        _unreadNotificationCount > 9 
+                            ? '9+' 
+                            : _unreadNotificationCount.toString(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          onPressed: () => _showNotificationsDialog(isDark),
+        ),
         const SizedBox(width: 4),
         IconButton(
           icon: Container(
@@ -786,7 +1236,6 @@ Widget buildNavigationWithSafeArea(bool isDark) {
             ),
           ),
           onPressed: () {
-            // Toggle theme using the provider
             final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
             themeProvider.toggleTheme();
           },
@@ -795,6 +1244,7 @@ Widget buildNavigationWithSafeArea(bool isDark) {
       ],
     );
   }
+
 
   Widget _buildSpotifyDrawer(bool isDark) {
     return Drawer(
@@ -1322,110 +1772,370 @@ Widget _buildExternalDrawerItem(IconData icon, String title, Widget screen, bool
     }
   }
 
-  void _showNotifications(bool isDark) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(
-          'الإشعارات',
-          style: TextStyle(
-            fontWeight: FontWeight.w700,
-            fontSize: 20,
-            color: isDark ? Colors.white : Colors.black87,
-          ),
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildNotificationItem(
-                Icons.info_rounded,
-                Colors.blue,
-                'مرحباً بك في التطبيق',
-                'نتمنى لك تجربة ممتعة في حجز قاعة زفافك',
-                isDark,
-              ),
-              const SizedBox(height: 12),
-              _buildNotificationItem(
-                Icons.update_rounded,
-                Colors.green,
-                'تحديث التطبيق',
-                'تم إضافة ميزات جديدة للتطبيق',
-                isDark,
-              ),
-            ],
-          ),
-        ),
+  // void _showNotifications(bool isDark) {
+  //   showDialog(
+  //     context: context,
+  //     builder: (context) => AlertDialog(
+  //       backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+  //       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+  //       title: Text(
+  //         'الإشعارات',
+  //         style: TextStyle(
+  //           fontWeight: FontWeight.w700,
+  //           fontSize: 20,
+  //           color: isDark ? Colors.white : Colors.black87,
+  //         ),
+  //       ),
+  //       content: SingleChildScrollView(
+  //         child: Column(
+  //           mainAxisSize: MainAxisSize.min,
+  //           children: [
+  //             _buildNotificationItem(
+  //               Icons.info_rounded,
+  //               Colors.blue,
+  //               'مرحباً بك في التطبيق',
+  //               'نتمنى لك تجربة ممتعة في حجز قاعة زفافك',
+  //               isDark,
+  //             ),
+  //             const SizedBox(height: 12),
+  //             _buildNotificationItem(
+  //               Icons.update_rounded,
+  //               Colors.green,
+  //               'تحديث التطبيق',
+  //               'تم إضافة ميزات جديدة للتطبيق',
+  //               isDark,
+  //             ),
+  //           ],
+  //         ),
+  //       ),
+  //       actions: [
+  //         TextButton(
+  //           onPressed: () => Navigator.pop(context),
+  //           style: TextButton.styleFrom(
+  //             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+  //           ),
+  //           child: Text(
+  //             'موافق',
+  //             style: TextStyle(
+  //               color: AppColors.primary,
+  //               fontWeight: FontWeight.w600,
+  //             ),
+  //           ),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
+
+  // Widget _buildNotificationItem(
+  //   IconData icon,
+  //   Color color,
+  //   String title,
+  //   String subtitle,
+  //   bool isDark,
+  // ) {
+  //   return Container(
+  //     padding: const EdgeInsets.all(12),
+  //     decoration: BoxDecoration(
+  //       color: color.withOpacity(isDark ? 0.2 : 0.1),
+  //       borderRadius: BorderRadius.circular(12),
+  //     ),
+  //     child: Row(
+  //       children: [
+  //         Container(
+  //           padding: const EdgeInsets.all(8),
+  //           decoration: BoxDecoration(
+  //             color: color,
+  //             borderRadius: BorderRadius.circular(8),
+  //           ),
+  //           child: Icon(icon, color: Colors.white, size: 20),
+  //         ),
+  //         const SizedBox(width: 12),
+  //         Expanded(
+  //           child: Column(
+  //             crossAxisAlignment: CrossAxisAlignment.start,
+  //             children: [
+  //               Text(
+  //                 title,
+  //                 style: TextStyle(
+  //                   fontWeight: FontWeight.w600,
+  //                   fontSize: 14,
+  //                   color: isDark ? Colors.white : Colors.black87,
+  //                 ),
+  //               ),
+  //               const SizedBox(height: 4),
+  //               Text(
+  //                 subtitle,
+  //                 style: TextStyle(
+  //                   fontSize: 12,
+  //                   color: isDark ? Colors.grey[400] : Colors.grey[700],
+  //                 ),
+  //               ),
+  //             ],
+  //           ),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
+}
+
+
+
+class NotificationsScreen extends StatefulWidget {
+  final VoidCallback onNotificationRead;
+  
+  const NotificationsScreen({
+    super.key,
+    required this.onNotificationRead,
+  });
+
+  @override
+  State<NotificationsScreen> createState() => _NotificationsScreenState();
+}
+
+class _NotificationsScreenState extends State<NotificationsScreen> {
+  List<dynamic> _notifications = [];
+  bool _isLoading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadNotifications();
+  }
+
+  Future<void> _loadNotifications() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final notifications = await ApiService.getNotifications(
+        unreadOnly: false,
+        limit: 50,
+      );
+      
+      if (mounted) {
+        setState(() {
+          _notifications = notifications;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Scaffold(
+      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF6F6F6),
+      appBar: AppBar(
+        title: const Text('الإشعارات'),
+        backgroundColor: isDark 
+            ? const Color(0xFF1E1E1E) 
+            : const Color.fromARGB(201, 255, 255, 255),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            ),
-            child: Text(
-              'موافق',
-              style: TextStyle(
-                color: AppColors.primary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+          IconButton(
+            icon: const Icon(Icons.done_all),
+            onPressed: () async {
+              try {
+                await ApiService.markAllNotificationsAsRead();
+                widget.onNotificationRead();
+                _loadNotifications();
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('فشل في تعليم الكل كمقروء: $e'),
+                    backgroundColor: AppColors.error,
+                  ),
+                );
+              }
+            },
+            tooltip: 'تعليم الكل كمقروء',
           ),
         ],
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.error_outline,
+                        size: 64,
+                        color: AppColors.error,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'حدث خطأ في تحميل الإشعارات',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: isDark ? Colors.white70 : Colors.black54,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: _loadNotifications,
+                        child: const Text('إعادة المحاولة'),
+                      ),
+                    ],
+                  ),
+                )
+              : _notifications.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.notifications_none_rounded,
+                            size: 64,
+                            color: isDark ? Colors.grey[700] : Colors.grey[300],
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'لا توجد إشعارات',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: isDark ? Colors.grey[400] : Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : RefreshIndicator(
+                      onRefresh: _loadNotifications,
+                      child: ListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: _notifications.length,
+                        itemBuilder: (context, index) {
+                          final notification = _notifications[index];
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: _buildNotificationCard(
+                              notification: notification,
+                              isDark: isDark,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+    );
+  }
+
+  Widget _buildNotificationCard({
+    required Map<String, dynamic> notification,
+    required bool isDark,
+  }) {
+    final isUnread = notification['is_read'] == false;
+    
+    return GestureDetector(
+      onTap: () async {
+        if (isUnread) {
+          try {
+            await ApiService.markNotificationAsRead(notification['id']);
+            widget.onNotificationRead();
+            _loadNotifications();
+          } catch (e) {
+            print('Error marking as read: $e');
+          }
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isUnread
+              ? (isDark 
+                  ? AppColors.primary.withOpacity(0.1) 
+                  : AppColors.primary.withOpacity(0.05))
+              : (isDark ? const Color(0xFF1E1E1E) : Colors.white),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isUnread
+                ? AppColors.primary.withOpacity(0.3)
+                : (isDark ? Colors.grey[800]! : Colors.grey[200]!),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    notification['title'] ?? 'إشعار',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 16,
+                      color: isDark ? Colors.white : Colors.black87,
+                    ),
+                  ),
+                ),
+                if (isUnread)
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              notification['message'] ?? '',
+              style: TextStyle(
+                fontSize: 14,
+                color: isDark ? Colors.grey[400] : Colors.grey[600],
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _formatDateTime(notification['created_at']),
+              style: TextStyle(
+                fontSize: 12,
+                color: isDark ? Colors.grey[500] : Colors.grey[500],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildNotificationItem(
-    IconData icon,
-    Color color,
-    String title,
-    String subtitle,
-    bool isDark,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: color.withOpacity(isDark ? 0.2 : 0.1),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: color,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, color: Colors.white, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                    color: isDark ? Colors.white : Colors.black87,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: isDark ? Colors.grey[400] : Colors.grey[700],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
+  String _formatDateTime(String? dateTimeStr) {
+    if (dateTimeStr == null) return '';
+    
+    try {
+      final dateTime = DateTime.parse(dateTimeStr);
+      final now = DateTime.now();
+      final difference = now.difference(dateTime);
+      
+      if (difference.inDays > 0) {
+        return 'منذ ${difference.inDays} ${difference.inDays == 1 ? 'يوم' : 'أيام'}';
+      } else if (difference.inHours > 0) {
+        return 'منذ ${difference.inHours} ${difference.inHours == 1 ? 'ساعة' : 'ساعات'}';
+      } else if (difference.inMinutes > 0) {
+        return 'منذ ${difference.inMinutes} ${difference.inMinutes == 1 ? 'دقيقة' : 'دقائق'}';
+      } else {
+        return 'الآن';
+      }
+    } catch (e) {
+      return '';
+    }
   }
 }

@@ -1,5 +1,6 @@
 // // lib/widgets/theme_toggle_button.dart
 // import 'package:flutter/material.dart';
+// import 'package:flutter/foundation.dart' show kIsWeb;
 // import 'package:provider/provider.dart';
 // import '../providers/theme_provider.dart';
 
@@ -30,8 +31,8 @@
 //     final themeProvider = Provider.of<ThemeProvider>(context);
     
 //     return SwitchListTile(
-//       title: Text('الوضع الداكن'),
-//       subtitle: Text('تفعيل المظهر الليلي'),
+//       title: const Text('الوضع الداكن'),
+//       subtitle: const Text('تفعيل المظهر الليلي'),
 //       value: themeProvider.isDarkMode,
 //       onChanged: (_) => themeProvider.toggleTheme(),
 //       secondary: Icon(
@@ -51,6 +52,7 @@
     
 //     return FloatingActionButton(
 //       onPressed: () => themeProvider.toggleTheme(),
+//       tooltip: themeProvider.isDarkMode ? 'الوضع النهاري' : 'الوضع الليلي',
 //       child: Icon(
 //         themeProvider.isDarkMode ? Icons.light_mode : Icons.dark_mode,
 //       ),

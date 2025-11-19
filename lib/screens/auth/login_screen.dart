@@ -5,7 +5,6 @@ import 'dart:io';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wedding_reservation_app/screens/auth/forgot_password_screen.dart';
 import 'package:wedding_reservation_app/screens/auth/sing_up_screen.dart';
@@ -13,14 +12,13 @@ import 'package:wedding_reservation_app/screens/auth/welcome_screen.dart';
 import 'package:wedding_reservation_app/screens/clan%20admin/home_screen.dart';
 import 'package:wedding_reservation_app/screens/groom/groom_home_screen.dart';
 import 'package:wedding_reservation_app/screens/super%20admin/home_screen.dart';
-import '../../utils/colors.dart';
+import 'package:wedding_reservation_app/services/notification_manager.dart';
+
 import '../../services/api_service.dart';
+import '../../utils/colors.dart';
 import '../../widgets/common/custom_text_field.dart' hide LoadingButton, AppColors;
-import '../../widgets/common/loading_button.dart';
 import '../../widgets/theme_toggle_button.dart';
-import '../../providers/theme_provider.dart';
-import '../groom/home_tab.dart';
-import 'signup_screen copy .dart';
+
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -219,110 +217,105 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  Future<void> _login() async {
-    if (!_formKey.currentState!.validate()) {
+Future<void> _login() async {
+  if (!_formKey.currentState!.validate()) {
+    return;
+  }
+
+  if (!mounted) return;
+  setState(() {
+    _isLoading = true;
+  });
+
+  final phoneText = _phoneController.text.trim();
+  final passwordText = _passwordController.text;
+
+  // Check internet connection
+  final hasInternet = await _checkInternetConnection();
+  
+  if (!hasInternet) {
+    _showNoInternetDialog();
+    return;
+  }
+
+  // Online login
+  try {
+    final response = await ApiService.login(phoneText, passwordText)
+        .timeout(const Duration(seconds: 10));
+
+    if (!mounted) return;
+
+    // Decode JWT to get role
+    final token = response['access_token'];
+    final parts = token.split('.');
+    if (parts.length != 3) {
+      throw Exception('توكن غير صالح');
+    }
+    
+    final payload = json.decode(
+      utf8.decode(base64Url.decode(base64Url.normalize(parts[1])))
+    );
+    
+    final role = payload['role'];
+  
+    // Save credentials for offline login
+    await _saveLoginCredentials(phoneText, passwordText, role, token);
+  
+    // *** ADD THIS SECTION - Start notification monitoring ***
+    try {
+      await NotificationManager().startMonitoring();
+      print('Notification monitoring started successfully');
+    } catch (e) {
+      print('Failed to start notification monitoring: $e');
+      // Don't block login if notification setup fails
+    }
+    // *** END OF NEW SECTION ***
+  
+    if (!mounted) return;
+    
+    Widget destination;
+    if (role == 'groom') {
+      destination = GroomHomeScreen(initialTabIndex: 0);
+    } else if (role == 'super_admin') {
+      destination = SuperAdminHomeScreen();
+    } else if (role == 'clan_admin') {
+      destination = ClanAdminHomeScreen();
+    } else {
+      if (!mounted) return;
+      _showErrorDialog('دور المستخدم غير معروف');
       return;
     }
 
+    Navigator.of(context).pushReplacement(
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) => destination,
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return FadeTransition(opacity: animation, child: child);
+        },
+        transitionDuration: const Duration(milliseconds: 200),
+      ),
+    );
+    
+  } on SocketException catch (_) {
     if (!mounted) return;
-    setState(() {
-      _isLoading = true;
-    });
-
-    final phoneText = _phoneController.text.trim();
-    final passwordText = _passwordController.text;
-
-    // Check internet connection
-    final hasInternet = await _checkInternetConnection();
-    
-    if (!hasInternet) {
-      _showNoInternetDialog();
-      // // Try offline login with saved credentials
-      // final offlineLoginSuccess = await _tryOfflineLogin(phoneText, passwordText);
-      
-      // if (!mounted) return;
-      // setState(() {
-      //   _isLoading = false;
-      // });
-      
-      // if (offlineLoginSuccess) {
-      //   // Successfully logged in offline
-      //   _showSuccessDialog('تم تسجيل الدخول بوضع عدم الاتصال');
-      // } else {
-      //   // Show dialog about no internet and wrong credentials
-      //   _showOfflineLoginFailedDialog();
-      // }
-      // return;
-    }
-
-    // Online login
-    try {
-      final response = await ApiService.login(phoneText, passwordText)
-          .timeout(const Duration(seconds: 10));
-
-      if (!mounted) return;
-
-      // Decode JWT to get role
-      final token = response['access_token'];
-      final parts = token.split('.');
-      if (parts.length != 3) {
-        throw Exception('توكن غير صالح');
-      }
-      
-      final payload = json.decode(
-        utf8.decode(base64Url.decode(base64Url.normalize(parts[1])))
-      );
-      
-      final role = payload['role'];
-    
-      // Save credentials for offline login
-      await _saveLoginCredentials(phoneText, passwordText, role, token);
-    
-      if (!mounted) return;
-      
-      Widget destination;
-      if (role == 'groom') {
-        destination = GroomHomeScreen(initialTabIndex: 0);
-      } else if (role == 'super_admin') {
-        destination = SuperAdminHomeScreen();
-      } else if (role == 'clan_admin') {
-        destination = ClanAdminHomeScreen();
-      } else {
-        if (!mounted) return;
-        _showErrorDialog('دور المستخدم غير معروف');
-        return;
-      }
-
-      Navigator.of(context).pushReplacement(
-        PageRouteBuilder(
-          pageBuilder: (context, animation, secondaryAnimation) => destination,
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return FadeTransition(opacity: animation, child: child);
-          },
-          transitionDuration: const Duration(milliseconds: 200),
-        ),
-      );
-      
-    } on SocketException catch (_) {
-      if (!mounted) return;
-      setState(() => _isLoading = false);
-      _showNoInternetDialog();
-    } on TimeoutException catch (_) {
-      if (!mounted) return;
-      setState(() => _isLoading = false);
-      _showErrorDialog('انتهت مهلة الاتصال. يرجى المحاولة مرة أخرى.');
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _isLoading = false);
-      _showErrorDialog('$e');
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+    setState(() => _isLoading = false);
+    _showNoInternetDialog();
+  } on TimeoutException catch (_) {
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+    _showErrorDialog('انتهت مهلة الاتصال. يرجى المحاولة مرة أخرى.');
+  } catch (e) {
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+    _showErrorDialog('$e');
+  } finally {
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
+}
 
   void _showSuccessDialog(String message) {
     showDialog(

@@ -1,10 +1,15 @@
 // lib/screens/clan admin/home_tab.dart
+import 'dart:async';
+
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:wedding_reservation_app/providers/theme_provider.dart';
 import 'package:wedding_reservation_app/utils/constants.dart';
-import '../../utils/colors.dart';
+import 'package:wedding_reservation_app/widgets/notification_panel.dart';
+
 import '../../services/api_service.dart';
+import '../../utils/colors.dart';
 
 class HomeTab extends StatefulWidget {
   final Function(int)? onNavigateToTab;
@@ -35,6 +40,32 @@ class HomeTabState extends State<HomeTab> with TickerProviderStateMixin {
   List<dynamic> _recentActivities = [];
   String _adminName = 'مدير العشيرة';
   String _ClanName = '';
+  Timer? _notificationTimer;
+  int _lastUnreadCount = 0;
+  // Add these new state variables after existing ones
+Map<String, dynamic> _clanStats = {
+    'today': 0,
+    'month': 0,
+    'year': 0,
+    'today_data': [],
+    'month_data': [],
+    'year_data': [],
+  };
+  
+  Map<String, dynamic> _countyStats = {
+    'today': 0,
+    'month': 0,
+    'year': 0,
+    'today_data': [],
+    'month_data': [],
+    'year_data': [],
+  };
+
+  bool _statsLoading = false;
+bool _isClanChartExpanded = true;
+bool _isCountyChartExpanded = false;
+String _clanSelectedPeriod = 'year';
+String _countySelectedPeriod = 'year';
 
   @override
   void initState() {
@@ -57,12 +88,72 @@ class HomeTabState extends State<HomeTab> with TickerProviderStateMixin {
 
     _animationController.forward();
     _loadDashboardData();
+    _startNotificationPolling();
   }
+void _debugStatisticsData() {
+  print('═════════════════════════════════════════');
+  print('🔍 STATISTICS DEBUG INFORMATION');
+  print('═════════════════════════════════════════');
+  
+  print('\n📊 CLAN STATISTICS:');
+  print('Today Count: ${_clanStats['today']}');
+  print('Month Count: ${_clanStats['month']}');
+  print('Year Count: ${_clanStats['year']}');
+  print('Today Data Length: ${(_clanStats['today_data'] as List?)?.length ?? 0}');
+  print('Month Data Length: ${(_clanStats['month_data'] as List?)?.length ?? 0}');
+  print('Year Data Length: ${(_clanStats['year_data'] as List?)?.length ?? 0}');
+  
+  if ((_clanStats['year_data'] as List?)?.isNotEmpty ?? false) {
+    print('\nSample Year Data:');
+    final yearData = _clanStats['year_data'] as List;
+    for (var i = 0; i < (yearData.length > 3 ? 3 : yearData.length); i++) {
+      print('  Reservation $i: ${yearData[i]}');
+    }
+  }
+  
+  print('\n📊 COUNTY STATISTICS:');
+  print('Today Count: ${_countyStats['today']}');
+  print('Month Count: ${_countyStats['month']}');
+  print('Year Count: ${_countyStats['year']}');
+  print('Today Data Length: ${(_countyStats['today_data'] as List?)?.length ?? 0}');
+  print('Month Data Length: ${(_countyStats['month_data'] as List?)?.length ?? 0}');
+  print('Year Data Length: ${(_countyStats['year_data'] as List?)?.length ?? 0}');
+  
+  print('\n═════════════════════════════════════════\n');
+}
+
+
+  void _startNotificationPolling() {
+    _notificationTimer = Timer.periodic(
+      const Duration(seconds: 30), // Check every 30 seconds
+      (timer) async {
+        try {
+          final newCount = await ApiService.getUnreadNotificationCount();
+          if (newCount > _lastUnreadCount && mounted) {
+            setState(() {
+              _lastUnreadCount = newCount;
+            });
+            // Optional: Show a snackbar
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('لديك إشعارات جديدة'),
+                duration: Duration(seconds: 2),
+              ),
+            );
+          }
+        } catch (e) {
+          print('Error polling notifications: $e');
+        }
+      },
+    );
+  }
+
 
   @override
   void dispose() {
     _animationController.dispose();
     _refreshAnimationController.dispose();
+    _notificationTimer?.cancel();
     super.dispose();
   }
 void _navigateToTab(int tabIndex) {
@@ -70,6 +161,7 @@ void _navigateToTab(int tabIndex) {
     widget.onNavigateToTab!(tabIndex);
   }
 }
+
 
 void _showLogoutDialog() {
   showDialog(
@@ -128,6 +220,7 @@ void _showLogoutDialog() {
       _recentActivities = _generateRecentActivities(
         halls, grooms, menus, allReservations
       );
+      await _loadStatisticsData();
 
       setState(() {
         _dashboardData = {
@@ -155,6 +248,54 @@ void _showLogoutDialog() {
     }
   }
 
+Future<void> _loadStatisticsData() async {
+  if (!mounted) return;
+  
+  setState(() => _statsLoading = true);
+
+  try {
+    // Load clan statistics with data arrays
+    final clanToday = await ApiService.getValidatedReservationsToday();
+    final clanMonth = await ApiService.getValidatedReservationsMonth();
+    final clanYear = await ApiService.getValidatedReservationsYear();
+    
+    // Load county statistics with data arrays
+    final countyToday = await ApiService.getValidatedReservationsTodayCounty();
+    final countyMonth = await ApiService.getValidatedReservationsMonthCounty();
+    final countyYear = await ApiService.getValidatedReservationsYearCounty();
+
+    if (!mounted) return;
+
+    setState(() {
+      _clanStats = {
+        'today': clanToday['count'] ?? 0,
+        'month': clanMonth['count'] ?? 0,
+        'year': clanYear['count'] ?? 0,
+        'today_data': clanToday['reservations'] ?? [],
+        'month_data': clanMonth['reservations'] ?? [],
+        'year_data': clanYear['reservations'] ?? [],
+      };
+      
+      _countyStats = {
+        'today': countyToday['count'] ?? 0,
+        'month': countyMonth['count'] ?? 0,
+        'year': countyYear['count'] ?? 0,
+        'today_data': countyToday['reservations'] ?? [],
+        'month_data': countyMonth['reservations'] ?? [],
+        'year_data': countyYear['reservations'] ?? [],
+      };
+      _statsLoading = false;
+    });
+    
+    // 🔍 DEBUG: Call debug method after loading data
+    _debugStatisticsData();
+    
+  } catch (e) {
+    if (!mounted) return;
+    setState(() => _statsLoading = false);
+    print('❌ Error loading statistics: $e');
+  }
+}
   // Public method to refresh data from parent
   void refreshData() {
     _loadDashboardData();
@@ -289,6 +430,9 @@ Widget build(BuildContext context) {
                     _buildQuickActions(context),
                     SizedBox(height: isMobile ? 24 : 32),
                     _buildRecentActivity(isMobile, isTablet),
+                    // SizedBox(height: 80),
+                    SizedBox(height: isMobile ? 24 : 32),
+                    _buildStatisticsSection(isMobile, isTablet), // ADD THIS LINE
                     SizedBox(height: 80),
 
 
@@ -338,11 +482,58 @@ PreferredSizeWidget _buildSliverAppBar(bool isMobile) {
         margin: EdgeInsets.only(right: isMobile ? 4 : 8),
         child: Stack(
           children: [
-            IconButton(
-              icon: Icon(Icons.notifications_outlined, 
-                color: Colors.white, 
-                size: isMobile ? 20 : 24),
-              onPressed: () {},
+            FutureBuilder<int>(
+              future: ApiService.getUnreadNotificationCount(),
+              builder: (context, snapshot) {
+                final unreadCount = snapshot.data ?? 0;
+                
+                return IconButton(
+                  icon: Stack(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.grey[800] : Colors.grey[100],
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          Icons.notifications_outlined,
+                          size: 20,
+                          color: isDark ? Colors.white : Colors.black87,
+                        ),
+                      ),
+                      if (unreadCount > 0)
+                        Positioned(
+                          right: 4,
+                          top: 4,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Text(
+                              unreadCount > 99 ? '99+' : unreadCount.toString(),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const NotificationPanel(),
+                      ),
+                    );
+                  },
+                );
+              },
             ),
                
             Positioned(
@@ -991,6 +1182,857 @@ Widget _buildRecentActivity(bool isMobile, bool isTablet) {
   );
 }
 
+Widget _buildStatisticsSection(bool isMobile, bool isTablet) {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        'إحصائيات الحجوزات',
+        style: TextStyle(
+          fontSize: isMobile ? 20 : (isTablet ? 28 : 24),
+          fontWeight: FontWeight.w700,
+          color: Theme.of(context).textTheme.bodyLarge?.color,
+        ),
+      ),
+      SizedBox(height: isMobile ? 16 : 20),
+      
+      if (_statsLoading)
+        Center(
+          child: Padding(
+            padding: EdgeInsets.all(40),
+            child: CircularProgressIndicator(color: AppColors.primary),
+          ),
+        )
+      else
+        Column(
+          children: [
+            // Clan Statistics Card with expandable chart
+            _buildChartCard(
+              title: 'أعراس عشيرتك',
+              icon: Icons.groups_rounded,
+              selectedPeriod: _clanSelectedPeriod,
+              data: _clanStats,
+              onPeriodChanged: (period) => setState(() => _clanSelectedPeriod = period),
+              isDark: isDark,
+              color: AppColors.primary,
+              isExpanded: _isClanChartExpanded,
+              onToggleExpand: () => setState(() => _isClanChartExpanded = !_isClanChartExpanded),
+              isMobile: isMobile,
+            ),
+            SizedBox(height: 16),
+            
+            // County Statistics Card with expandable chart
+            _buildChartCard(
+              title: 'أعراس المحافظة',
+              icon: Icons.location_city_rounded,
+              selectedPeriod: _countySelectedPeriod,
+              data: _countyStats,
+              onPeriodChanged: (period) => setState(() => _countySelectedPeriod = period),
+              isDark: isDark,
+              color: Colors.blue,
+              isExpanded: _isCountyChartExpanded,
+              onToggleExpand: () => setState(() => _isCountyChartExpanded = !_isCountyChartExpanded),
+              isMobile: isMobile,
+            ),
+          ],
+        ),
+    ],
+  );
+}
+
+Widget _buildChartCard({
+  required String title,
+  required IconData icon,
+  required String selectedPeriod,
+  required Map<String, dynamic> data,
+  required Function(String) onPeriodChanged,
+  required bool isDark,
+  required Color color,
+  required bool isExpanded,
+  required VoidCallback onToggleExpand,
+  required bool isMobile,
+}) {
+  return AnimatedContainer(
+    duration: const Duration(milliseconds: 300),
+    curve: Curves.easeInOut,
+    padding: EdgeInsets.all(isMobile ? 16 : 20),
+    decoration: BoxDecoration(
+      color: Theme.of(context).cardColor,
+      borderRadius: BorderRadius.circular(isMobile ? 12 : 16),
+      boxShadow: [
+        BoxShadow(
+          color: isDark
+            ? Colors.black.withOpacity(0.3)
+            : Colors.black.withOpacity(0.04),
+          spreadRadius: 0,
+          blurRadius: 12,
+          offset: Offset(0, 4),
+        ),
+      ],
+      border: Border.all(
+        color: isDark
+          ? Colors.white.withOpacity(0.1)
+          : Colors.grey.withOpacity(0.1)
+      ),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Header row with toggle
+        InkWell(
+          onTap: onToggleExpand,
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              children: [
+                Container(
+                  padding: EdgeInsets.all(isMobile ? 6 : 8),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(isMobile ? 6 : 8),
+                  ),
+                  child: Icon(icon, color: color, size: isMobile ? 18 : 20),
+                ),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          fontSize: isMobile ? 15 : 16,
+                          fontWeight: FontWeight.w700,
+                          color: Theme.of(context).textTheme.bodyLarge?.color,
+                        ),
+                      ),
+                      if (!isExpanded) ...[
+                        SizedBox(height: 4),
+                        Text(
+                          'أعراس هذا الشهر ${(data['month'] as num?) ?? 0}',
+                          style: TextStyle(
+                            fontSize: isMobile ? 12 : 13,
+                            color: color,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                AnimatedRotation(
+                  turns: isExpanded ? 0.5 : 0,
+                  duration: const Duration(milliseconds: 300),
+                  child: Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.7),
+                    size: isMobile ? 24 : 28,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        
+        // Expandable content with chart
+        AnimatedCrossFade(
+          firstChild: const SizedBox.shrink(),
+          secondChild: Column(
+            children: [
+              SizedBox(height: isMobile ? 12 : 16),
+              Row(
+                children: [
+                  _buildPeriodButton('اليوم', 'today', selectedPeriod, onPeriodChanged, color, isDark, isMobile),
+                  SizedBox(width: 8),
+                  _buildPeriodButton('الشهر', 'month', selectedPeriod, onPeriodChanged, color, isDark, isMobile),
+                  SizedBox(width: 8),
+                  _buildPeriodButton('السنة', 'year', selectedPeriod, onPeriodChanged, color, isDark, isMobile),
+                ],
+              ),
+              SizedBox(height: isMobile ? 16 : 20),
+              SizedBox(
+                height: isMobile ? 150 : 180,
+                child: _buildLineChart(data, selectedPeriod, color, isDark, isMobile),
+              ),
+              SizedBox(height: 12),
+              Center(
+                child: Column(
+                  children: [
+                    Text(
+                      '${(data[selectedPeriod] as num?) ?? 0}',
+                      style: TextStyle(
+                        fontSize: isMobile ? 28 : 32,
+                        fontWeight: FontWeight.w900,
+                        color: color,
+                      ),
+                    ),
+                    Text(
+                      selectedPeriod == 'today' 
+                          ? 'أعراس اليوم' 
+                          : selectedPeriod == 'month' 
+                              ? 'أعراس هذا الشهر' 
+                              : 'أعراس هذه السنة',
+                      style: TextStyle(
+                        fontSize: isMobile ? 12 : 13,
+                        color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.7),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          crossFadeState: isExpanded 
+              ? CrossFadeState.showSecond 
+              : CrossFadeState.showFirst,
+          duration: const Duration(milliseconds: 300),
+        ),
+      ],
+    ),
+  );
+}
+
+// Add this method for period selection buttons
+Widget _buildPeriodButton(
+  String label,
+  String value,
+  String selectedPeriod,
+  Function(String) onPeriodChanged,
+  Color color,
+  bool isDark,
+  bool isMobile,
+) {
+  final isSelected = selectedPeriod == value;
+  return Expanded(
+    child: GestureDetector(
+      onTap: () => onPeriodChanged(value),
+      child: Container(
+        padding: EdgeInsets.symmetric(vertical: isMobile ? 6 : 8),
+        decoration: BoxDecoration(
+          color: isSelected 
+              ? color.withOpacity(0.15) 
+              : (isDark ? const Color(0xFF2A2A2A) : Colors.grey[100]),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isSelected ? color : Colors.transparent,
+            width: 1.5,
+          ),
+        ),
+        child: Text(
+          label,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: isMobile ? 11 : 12,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+            color: isSelected 
+                ? color 
+                : (isDark ? Colors.grey[400] : const Color(0xFF6A6A6A)),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+
+Widget _buildLineChart(
+  Map<String, dynamic> data,
+  String selectedPeriod,
+  Color color,
+  bool isDark,
+  bool isMobile,
+) {
+  final List<dynamic> reservations = data['${selectedPeriod}_data'] ?? [];
+  
+  print('📊 DEBUG CHART DATA:');
+  print('Selected Period: $selectedPeriod');
+  print('Total Reservations: ${reservations.length}');
+  print('Sample Data: ${reservations.take(3).toList()}');
+  
+  List<FlSpot> spots;
+  Map<int, int> dateCounts = {}; // Changed to int keys for better handling
+  
+  if (selectedPeriod == 'today') {
+    // Group by hour (0-23)
+    for (var res in reservations) {
+      try {
+        final dateStr = res['date1'] ?? res['wedding_date'] ?? '';
+        print('Processing date: $dateStr');
+        
+        if (dateStr.isNotEmpty) {
+          final date = DateTime.parse(dateStr);
+          final hour = date.hour;
+          dateCounts[hour] = (dateCounts[hour] ?? 0) + 1;
+          print('Hour $hour: ${dateCounts[hour]} reservations');
+        }
+      } catch (e) {
+        print('Error parsing date: $e');
+      }
+    }
+    
+    // Create spots for all 24 hours
+    spots = List.generate(24, (i) {
+      final count = dateCounts[i] ?? 0;
+      print('Hour $i final count: $count');
+      return FlSpot(i.toDouble(), count.toDouble());
+    });
+    
+  } else if (selectedPeriod == 'month') {
+    // Group by day (1-31)
+    final now = DateTime.now();
+    final daysInMonth = DateTime(now.year, now.month + 1, 0).day;
+    
+    for (var res in reservations) {
+      try {
+        final dateStr = res['date1'] ?? res['wedding_date'] ?? '';
+        print('Processing date: $dateStr');
+        
+        if (dateStr.isNotEmpty) {
+          final date = DateTime.parse(dateStr);
+          // Only count if it's in the current month
+          if (date.year == now.year && date.month == now.month) {
+            final day = date.day;
+            dateCounts[day] = (dateCounts[day] ?? 0) + 1;
+            print('Day $day: ${dateCounts[day]} reservations');
+          }
+        }
+      } catch (e) {
+        print('Error parsing date: $e');
+      }
+    }
+    
+    // Create spots for all days in month
+    spots = List.generate(daysInMonth, (i) {
+      final day = i + 1;
+      final count = dateCounts[day] ?? 0;
+      print('Day $day final count: $count');
+      return FlSpot(i.toDouble(), count.toDouble());
+    });
+    
+  } else {
+    // Group by month (1-12)
+    final now = DateTime.now();
+    
+    for (var res in reservations) {
+      try {
+        final dateStr = res['date1'] ?? res['wedding_date'] ?? '';
+        print('Processing date: $dateStr');
+        
+        if (dateStr.isNotEmpty) {
+          final date = DateTime.parse(dateStr);
+          // Only count if it's in the current year
+          if (date.year == now.year) {
+            final month = date.month;
+            dateCounts[month] = (dateCounts[month] ?? 0) + 1;
+            print('Month $month: ${dateCounts[month]} reservations');
+          }
+        }
+      } catch (e) {
+        print('Error parsing date: $e');
+      }
+    }
+    
+    // Create spots for all 12 months
+    spots = List.generate(12, (i) {
+      final month = i + 1;
+      final count = dateCounts[month] ?? 0;
+      print('Month $month final count: $count');
+      return FlSpot(i.toDouble(), count.toDouble());
+    });
+  }
+  
+  print('Final spots: ${spots.map((s) => '(${s.x}, ${s.y})').join(', ')}');
+  
+  // Calculate max Y value
+  final maxY = spots.isEmpty ? 5.0 : spots.map((e) => e.y).reduce((a, b) => a > b ? a : b);
+  final adjustedMaxY = maxY > 0 ? (maxY * 1.3).ceilToDouble() : 5.0;
+  final midY = adjustedMaxY / 2;
+  
+  print('Max Y: $maxY, Adjusted Max Y: $adjustedMaxY');
+  
+  return LineChart(
+    LineChartData(
+      gridData: FlGridData(
+        show: true,
+        drawVerticalLine: true,
+        horizontalInterval: midY > 0 ? midY : 1,
+        getDrawingHorizontalLine: (value) => FlLine(
+          color: (isDark ? Colors.grey[800]! : Colors.grey[200]!).withOpacity(0.5),
+          strokeWidth: 1,
+        ),
+        getDrawingVerticalLine: (value) => FlLine(
+          color: (isDark ? Colors.grey[800]! : Colors.grey[200]!).withOpacity(0.3),
+          strokeWidth: 1,
+        ),
+      ),
+      titlesData: FlTitlesData(
+        show: true,
+        rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        bottomTitles: AxisTitles(
+          sideTitles: SideTitles(
+            showTitles: true,
+            reservedSize: isMobile ? 25 : 30,
+            interval: selectedPeriod == 'today' ? 6 : (selectedPeriod == 'month' ? 5 : 2),
+            getTitlesWidget: (value, meta) {
+              final index = value.toInt();
+              if (index < 0 || index >= spots.length) return const Text('');
+              
+              bool shouldShow = false;
+              if (selectedPeriod == 'today' && index % 6 == 0) shouldShow = true;
+              if (selectedPeriod == 'month' && index % 5 == 0) shouldShow = true;
+              if (selectedPeriod == 'year' && index % 2 == 0) shouldShow = true;
+              
+              if (!shouldShow) return const Text('');
+              
+              final displayValue = selectedPeriod == 'today' 
+                  ? index.toString() 
+                  : (index + 1).toString();
+              
+              return Padding(
+                padding: EdgeInsets.only(top: isMobile ? 6 : 8),
+                child: Text(
+                  displayValue,
+                  style: TextStyle(
+                    color: isDark ? Colors.grey[400] : const Color(0xFF6A6A6A),
+                    fontWeight: FontWeight.w600,
+                    fontSize: isMobile ? 10 : 11,
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        leftTitles: AxisTitles(
+          sideTitles: SideTitles(
+            showTitles: true,
+            reservedSize: isMobile ? 35 : 40,
+            interval: midY > 0 ? midY : 1,
+            getTitlesWidget: (value, meta) {
+              if (value == 0.0) {
+                return Text(
+                  '0',
+                  style: TextStyle(
+                    color: isDark ? Colors.grey[400] : const Color(0xFF6A6A6A),
+                    fontWeight: FontWeight.w600,
+                    fontSize: isMobile ? 10 : 11,
+                  ),
+                );
+              } else if ((value - midY).abs() < 1) {
+                return Text(
+                  midY.round().toString(),
+                  style: TextStyle(
+                    color: isDark ? Colors.grey[400] : const Color(0xFF6A6A6A),
+                    fontWeight: FontWeight.w600,
+                    fontSize: isMobile ? 10 : 11,
+                  ),
+                );
+              } else if ((value - adjustedMaxY).abs() < 1) {
+                return Text(
+                  adjustedMaxY.round().toString(),
+                  style: TextStyle(
+                    color: isDark ? Colors.grey[400] : const Color(0xFF6A6A6A),
+                    fontWeight: FontWeight.w600,
+                    fontSize: isMobile ? 10 : 11,
+                  ),
+                );
+              }
+              return const Text('');
+            },
+          ),
+        ),
+      ),
+      borderData: FlBorderData(
+        show: true,
+        border: Border.all(
+          color: (isDark ? Colors.grey[800]! : Colors.grey[200]!).withOpacity(0.5),
+          width: 1,
+        ),
+      ),
+      minX: 0,
+      maxX: (spots.length - 1).toDouble(),
+      minY: 0.0,
+      maxY: adjustedMaxY,
+      lineBarsData: [
+        LineChartBarData(
+          spots: spots,
+          isCurved: true,
+          color: color,
+          barWidth: isMobile ? 2.5 : 3,
+          isStrokeCapRound: true,
+          dotData: FlDotData(
+            show: true,
+            getDotPainter: (spot, percent, barData, index) {
+              final hasData = spot.y > 0;
+              return FlDotCirclePainter(
+                radius: hasData ? (isMobile ? 5 : 6) : 2,
+                color: hasData ? color : color.withOpacity(0.2),
+                strokeWidth: hasData ? 2 : 1,
+                strokeColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+              );
+            },
+          ),
+          belowBarData: BarAreaData(
+            show: true,
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                color.withOpacity(0.3),
+                color.withOpacity(0.05),
+              ],
+            ),
+          ),
+        ),
+      ],
+      lineTouchData: LineTouchData(
+        enabled: true,
+        touchTooltipData: LineTouchTooltipData(
+          getTooltipColor: (touchedSpot) => color.withOpacity(0.9),
+          getTooltipItems: (touchedSpots) {
+            return touchedSpots.map((spot) {
+              String label = '';
+              if (selectedPeriod == 'today') {
+                label = 'الساعة ${spot.x.toInt()}';
+              } else if (selectedPeriod == 'month') {
+                label = 'اليوم ${(spot.x.toInt() + 1)}';
+              } else {
+                label = 'الشهر ${(spot.x.toInt() + 1)}';
+              }
+              
+              final count = spot.y.toInt();
+              return LineTooltipItem(
+                '$label\n${count > 0 ? "$count أعراس" : "لا يوجد أعراس"}',
+                const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              );
+            }).toList();
+          },
+        ),
+        handleBuiltInTouches: true,
+        getTouchedSpotIndicator: (barData, spotIndexes) {
+          return spotIndexes.map((index) {
+            return TouchedSpotIndicatorData(
+              FlLine(
+                color: color.withOpacity(0.5),
+                strokeWidth: 2,
+                dashArray: [5, 5],
+              ),
+              FlDotData(
+                show: true,
+                getDotPainter: (spot, percent, barData, index) => FlDotCirclePainter(
+                  radius: isMobile ? 7 : 8,
+                  color: color,
+                  strokeWidth: 3,
+                  strokeColor: Colors.white,
+                ),
+              ),
+            );
+          }).toList();
+        },
+      ),
+    ),
+    duration: const Duration(milliseconds: 250),
+  );
+}
+
+Widget _buildStatCard2({
+  required String title,
+  required IconData icon,
+  required Color color,
+  required Map<String, dynamic> stats,
+  required bool isMobile,
+  required bool isDark,
+}) {
+  return Container(
+    padding: EdgeInsets.all(isMobile ? 16 : 20),
+    decoration: BoxDecoration(
+      color: Theme.of(context).cardColor,
+      borderRadius: BorderRadius.circular(isMobile ? 12 : 16),
+      boxShadow: [
+        BoxShadow(
+          color: isDark
+            ? Colors.black.withOpacity(0.3)
+            : Colors.black.withOpacity(0.04),
+          spreadRadius: 0,
+          blurRadius: 12,
+          offset: Offset(0, 4),
+        ),
+      ],
+      border: Border.all(
+        color: isDark
+          ? Colors.white.withOpacity(0.1)
+          : Colors.grey.withOpacity(0.1)
+      ),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Header
+        Row(
+          children: [
+            Container(
+              padding: EdgeInsets.all(isMobile ? 8 : 10),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(isMobile ? 8 : 10),
+              ),
+              child: Icon(icon, color: color, size: isMobile ? 20 : 24),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                title,
+                style: TextStyle(
+                  fontSize: isMobile ? 16 : 18,
+                  fontWeight: FontWeight.w700,
+                  color: Theme.of(context).textTheme.bodyLarge?.color,
+                ),
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: isMobile ? 16 : 20),
+        
+        // Statistics Rows
+        _buildStatRow('اليوم', stats['today'], color, isMobile),
+        SizedBox(height: 12),
+        _buildStatRow('هذا الشهر', stats['month'], color, isMobile),
+        SizedBox(height: 12),
+        _buildStatRow('هذا العام', stats['year'], color, isMobile),
+      ],
+    ),
+  );
+}
+
+Widget _buildStatRow(String label, int value, Color color, bool isMobile) {
+  // Calculate max value for progress bar
+  final maxValue = _clanStats['year'] > _countyStats['year'] 
+      ? _clanStats['year'] 
+      : _countyStats['year'];
+  final progress = maxValue > 0 ? (value / maxValue).clamp(0.0, 1.0) : 0.0;
+  
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: isMobile ? 13 : 14,
+              color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.7),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          Text(
+            value.toString(),
+            style: TextStyle(
+              fontSize: isMobile ? 16 : 18,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+      SizedBox(height: 6),
+      ClipRRect(
+        borderRadius: BorderRadius.circular(4),
+        child: LinearProgressIndicator(
+          value: progress,
+          backgroundColor: color.withOpacity(0.1),
+          valueColor: AlwaysStoppedAnimation<Color>(color),
+          minHeight: isMobile ? 6 : 8,
+        ),
+      ),
+    ],
+  );
+}
+
+Widget _buildComparisonChart(bool isMobile, bool isDark) {
+  return Container(
+    padding: EdgeInsets.all(isMobile ? 16 : 20),
+    decoration: BoxDecoration(
+      color: Theme.of(context).cardColor,
+      borderRadius: BorderRadius.circular(isMobile ? 12 : 16),
+      boxShadow: [
+        BoxShadow(
+          color: isDark
+            ? Colors.black.withOpacity(0.3)
+            : Colors.black.withOpacity(0.04),
+          spreadRadius: 0,
+          blurRadius: 12,
+          offset: Offset(0, 4),
+        ),
+      ],
+      border: Border.all(
+        color: isDark
+          ? Colors.white.withOpacity(0.1)
+          : Colors.grey.withOpacity(0.1)
+      ),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(
+              Icons.bar_chart,
+              color: AppColors.primary,
+              size: isMobile ? 20 : 24,
+            ),
+            SizedBox(width: 12),
+            Text(
+              'مقارنة الأداء',
+              style: TextStyle(
+                fontSize: isMobile ? 16 : 18,
+                fontWeight: FontWeight.w700,
+                color: Theme.of(context).textTheme.bodyLarge?.color,
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: isMobile ? 16 : 20),
+        
+        // Comparison bars
+        _buildComparisonBar('اليوم', _clanStats['today'], _countyStats['today'], isMobile, isDark),
+        SizedBox(height: 16),
+        _buildComparisonBar('هذا الشهر', _clanStats['month'], _countyStats['month'], isMobile, isDark),
+        SizedBox(height: 16),
+        _buildComparisonBar('هذا العام', _clanStats['year'], _countyStats['year'], isMobile, isDark),
+        
+        SizedBox(height: 16),
+        
+        // Legend
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _buildLegendItem('عشيرتك', AppColors.primary, isMobile),
+            SizedBox(width: 24),
+            _buildLegendItem('المحافظة', Colors.blue, isMobile),
+          ],
+        ),
+      ],
+    ),
+  );
+}
+
+Widget _buildComparisonBar(String label, int clanValue, int countyValue, bool isMobile, bool isDark) {
+  final maxValue = countyValue > 0 ? countyValue : 1;
+  final clanProgress = (clanValue / maxValue).clamp(0.0, 1.0);
+  final countyProgress = 1.0;
+  
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        label,
+        style: TextStyle(
+          fontSize: isMobile ? 13 : 14,
+          fontWeight: FontWeight.w600,
+          color: Theme.of(context).textTheme.bodyLarge?.color,
+        ),
+      ),
+      SizedBox(height: 8),
+      
+      // Clan bar
+      Row(
+        children: [
+          Expanded(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: clanProgress,
+                backgroundColor: AppColors.primary.withOpacity(0.1),
+                valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                minHeight: isMobile ? 12 : 14,
+              ),
+            ),
+          ),
+          SizedBox(width: 8),
+          SizedBox(
+            width: 40,
+            child: Text(
+              clanValue.toString(),
+              textAlign: TextAlign.end,
+              style: TextStyle(
+                fontSize: isMobile ? 12 : 13,
+                fontWeight: FontWeight.w700,
+                color: AppColors.primary,
+              ),
+            ),
+          ),
+        ],
+      ),
+      SizedBox(height: 6),
+      
+      // County bar
+      Row(
+        children: [
+          Expanded(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: countyProgress,
+                backgroundColor: Colors.blue.withOpacity(0.1),
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+                minHeight: isMobile ? 12 : 14,
+              ),
+            ),
+          ),
+          SizedBox(width: 8),
+          SizedBox(
+            width: 40,
+            child: Text(
+              countyValue.toString(),
+              textAlign: TextAlign.end,
+              style: TextStyle(
+                fontSize: isMobile ? 12 : 13,
+                fontWeight: FontWeight.w700,
+                color: Colors.blue,
+              ),
+            ),
+          ),
+        ],
+      ),
+    ],
+  );
+}
+
+Widget _buildLegendItem(String label, Color color, bool isMobile) {
+  return Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Container(
+        width: isMobile ? 12 : 14,
+        height: isMobile ? 12 : 14,
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(3),
+        ),
+      ),
+      SizedBox(width: 6),
+      Text(
+        label,
+        style: TextStyle(
+          fontSize: isMobile ? 12 : 13,
+          fontWeight: FontWeight.w500,
+          color: Theme.of(context).textTheme.bodyMedium?.color,
+        ),
+      ),
+    ],
+  );
+}
+
+
 Widget _buildActivityItem({
   required IconData icon,
   required String title,
@@ -1042,4 +2084,7 @@ Widget _buildActivityItem({
     ],
   );
 }
+
+
+
 }

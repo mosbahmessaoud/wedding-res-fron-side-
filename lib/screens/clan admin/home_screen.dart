@@ -1,20 +1,23 @@
 // lib/screens/home/clan_admin_home_screen.dart
 import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:wedding_reservation_app/screens/clan%20admin/HallsTab.dart';
+import 'package:wedding_reservation_app/screens/clan%20admin/clan_rules_management_page.dart';
 import 'package:wedding_reservation_app/screens/clan%20admin/clan_settings_tab.dart';
 import 'package:wedding_reservation_app/screens/clan%20admin/food_menu_tab.dart';
 import 'package:wedding_reservation_app/screens/clan%20admin/grooms_tab.dart';
-import 'package:wedding_reservation_app/screens/clan%20admin/reservations_tab.dart';
 import 'package:wedding_reservation_app/screens/clan%20admin/home_tab.dart';
-import 'package:wedding_reservation_app/screens/clan%20admin/clan_rules_management_page.dart';
+import 'package:wedding_reservation_app/screens/clan%20admin/reservations_tab.dart';
 import 'package:wedding_reservation_app/screens/clan%20admin/special_reservations_tab.dart';
-import 'admin_otp_screen.dart';
+import 'package:wedding_reservation_app/services/notification_manager.dart';
+
+import '../../providers/theme_provider.dart';
+import '../../services/api_service.dart';
 import '../../utils/colors.dart';
 import '../../utils/constants.dart';
-import '../../services/api_service.dart';
-import '../../providers/theme_provider.dart';
+import 'admin_otp_screen.dart';
 
 class ClanAdminHomeScreen extends StatefulWidget {
   const ClanAdminHomeScreen({super.key});
@@ -183,8 +186,12 @@ class _ClanAdminHomeScreenState extends State<ClanAdminHomeScreen>
             ),
           ),
           ElevatedButton(
-            onPressed: () {
-              ApiService.clearToken();
+            onPressed: () async  {
+              await ApiService.clearToken();
+               // Stop notification monitoring
+              NotificationManager().stopMonitoring();
+              // Clear all notifications
+              await NotificationManager().cancelAllNotifications();
               Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
             },
             style: ElevatedButton.styleFrom(
@@ -354,7 +361,7 @@ Widget build(BuildContext context) {
                       _buildRightNavItem(Icons.book_outlined, 'الحجوزات', 3, isDark),
                       _buildRightNavItem(Icons.restaurant_menu_outlined, 'قوائم الطعام', 4, isDark),
                       _buildRightNavItem(Icons.settings_outlined, 'الإعدادات', 5, isDark),
-                      _buildRightNavItem(Icons.lock_outline, 'رموز التحقق', 6, isDark),
+                      // _buildRightNavItem(Icons.lock_outline, 'رموز التحقق', 6, isDark),
                       _buildRightNavItem(Icons.rule_outlined, 'قوانين العشيرة', 7, isDark),
                       _buildRightNavItem(Icons.star_border_outlined, 'الحجوزات الخاصة', 8, isDark), // Added
                       _buildRightNavItem(Icons.person_outline, 'الملف الشخصي', 9, isDark), // Changed from 8 to 9                    
@@ -631,12 +638,12 @@ Widget build(BuildContext context) {
                   _buildNavItem(Icons.castle_outlined, 'القاعات', 1, isDark),
                   _buildNavItem(Icons.group_outlined, 'العرسان', 2, isDark),
                   _buildNavItem(Icons.book_outlined, 'الحجوزات', 3, isDark),
-                  _buildNavItem(Icons.restaurant_menu_outlined, 'الطعام', 4, isDark),
                   _buildNavItem(Icons.home_rounded, 'الرئيسية', 0, isDark),
+                  _buildNavItem(Icons.restaurant_menu_outlined, 'الطعام', 4, isDark),
                   _buildNavItem(Icons.settings_outlined, 'الإعدادات', 5, isDark),
-                  _buildNavItem(Icons.lock_outline, 'OTP', 6, isDark),
+                  // _buildNavItem(Icons.lock_outline, 'OTP', 6, isDark),
                   _buildNavItem(Icons.star_border_outlined, 'حجز خاص', 8, isDark),
-                  _buildNavItem(Icons.rule_outlined, 'القوانين', 7, isDark),
+                  // _buildNavItem(Icons.rule_outlined, 'القوانين', 7, isDark),
                 ],
               ),
             ),

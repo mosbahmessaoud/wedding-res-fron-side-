@@ -2,22 +2,15 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'package:dio/dio.dart';
+import 'dart:typed_data';
+
 import 'package:http/http.dart' as http;
-import 'package:http/http.dart' as _dio;
+import 'package:path/path.dart' as path;
 import 'package:wedding_reservation_app/models/reservation.dart';
 import 'package:wedding_reservation_app/services/token_manager.dart';
-import '../models/user.dart';
-import '../models/county.dart';
-import '../models/clan.dart';
-import '../utils/constants.dart';
-import 'dart:convert';
-import 'dart:io';
-import 'dart:async';
-import 'dart:typed_data';
-import 'package:http/http.dart' as http; 
 
-import 'package:path/path.dart' as path;
+import '../models/clan.dart';
+import '../models/county.dart';
 
 
 class ApiService {
@@ -1278,19 +1271,84 @@ static Future<Map<String, dynamic>> changePaymentStatus(int reservationId) async
   }
 }
 
+
+// static Future<Map<String, dynamic>> createReservation(Map<String, dynamic> reservationData) async {
+//   try {
+//     print('Sending reservation data: $reservationData');
+    
+//     final response = await http.post(
+//       Uri.parse('$baseUrl/reservations'), // Make sure this matches your backend route
+//       headers: await _headers,
+//       body: json.encode(reservationData),
+//     );
+
+//     print('Response status code: ${response.statusCode}');
+//     print('Response body: ${response.body}');
+//     print('Response headers: await ${response.headers}');
+
+//     if (response.statusCode == 200 || response.statusCode == 201) {
+//       // Check if response body is not empty
+//       if (response.body.isEmpty) {
+//         throw Exception('Server returned empty response');
+//       }
+      
+//       try {
+//         final responseData = json.decode(response.body) as Map<String, dynamic>;
+//         return responseData;
+//       } catch (jsonError) {
+//         print('JSON parsing error: $jsonError');
+//         print('Raw response body: "${response.body}"');
+//         throw FormatException('Invalid JSON response from server: $jsonError');
+//       }
+//     } else {
+//       // Handle HTTP errors
+//       String errorMessage = 'Server error (${response.statusCode})';
+      
+//       if (response.body.isNotEmpty) {
+//         try {
+//           final errorData = json.decode(response.body);
+//           errorMessage = errorData['detail'] ?? errorData['message'] ?? errorMessage;
+//         } catch (e) {
+//           // If error response is not JSON, use the raw body
+//           errorMessage = response.body.length > 200 
+//               ? response.body.substring(0, 200) + '...'
+//               : response.body;
+//         }
+//       }
+      
+//       throw Exception(errorMessage);
+//     }
+//   } catch (e) {
+//     print('Error in createReservation: $e');
+    
+//     // Re-throw with more context if it's a FormatException
+//     if (e is FormatException) {
+//       throw FormatException('Failed to parse server response: ${e.message}');
+//     }
+    
+//     rethrow;
+//   }
+// }
+
+
+// ==================== UPDATED CREATE RESERVATION METHOD ====================
+// Replace your existing createReservation method with this updated version
+
+/// Create a new reservation and automatically notify the clan admin
+/// POST /reservations
 static Future<Map<String, dynamic>> createReservation(Map<String, dynamic> reservationData) async {
   try {
     print('Sending reservation data: $reservationData');
     
     final response = await http.post(
-      Uri.parse('$baseUrl/reservations'), // Make sure this matches your backend route
+      Uri.parse('$baseUrl/reservations'),
       headers: await _headers,
       body: json.encode(reservationData),
     );
 
     print('Response status code: ${response.statusCode}');
     print('Response body: ${response.body}');
-    print('Response headers: await ${response.headers}');
+    print('Response headers: ${response.headers}');
 
     if (response.statusCode == 200 || response.statusCode == 201) {
       // Check if response body is not empty
@@ -1300,6 +1358,26 @@ static Future<Map<String, dynamic>> createReservation(Map<String, dynamic> reser
       
       try {
         final responseData = json.decode(response.body) as Map<String, dynamic>;
+        
+        // ✅ AUTOMATICALLY NOTIFY CLAN ADMIN
+        if (responseData.containsKey('id')) {
+          final reservationId = responseData['id'] as int;
+          
+          print('🔔 Reservation created successfully with ID: $reservationId');
+          print('📨 Fetching and notifying clan admin...');
+          
+          // Notify clan admin in background (don't block the UI)
+          notifyClanAdminOfNewReservation(reservationId).then((success) {
+            if (success) {
+              print('✅ Clan admin notification sent successfully');
+            } else {
+              print('⚠️ Failed to send notification to clan admin');
+            }
+          }).catchError((error) {
+            print('❌ Error sending notification: $error');
+          });
+        }
+        
         return responseData;
       } catch (jsonError) {
         print('JSON parsing error: $jsonError');
@@ -1333,6 +1411,155 @@ static Future<Map<String, dynamic>> createReservation(Map<String, dynamic> reser
     }
     
     rethrow;
+  }
+}
+
+// ==================== ALTERNATIVE: SYNCHRONOUS VERSION ====================
+// If you want to WAIT for the notification to be sent before returning
+
+/// Create a new reservation and wait for notification confirmation
+/// POST /reservations
+static Future<Map<String, dynamic>> createReservationWithNotification(
+  Map<String, dynamic> reservationData
+) async {
+  try {
+    print('Sending reservation data: $reservationData');
+    
+    final response = await http.post(
+      Uri.parse('$baseUrl/reservations'),
+      headers: await _headers,
+      body: json.encode(reservationData),
+    );
+
+    print('Response status code: ${response.statusCode}');
+    print('Response body: ${response.body}');
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      if (response.body.isEmpty) {
+        throw Exception('Server returned empty response');
+      }
+      
+      try {
+        final responseData = json.decode(response.body) as Map<String, dynamic>;
+        
+        // ✅ WAIT FOR NOTIFICATION TO BE SENT
+        if (responseData.containsKey('id')) {
+          final reservationId = responseData['id'] as int;
+          
+          print('🔔 Reservation created successfully with ID: $reservationId');
+          print('📨 Sending notification to clan admin...');
+          
+          // Wait for notification to be sent
+          final notificationSent = await notifyClanAdminOfNewReservation(reservationId);
+          
+          if (notificationSent) {
+            print('✅ Clan admin notification sent successfully');
+            responseData['notification_sent'] = true;
+          } else {
+            print('⚠️ Failed to send notification to clan admin');
+            responseData['notification_sent'] = false;
+          }
+        }
+        
+        return responseData;
+      } catch (jsonError) {
+        print('JSON parsing error: $jsonError');
+        throw FormatException('Invalid JSON response from server: $jsonError');
+      }
+    } else {
+      String errorMessage = 'Server error (${response.statusCode})';
+      
+      if (response.body.isNotEmpty) {
+        try {
+          final errorData = json.decode(response.body);
+          errorMessage = errorData['detail'] ?? errorData['message'] ?? errorMessage;
+        } catch (e) {
+          errorMessage = response.body.length > 200 
+              ? response.body.substring(0, 200) + '...'
+              : response.body;
+        }
+      }
+      
+      throw Exception(errorMessage);
+    }
+  } catch (e) {
+    print('Error in createReservationWithNotification: $e');
+    
+    if (e is FormatException) {
+      throw FormatException('Failed to parse server response: ${e.message}');
+    }
+    
+    rethrow;
+  }
+}
+
+// ==================== BATCH RESERVATION WITH NOTIFICATIONS ====================
+
+/// Create multiple reservations and notify clan admins
+static Future<List<Map<String, dynamic>>> createReservationsBatch(
+  List<Map<String, dynamic>> reservationsData
+) async {
+  final results = <Map<String, dynamic>>[];
+  
+  for (var i = 0; i < reservationsData.length; i++) {
+    try {
+      print('Creating reservation ${i + 1}/${reservationsData.length}...');
+      
+      final result = await createReservation(reservationsData[i]);
+      results.add({
+        'success': true,
+        'data': result,
+        'index': i,
+      });
+      
+      // Small delay between requests
+      if (i < reservationsData.length - 1) {
+        await Future.delayed(const Duration(milliseconds: 500));
+      }
+    } catch (e) {
+      print('Failed to create reservation ${i + 1}: $e');
+      results.add({
+        'success': false,
+        'error': e.toString(),
+        'data': reservationsData[i],
+        'index': i,
+      });
+    }
+  }
+  
+  return results;
+}
+
+// ==================== NOTIFICATION STATUS CHECKING ====================
+
+/// Check if notification was successfully sent for a reservation
+static Future<bool> checkReservationNotificationStatus(int reservationId) async {
+  try {
+    final notification = await getLatestNotificationForReservation(reservationId);
+    return notification != null;
+  } catch (e) {
+    print('Error checking notification status: $e');
+    return false;
+  }
+}
+
+/// Retry sending notification if it failed initially
+static Future<bool> retryNotificationForReservation(int reservationId) async {
+  try {
+    print('🔄 Retrying notification for reservation $reservationId...');
+    
+    final success = await notifyClanAdminOfNewReservation(reservationId);
+    
+    if (success) {
+      print('✅ Notification retry successful');
+    } else {
+      print('❌ Notification retry failed');
+    }
+    
+    return success;
+  } catch (e) {
+    print('❌ Error during notification retry: $e');
+    return false;
   }
 }
 
@@ -4339,6 +4566,898 @@ static Future<int> getValidatedReservationsYearCountyCount() async {
 //     throw Exception('خطأ في جلب العدد: $e');
 //   }
 // }
+
+
+
+
+
+
+
+
+
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// ==================== NOTIFICATION ENDPOINTS ====================
+// Add these methods to your ApiService class in lib/services/api_service.dart
+
+// ========== NOTIFICATION HELPER FOR RESERVATIONS ==========
+
+/// Get the latest notification for a specific reservation
+/// This is called after creating a reservation to fetch the auto-generated notification
+static Future<Map<String, dynamic>?> getLatestNotificationForReservation(int reservationId) async {
+  try {
+    final response = await http.get(
+      Uri.parse('$baseUrl/notifications/by-reservation/$reservationId'),
+      headers: await _headers,
+    );
+
+    print('Get latest notification for reservation response: ${response.statusCode}');
+    print('Get latest notification body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      final notifications = json.decode(response.body) as List<dynamic>;
+      if (notifications.isNotEmpty) {
+        // Return the most recent notification
+        return notifications.first as Map<String, dynamic>;
+      }
+      return null;
+    } else {
+      print('No notification found for reservation $reservationId');
+      return null;
+    }
+  } catch (e) {
+    print('Error getting notification for reservation: $e');
+    return null;
+  }
+}
+
+/// Trigger notification to clan admin after reservation creation
+/// This fetches the auto-generated notification and ensures it's delivered
+static Future<bool> notifyClanAdminOfNewReservation(int reservationId) async {
+  try {
+    // Wait a moment for backend to create the notification
+    await Future.delayed(const Duration(milliseconds: 500));
+    
+    // Fetch the notification that was auto-generated
+    final notification = await getLatestNotificationForReservation(reservationId);
+    
+    if (notification != null) {
+      print('✅ Notification found and ready for clan admin');
+      print('Notification ID: ${notification['id']}');
+      print('Title: ${notification['title']}');
+      print('Message: ${notification['message']}');
+      
+      // Clear notifications cache so clan admin sees the new notification
+      clearNotificationsCache();
+      
+      return true;
+    } else {
+      print('⚠️ No notification found for reservation $reservationId');
+      return false;
+    }
+  } catch (e) {
+    print('❌ Error notifying clan admin: $e');
+    return false;
+  }
+}
+
+// ========== GET NOTIFICATIONS ==========
+
+/// Get all notifications for the current user
+/// GET /notifications
+/// 
+/// Parameters:
+/// - unread_only: Filter to show only unread notifications (default: false)
+/// - limit: Maximum number of notifications to return (1-100, default: 50)
+static Future<List<dynamic>> getNotifications({
+  bool unreadOnly = false,
+  int limit = 50,
+}) async {
+  try {
+    final queryParams = {
+      'unread_only': unreadOnly.toString(),
+      'limit': limit.toString(),
+    };
+
+    final uri = Uri.parse('$baseUrl/notifications')
+        .replace(queryParameters: queryParams);
+
+    final response = await http.get(
+      uri,
+      headers: await _headers,
+    );
+
+    print('Get notifications response: ${response.statusCode}');
+    print('Get notifications body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body) as List<dynamic>;
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل في جلب الإشعارات');
+    }
+  } catch (e) {
+    throw Exception('خطأ في جلب الإشعارات: $e');
+  }
+}
+
+/// Get notification statistics for the current user
+/// GET /notifications/stats
+/// 
+/// Returns:
+/// - unread_count: Total count of unread notifications
+/// - total_count: Total count of all notifications
+/// - by_type: Breakdown by notification type
+static Future<Map<String, dynamic>> getNotificationStats() async {
+  try {
+    final response = await http.get(
+      Uri.parse('$baseUrl/notifications/stats'),
+      headers: await _headers,
+    );
+
+    print('Get notification stats response: ${response.statusCode}');
+    print('Get notification stats body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل في جلب إحصائيات الإشعارات');
+    }
+  } catch (e) {
+    throw Exception('خطأ في جلب إحصائيات الإشعارات: $e');
+  }
+}
+
+/// Get the count of unread notifications for quick polling
+/// GET /notifications/unread-count
+/// 
+/// Returns:
+/// - count: Number of unread notifications
+static Future<int> getUnreadNotificationCount() async {
+  try {
+    final response = await http.get(
+      Uri.parse('$baseUrl/notifications/unread-count'),
+      headers: await _headers,
+    );
+
+    print('Get unread count response: ${response.statusCode}');
+    print('Get unread count body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return data['count'] as int;
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل في جلب عدد الإشعارات');
+    }
+  } catch (e) {
+    throw Exception('خطأ في جلب عدد الإشعارات: $e');
+  }
+}
+
+/// Get a specific notification by ID
+/// GET /notifications/{notification_id}
+static Future<Map<String, dynamic>> getNotificationById(int notificationId) async {
+  try {
+    final response = await http.get(
+      Uri.parse('$baseUrl/notifications/$notificationId'),
+      headers: await _headers,
+    );
+
+    print('Get notification by ID response: ${response.statusCode}');
+    print('Get notification by ID body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else if (response.statusCode == 404) {
+      throw Exception('الإشعار غير موجود');
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل في جلب الإشعار');
+    }
+  } catch (e) {
+    throw Exception('خطأ في جلب الإشعار: $e');
+  }
+}
+
+/// Get notifications filtered by type
+/// GET /notifications/by-type/{notification_type}
+/// 
+/// Parameters:
+/// - notificationType: Type of notifications to retrieve
+///   (reservation_approved, reservation_rejected, reservation_cancelled, 
+///    reservation_reminder, payment_reminder, general_announcement, system_update)
+/// - limit: Maximum number of notifications to return (1-100, default: 50)
+static Future<List<dynamic>> getNotificationsByType({
+  required String notificationType,
+  int limit = 50,
+}) async {
+  try {
+    final uri = Uri.parse('$baseUrl/notifications/by-type/$notificationType')
+        .replace(queryParameters: {'limit': limit.toString()});
+
+    final response = await http.get(
+      uri,
+      headers: await _headers,
+    );
+
+    print('Get notifications by type response: ${response.statusCode}');
+    print('Get notifications by type body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body) as List<dynamic>;
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل في جلب الإشعارات');
+    }
+  } catch (e) {
+    throw Exception('خطأ في جلب الإشعارات: $e');
+  }
+}
+
+// ========== UPDATE NOTIFICATIONS ==========
+
+/// Mark a specific notification as read
+/// PATCH /notifications/{notification_id}/read
+static Future<Map<String, dynamic>> markNotificationAsRead(int notificationId) async {
+  try {
+    final response = await http.patch(
+      Uri.parse('$baseUrl/notifications/$notificationId/read'),
+      headers: await _headers,
+    );
+
+    print('Mark notification as read response: ${response.statusCode}');
+    print('Mark notification as read body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else if (response.statusCode == 404) {
+      throw Exception('الإشعار غير موجود');
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل في تعليم الإشعار كمقروء');
+    }
+  } catch (e) {
+    throw Exception('خطأ في تعليم الإشعار كمقروء: $e');
+  }
+}
+
+/// Mark all notifications as read for the current user
+/// PATCH /notifications/mark-all-read
+static Future<Map<String, dynamic>> markAllNotificationsAsRead() async {
+  try {
+    final response = await http.patch(
+      Uri.parse('$baseUrl/notifications/mark-all-read'),
+      headers: await _headers,
+    );
+
+    print('Mark all notifications as read response: ${response.statusCode}');
+    print('Mark all notifications as read body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل في تعليم الإشعارات كمقروءة');
+    }
+  } catch (e) {
+    throw Exception('خطأ في تعليم الإشعارات كمقروءة: $e');
+  }
+}
+
+// ========== DELETE NOTIFICATIONS ==========
+
+/// Delete a specific notification
+/// DELETE /notifications/{notification_id}
+static Future<Map<String, dynamic>> deleteNotification(int notificationId) async {
+  try {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/notifications/$notificationId'),
+      headers: await _headers,
+    );
+
+    print('Delete notification response: ${response.statusCode}');
+    print('Delete notification body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else if (response.statusCode == 404) {
+      throw Exception('الإشعار غير موجود');
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل في حذف الإشعار');
+    }
+  } catch (e) {
+    throw Exception('خطأ في حذف الإشعار: $e');
+  }
+}
+
+/// Delete multiple notifications at once
+/// DELETE /notifications/bulk-delete
+/// 
+/// Parameters:
+/// - notificationIds: List of notification IDs to delete
+static Future<Map<String, dynamic>> bulkDeleteNotifications(List<int> notificationIds) async {
+  try {
+    if (notificationIds.isEmpty) {
+      throw Exception('قائمة معرفات الإشعارات فارغة');
+    }
+
+    final response = await http.delete(
+      Uri.parse('$baseUrl/notifications/bulk-delete'),
+      headers: await _headers,
+      body: json.encode(notificationIds),
+    );
+
+    print('Bulk delete notifications response: ${response.statusCode}');
+    print('Bulk delete notifications body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل في حذف الإشعارات');
+    }
+  } catch (e) {
+    throw Exception('خطأ في حذف الإشعارات: $e');
+  }
+}
+
+// ========== ADMIN-ONLY ENDPOINTS ==========
+
+/// Create a general notification (Clan Admin only)
+/// POST /notifications/create-general
+/// 
+/// Parameters:
+/// - userId: Target user ID
+/// - reservationId: Associated reservation ID
+/// - title: Notification title
+/// - message: Notification message
+static Future<Map<String, dynamic>> createGeneralNotification({
+  required int userId,
+  required int reservationId,
+  required String title,
+  required String message,
+}) async {
+  try {
+    final response = await http.post(
+      Uri.parse('$baseUrl/notifications/create-general'),
+      headers: await _headers,
+      body: json.encode({
+        'user_id': userId,
+        'reservation_id': reservationId,
+        'title': title,
+        'message': message,
+      }),
+    );
+
+    print('Create general notification response: ${response.statusCode}');
+    print('Create general notification body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else if (response.statusCode == 404) {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'الحجز أو المستخدم غير موجود');
+    } else if (response.statusCode == 403) {
+      throw Exception('غير مصرح لك بإرسال إشعارات لهذا الحجز');
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل في إنشاء الإشعار');
+    }
+  } catch (e) {
+    throw Exception('خطأ في إنشاء الإشعار: $e');
+  }
+}
+
+/// Send validation notification to groom (Clan Admin only)
+/// POST /notifications/notify-validation/{reservation_id}
+/// 
+/// Parameters:
+/// - reservationId: The ID of the reservation
+/// - isApproved: Whether the reservation was approved or rejected
+static Future<Map<String, dynamic>> notifyReservationValidation({
+  required int reservationId,
+  required bool isApproved,
+}) async {
+  try {
+    final uri = Uri.parse('$baseUrl/notifications/notify-validation/$reservationId')
+        .replace(queryParameters: {'is_approved': isApproved.toString()});
+
+    final response = await http.post(
+      uri,
+      headers: await _headers,
+    );
+
+    print('Notify reservation validation response: ${response.statusCode}');
+    print('Notify reservation validation body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else if (response.statusCode == 404) {
+      throw Exception('الحجز غير موجود');
+    } else if (response.statusCode == 403) {
+      throw Exception('غير مصرح لك بالتعامل مع هذا الحجز');
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل في إرسال إشعار التحقق');
+    }
+  } catch (e) {
+    throw Exception('خطأ في إرسال إشعار التحقق: $e');
+  }
+}
+
+// ========== UTILITY METHODS ==========
+
+/// Get notifications with caching support
+static Future<List<dynamic>> getNotificationsCached({
+  bool unreadOnly = false,
+  int limit = 50,
+  bool forceRefresh = false,
+}) async {
+  final cacheKey = 'notifications_${unreadOnly}_$limit';
+  
+  if (!forceRefresh) {
+    final cached = getCachedData<List<dynamic>>(cacheKey);
+    if (cached != null) {
+      return cached;
+    }
+  }
+
+  final notifications = await getNotifications(
+    unreadOnly: unreadOnly,
+    limit: limit,
+  );
+  
+  setCachedData(cacheKey, notifications);
+  return notifications;
+}
+
+/// Clear notifications cache
+static void clearNotificationsCache() {
+  // Clear all notification-related cache entries
+  final keys = _cache.keys.where((key) => key.startsWith('notifications_')).toList();
+  for (final key in keys) {
+    removeCachedData(key);
+  }
+}
+
+/// Poll for new notifications
+/// Returns true if there are new unread notifications
+static Future<bool> hasNewNotifications({int? lastCount}) async {
+  try {
+    final currentCount = await getUnreadNotificationCount();
+    
+    if (lastCount == null) {
+      return currentCount > 0;
+    }
+    
+    return currentCount > lastCount;
+  } catch (e) {
+    print('Error checking for new notifications: $e');
+    return false;
+  }
+}
+
+/// Get unread notifications only (convenience method)
+static Future<List<dynamic>> getUnreadNotifications({int limit = 50}) async {
+  return await getNotifications(unreadOnly: true, limit: limit);
+}
+
+/// Get read notifications only (convenience method)
+static Future<List<dynamic>> getReadNotifications({int limit = 50}) async {
+  final allNotifications = await getNotifications(limit: limit);
+  return allNotifications.where((notif) => notif['is_read'] == true).toList();
+}
+
+/// Check if notification exists and is unread
+static Future<bool> isNotificationUnread(int notificationId) async {
+  try {
+    final notification = await getNotificationById(notificationId);
+    return notification['is_read'] == false;
+  } catch (e) {
+    print('Error checking notification read status: $e');
+    return false;
+  }
+}
+
+/// Get notifications by multiple types
+static Future<List<dynamic>> getNotificationsByTypes({
+  required List<String> notificationTypes,
+  int limit = 50,
+}) async {
+  final allNotifications = <dynamic>[];
+  
+  for (final type in notificationTypes) {
+    try {
+      final notifications = await getNotificationsByType(
+        notificationType: type,
+        limit: limit,
+      );
+      allNotifications.addAll(notifications);
+    } catch (e) {
+      print('Error getting notifications of type $type: $e');
+    }
+  }
+  
+  // Sort by created_at descending
+  allNotifications.sort((a, b) {
+    final aTime = DateTime.parse(a['created_at']);
+    final bTime = DateTime.parse(b['created_at']);
+    return bTime.compareTo(aTime);
+  });
+  
+  return allNotifications.take(limit).toList();
+}
+
+/// Mark multiple notifications as read
+static Future<List<bool>> markMultipleNotificationsAsRead(List<int> notificationIds) async {
+  final results = <bool>[];
+  
+  for (final id in notificationIds) {
+    try {
+      await markNotificationAsRead(id);
+      results.add(true);
+    } catch (e) {
+      print('Error marking notification $id as read: $e');
+      results.add(false);
+    }
+  }
+  
+  return results;
+}
+
+/// Delete all read notifications
+static Future<int> deleteAllReadNotifications() async {
+  try {
+    final notifications = await getNotifications(limit: 100);
+    final readNotificationIds = notifications
+        .where((notif) => notif['is_read'] == true)
+        .map((notif) => notif['id'] as int)
+        .toList();
+    
+    if (readNotificationIds.isEmpty) {
+      return 0;
+    }
+    
+    final result = await bulkDeleteNotifications(readNotificationIds);
+    return result['count'] as int;
+  } catch (e) {
+    print('Error deleting read notifications: $e');
+    return 0;
+  }
+}
+
+/// Get notification count by type
+static Future<Map<String, int>> getNotificationCountByType() async {
+  try {
+    final stats = await getNotificationStats();
+    return Map<String, int>.from(stats['by_type'] ?? {});
+  } catch (e) {
+    print('Error getting notification count by type: $e');
+    return {};
+  }  
+}
+
+/// Check if user has unread reservation notifications
+static Future<bool> hasUnreadReservationNotifications() async {
+  try {
+    final reservationTypes = [
+      'reservation_approved',
+      'reservation_rejected',
+      'reservation_cancelled',
+    ];
+    
+    for (final type in reservationTypes) {
+      final notifications = await getNotificationsByType(
+        notificationType: type,
+        limit: 1,
+      );
+      
+      if (notifications.isNotEmpty && notifications[0]['is_read'] == false) {
+        return true;
+      }
+    }
+    
+    return false;
+  } catch (e) {
+    print('Error checking unread reservation notifications: $e');
+    return false;
+  }
+}
+
+/// Format notification for display
+static String formatNotificationMessage(Map<String, dynamic> notification) {
+  final title = notification['title'] ?? 'إشعار';
+  final message = notification['message'] ?? '';
+  final createdAt = DateTime.parse(notification['created_at']);
+  final timeAgo = _getTimeAgo(createdAt);
+  
+  return '$title\n$message\n$timeAgo';
+}
+
+/// Helper method to get relative time string
+static String _getTimeAgo(DateTime dateTime) {
+  final now = DateTime.now();
+  final difference = now.difference(dateTime);
+  
+  if (difference.inDays > 365) {
+    final years = (difference.inDays / 365).floor();
+    return 'منذ $years ${years == 1 ? 'سنة' : 'سنوات'}';
+  } else if (difference.inDays > 30) {
+    final months = (difference.inDays / 30).floor();
+    return 'منذ $months ${months == 1 ? 'شهر' : 'أشهر'}';
+  } else if (difference.inDays > 0) {
+    return 'منذ ${difference.inDays} ${difference.inDays == 1 ? 'يوم' : 'أيام'}';
+  } else if (difference.inHours > 0) {
+    return 'منذ ${difference.inHours} ${difference.inHours == 1 ? 'ساعة' : 'ساعات'}';
+  } else if (difference.inMinutes > 0) {
+    return 'منذ ${difference.inMinutes} ${difference.inMinutes == 1 ? 'دقيقة' : 'دقائق'}';
+  } else {
+    return 'الآن';
+  }
+}
+
+/// Validate notification data before sending (for admin)
+static Map<String, String> validateNotificationData({
+  required String title,
+  required String message,
+}) {
+  final errors = <String, String>{};
+
+  if (title.trim().isEmpty) {
+    errors['title'] = 'العنوان مطلوب';
+  } else if (title.trim().length < 3) {
+    errors['title'] = 'العنوان قصير جداً (الحد الأدنى 3 أحرف)';
+  } else if (title.trim().length > 100) {
+    errors['title'] = 'العنوان طويل جداً (الحد الأقصى 100 حرف)';
+  }
+
+  if (message.trim().isEmpty) {
+    errors['message'] = 'الرسالة مطلوبة';
+  } else if (message.trim().length < 10) {
+    errors['message'] = 'الرسالة قصيرة جداً (الحد الأدنى 10 أحرف)';
+  } else if (message.trim().length > 500) {
+    errors['message'] = 'الرسالة طويلة جداً (الحد الأقصى 500 حرف)';
+  }
+
+  return errors;
+}
+
+
+
+
+
+
+
+
+
+
+
+// ==================== SUPER ADMIN NOTIFICATION ENDPOINTS ====================
+
+/// Create and send notification to all users of a specific role
+/// POST /notifications/create_notification
+/// 
+/// Parameters:
+/// - title: Notification title
+/// - message: Notification message
+/// - isGroom: If true, sends to all grooms. If false, sends to all clan admins
+/// 
+/// Returns:
+/// - message: Success message with count of users notified
+static Future<Map<String, dynamic>> createNotificationForRole({
+  required String title,
+  required String message,
+  required bool isGroom,
+}) async {
+  try {
+    final response = await http.post(
+      Uri.parse('$baseUrl/notifications/create_notification'),
+      headers: await _headers,
+      body: json.encode({
+        'title': title,
+        'message': message,
+        'is_groom': isGroom,
+      }),
+    );
+
+    print('Create notification for role response: ${response.statusCode}');
+    print('Create notification for role body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else if (response.statusCode == 403) {
+      throw Exception('غير مصرح لك بإرسال الإشعارات');
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل في إرسال الإشعار');
+    }
+  } catch (e) {
+    throw Exception('خطأ في إرسال الإشعار: $e');
+  }
+}
+
+// ========== CONVENIENCE METHODS ==========
+
+/// Send notification to all grooms
+static Future<Map<String, dynamic>> sendNotificationToAllGrooms({
+  required String title,
+  required String message,
+}) async {
+  return await createNotificationForRole(
+    title: title,
+    message: message,
+    isGroom: true,
+  );
+}
+
+/// Send notification to all clan admins
+static Future<Map<String, dynamic>> sendNotificationToAllClanAdmins({
+  required String title,
+  required String message,
+}) async {
+  return await createNotificationForRole(
+    title: title,
+    message: message,
+    isGroom: false,
+  );
+}
+
+/// Send notification to ALL users (both grooms and clan admins)
+static Future<Map<String, int>> sendNotificationToAllUsers({
+  required String title,
+  required String message,
+}) async {
+  try {
+    // Send to grooms
+    final groomResult = await sendNotificationToAllGrooms(
+      title: title,
+      message: message,
+    );
+    
+    // Send to clan admins
+    final adminResult = await sendNotificationToAllClanAdmins(
+      title: title,
+      message: message,
+    );
+    
+    // Extract counts from messages
+    final groomCount = _extractCountFromMessage(groomResult['message']);
+    final adminCount = _extractCountFromMessage(adminResult['message']);
+    
+    return {
+      'groom_count': groomCount,
+      'clan_admin_count': adminCount,
+      'total_count': groomCount + adminCount,
+    };
+  } catch (e) {
+    throw Exception('خطأ في إرسال الإشعار لجميع المستخدمين: $e');
+  }
+}
+
+/// Helper method to extract user count from success message
+static int _extractCountFromMessage(String message) {
+  // Expected format: "Notification sent to X users successfully"
+  final regex = RegExp(r'(\d+)\s+users?');
+  final match = regex.firstMatch(message);
+  
+  if (match != null && match.groupCount >= 1) {
+    return int.tryParse(match.group(1) ?? '0') ?? 0;
+  }
+  
+  return 0;
+}
+
+// ========== APP UPDATE NOTIFICATION ==========
+
+/// Send app update notification to all users
+/// This is a specific use case for notifying about new app versions
+static Future<Map<String, int>> sendAppUpdateNotification({
+  required String version,
+  String? updateMessage,
+}) async {
+  final title = 'تحديث جديد متاح 📱';
+  final message = updateMessage ?? 
+      'يتوفر إصدار جديد من التطبيق (الإصدار $version).\n'
+      'يرجى التحديث للحصول على أحدث الميزات والتحسينات.';
+  
+  return await sendNotificationToAllUsers(
+    title: title,
+    message: message,
+  );
+}
+
+/// Send maintenance notification to all users
+static Future<Map<String, int>> sendMaintenanceNotification({
+  required String maintenanceTime,
+  String? additionalInfo,
+}) async {
+  final title = 'صيانة مجدولة ⚙️';
+  final message = additionalInfo ?? 
+      'سيخضع التطبيق لصيانة مجدولة في $maintenanceTime.\n'
+      'قد تواجه بعض الانقطاعات المؤقتة في الخدمة.';
+  
+  return await sendNotificationToAllUsers(
+    title: title,
+    message: message,
+  );
+}
+
+/// Send general announcement to all users
+static Future<Map<String, int>> sendGeneralAnnouncement({
+  required String title,
+  required String message,
+}) async {
+  return await sendNotificationToAllUsers(
+    title: title,
+    message: message,
+  );
+}
+
+/// Send urgent notification to all users
+static Future<Map<String, int>> sendUrgentNotification({
+  required String title,
+  required String message,
+}) async {
+  final urgentTitle = '⚠️ عاجل: $title';
+  
+  return await sendNotificationToAllUsers(
+    title: urgentTitle,
+    message: message,
+  );
+}
+
+// ========== VALIDATION METHODS ==========
+
+/// Validate notification data before sending to multiple users
+static Map<String, String> validateBulkNotificationData({
+  required String title,
+  required String message,
+}) {
+  final errors = <String, String>{};
+
+  // Title validation
+  if (title.trim().isEmpty) {
+    errors['title'] = 'العنوان مطلوب';
+  } else if (title.trim().length < 3) {
+    errors['title'] = 'العنوان قصير جداً (الحد الأدنى 3 أحرف)';
+  } else if (title.trim().length > 200) {
+    errors['title'] = 'العنوان طويل جداً (الحد الأقصى 200 حرف)';
+  }
+
+  // Message validation
+  if (message.trim().isEmpty) {
+    errors['message'] = 'الرسالة مطلوبة';
+  } else if (message.trim().length < 10) {
+    errors['message'] = 'الرسالة قصيرة جداً (الحد الأدنى 10 أحرف)';
+  } else if (message.trim().length > 1000) {
+    errors['message'] = 'الرسالة طويلة جداً (الحد الأقصى 1000 حرف)';
+  }
+
+  return errors;
+}
+
+// ========== STATISTICS METHODS ==========
+
+/// Get notification sending history (for admin dashboard)
+/// This would need a backend endpoint to work
+static Future<List<Map<String, dynamic>>> getNotificationHistory({
+  int limit = 50,
+}) async {
+  // Placeholder - implement when backend endpoint is available
+  // This could track all bulk notifications sent
+  throw UnimplementedError('Notification history endpoint not yet implemented');
+}
+
+
+
+
+
+
 
 
 

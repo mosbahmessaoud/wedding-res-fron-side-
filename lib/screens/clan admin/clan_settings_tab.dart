@@ -2,8 +2,9 @@
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../utils/colors.dart';
+
 import '../../services/api_service.dart';
+import '../../utils/colors.dart';
 
 class SettingsTab extends StatefulWidget {
   const SettingsTab({super.key});
@@ -34,8 +35,8 @@ class SettingsTabState extends State<SettingsTab>
   bool _allowTwoDayReservations = true;
   int _validationDeadlineDays = 10;
   int _calendarYearsAhead = 3;
-  int _yearsMaxReservGroomFromOutClan = 3;
-  int _yearsMaxReservGroomFromOriginClan = 1;
+  int _yearsMaxReservGroomFromOutClan = 1;
+  int _yearsMaxReservGroomFromOriginClan = 3;
 
   // Month selection lists
   List<int> _selectedSingleDayMonths = [11, 12, 1, 2, 3, 4];
@@ -290,63 +291,119 @@ void _populateFormFields() {
     }
   }
 }
-
-  Future<void> _saveSettings() async {
-    if (_clanId == null) {
-      setState(() => _errorMessage = 'معرف العشيرة غير متاح');
-      return;
-    }
-
-    setState(() {
-      _isSaving = true;
-      _errorMessage = null;
-      _successMessage = null;
-    });
-
-    try {
-    final settingsData = {
-            'allow_cross_clan_reservations': _allowCrossClanReservations,
-            'max_grooms_per_date': _maxGroomsPerDate,
-            'years_max_reserv_GroomFromOutClan': _yearsMaxReservGroomFromOutClan,
-            'years_max_reserv_GrooomFromOriginClan': _yearsMaxReservGroomFromOriginClan,
-            'allow_two_day_reservations': _allowTwoDayReservations,
-            'validation_deadline_days': _validationDeadlineDays,
-            'allowed_months_single_day': _selectedSingleDayMonths.join(','),
-            'allowed_months_two_day': _selectedTwoDayMonths.join(','),
-            'calendar_years_ahead': _calendarYearsAhead,
-            'days_to_accept_invites': _selectedInviteDays.join(','),
-            'accept_invites_times': _buildTimesString(),
-          };
- 
-      await ApiService.updateSettings(_clanId!, settingsData);
-
-      if (!mounted) return;
-
-      setState(() {
-        _successMessage = 'تم حفظ الإعدادات بنجاح';
-        _isSaving = false;
-      });
-
-      _saveAnimationController.forward().then((_) {
-        _saveAnimationController.reverse();
-      });
-
-      // Hide success message after 3 seconds
-      Future.delayed(Duration(seconds: 3), () {
-        if (mounted) {
-          setState(() => _successMessage = null);
-        }
-      });
-
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _errorMessage = 'فشل في حفظ الإعدادات: $e';
-        _isSaving = false;
-      });
-    }
+Future<void> _saveSettings() async {
+  if (_clanId == null) {
+    setState(() => _errorMessage = 'معرف العشيرة غير متاح');
+    return;
   }
 
+  setState(() {
+    _isSaving = true;
+    _errorMessage = null;
+    _successMessage = null;
+  });
+
+  try {
+    final settingsData = {
+      'allow_cross_clan_reservations': _allowCrossClanReservations,
+      'max_grooms_per_date': _maxGroomsPerDate,
+      'years_max_reserv_GroomFromOutClan': _yearsMaxReservGroomFromOutClan,
+      'years_max_reserv_GrooomFromOriginClan': _yearsMaxReservGroomFromOriginClan,
+      'allow_two_day_reservations': _allowTwoDayReservations,
+      'validation_deadline_days': _validationDeadlineDays,
+      'allowed_months_single_day': _selectedSingleDayMonths.join(','),
+      'allowed_months_two_day': _selectedTwoDayMonths.join(','),
+      'calendar_years_ahead': _calendarYearsAhead,
+      'days_to_accept_invites': _selectedInviteDays.join(','),
+      'accept_invites_times': _buildTimesString(),
+    };
+
+    await ApiService.updateSettings(_clanId!, settingsData);
+
+    if (!mounted) return;
+
+    setState(() {
+      _isSaving = false;
+    });
+
+    // Show success popup dialog
+    _showSuccessDialog();
+
+  } catch (e) {
+    if (!mounted) return;
+    setState(() {
+      _errorMessage = 'فشل في حفظ الإعدادات: $e';
+      _isSaving = false;
+    });
+  }
+}
+void _showSuccessDialog() {
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.green.shade50,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.check_circle,
+              color: Colors.green.shade600,
+              size: 48,
+            ),
+          ),
+          SizedBox(height: 16),
+          Text(
+            'تم الحفظ بنجاح',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          SizedBox(height: 8),
+          Text(
+            'تم حفظ جميع الإعدادات بنجاح',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 14,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: () => Navigator.pop(context),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              padding: EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: Text(
+              'حسناً',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
   @override
   Widget build(BuildContext context) {
     final screenSize = MediaQuery.of(context).size;

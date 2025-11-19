@@ -1,11 +1,12 @@
 // lib/providers/theme_provider.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io' show Platform;
 
 class ThemeProvider extends ChangeNotifier {
-  ThemeMode _themeMode = ThemeMode.light;
+  ThemeMode _themeMode = ThemeMode.system; // Start with system default
   
   ThemeMode get themeMode => _themeMode;
   bool get isDarkMode => _themeMode == ThemeMode.dark;
@@ -14,30 +15,40 @@ class ThemeProvider extends ChangeNotifier {
     _loadTheme();
   }
   
-  // Determine default theme based on platform
-  bool _getDefaultThemeForPlatform() {
+  // Get system's current brightness
+  Brightness _getSystemBrightness() {
+    try {
+      return SchedulerBinding.instance.platformDispatcher.platformBrightness;
+    } catch (e) {
+      debugPrint('Error getting system brightness: $e');
+      return Brightness.light; // Fallback
+    }
+  }
+  
+  // Determine default theme based on platform and system settings
+  ThemeMode _getDefaultThemeMode() {
     if (kIsWeb) {
-      // For web, default to light mode
-      return false;
+      // For web, follow system theme
+      final brightness = _getSystemBrightness();
+      return brightness == Brightness.dark ? ThemeMode.dark : ThemeMode.light;
     }
     
     try {
-      // Android and iOS: default to dark mode
+      // Android and iOS: follow system theme
       if (Platform.isAndroid || Platform.isIOS) {
-        return true;
+        return ThemeMode.system; // Let Flutter handle system theme
       }
-      // Windows, macOS, Linux: default to light mode
+      // Windows, macOS, Linux: follow system theme
       else if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
-        return false;
+        return ThemeMode.system;
       }
     } catch (e) {
-      // If Platform is not available, default to light mode
       debugPrint('Error detecting platform: $e');
-      return false;
+      return ThemeMode.system;
     }
     
-    // Fallback to light mode
-    return false;
+    // Fallback to system theme
+    return ThemeMode.system;
   }
   
   // Load saved theme preference
@@ -46,53 +57,109 @@ class ThemeProvider extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       
       // Check if user has a saved preference
-      if (prefs.containsKey('isDarkMode')) {
+      if (prefs.containsKey('theme_mode')) {
         // Load user's saved preference
-        final isDark = prefs.getBool('isDarkMode') ?? _getDefaultThemeForPlatform();
-        _themeMode = isDark ? ThemeMode.dark : ThemeMode.light;
+        final savedTheme = prefs.getString('theme_mode');
+        
+        switch (savedTheme) {
+          case 'light':
+            _themeMode = ThemeMode.light;
+            break;
+          case 'dark':
+            _themeMode = ThemeMode.dark;
+            break;
+          case 'system':
+            _themeMode = ThemeMode.system;
+            break;
+          default:
+            _themeMode = _getDefaultThemeMode();
+        }
       } else {
-        // First time launch: use platform-specific default
-        final isDark = _getDefaultThemeForPlatform();
-        _themeMode = isDark ? ThemeMode.dark : ThemeMode.light;
+        // First time launch: use system default
+        _themeMode = _getDefaultThemeMode();
         
         // Save the default preference
-        await prefs.setBool('isDarkMode', isDark);
+        await prefs.setString('theme_mode', 'system');
       }
       
       notifyListeners();
     } catch (e) {
-      // If SharedPreferences fails, use platform default
+      // If SharedPreferences fails, use system default
       debugPrint('Error loading theme: $e');
-      final isDark = _getDefaultThemeForPlatform();
-      _themeMode = isDark ? ThemeMode.dark : ThemeMode.light;
+      _themeMode = _getDefaultThemeMode();
       notifyListeners();
     }
   }
   
-  // Toggle theme
+  // Toggle theme (switches between light and dark, not system)
   Future<void> toggleTheme() async {
-    _themeMode = _themeMode == ThemeMode.light ? ThemeMode.dark : ThemeMode.light;
+    // If currently in system mode, determine current appearance and toggle
+    if (_themeMode == ThemeMode.system) {
+      final brightness = _getSystemBrightness();
+      _themeMode = brightness == Brightness.dark ? ThemeMode.light : ThemeMode.dark;
+    } else {
+      // Toggle between light and dark
+      _themeMode = _themeMode == ThemeMode.light ? ThemeMode.dark : ThemeMode.light;
+    }
+    
     notifyListeners();
     
     try {
-      // Save preference
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('isDarkMode', _themeMode == ThemeMode.dark);
+      await prefs.setString('theme_mode', _themeMode == ThemeMode.light ? 'light' : 'dark');
     } catch (e) {
       debugPrint('Error saving theme: $e');
     }
   }
   
-  // Set specific theme
+  // Set specific theme mode
   Future<void> setTheme(ThemeMode mode) async {
     _themeMode = mode;
     notifyListeners();
     
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('isDarkMode', mode == ThemeMode.dark);
+      String themeString;
+      
+      switch (mode) {
+        case ThemeMode.light:
+          themeString = 'light';
+          break;
+        case ThemeMode.dark:
+          themeString = 'dark';
+          break;
+        case ThemeMode.system:
+          themeString = 'system';
+          break;
+      }
+      
+      await prefs.setString('theme_mode', themeString);
     } catch (e) {
       debugPrint('Error saving theme: $e');
     }
+  }
+  
+  // Reset to system default
+  Future<void> useSystemTheme() async {
+    _themeMode = ThemeMode.system;
+    notifyListeners();
+    
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('theme_mode', 'system');
+    } catch (e) {
+      debugPrint('Error saving theme: $e');
+    }
+  }
+  
+  // Check if currently using system theme
+  bool get isSystemTheme => _themeMode == ThemeMode.system;
+  
+  // Get current effective brightness (considering system mode)
+  Brightness getCurrentBrightness() {
+    if (_themeMode == ThemeMode.system) {
+      return _getSystemBrightness();
+    }
+    return _themeMode == ThemeMode.dark ? Brightness.dark : Brightness.light;
   }
 }

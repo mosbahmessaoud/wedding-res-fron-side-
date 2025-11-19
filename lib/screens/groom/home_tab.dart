@@ -8,7 +8,7 @@ import '../../../services/api_service.dart';
 import '../../../utils/colors.dart';
 import '../../../providers/theme_provider.dart';
 
-class HomeTab extends StatefulWidget {
+class HomeTab extends StatefulWidget { 
   final Function(int)? onTabChanged;
   
   const HomeTab({super.key, this.onTabChanged});

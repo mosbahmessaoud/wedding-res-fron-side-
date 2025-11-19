@@ -1,21 +1,17 @@
 // lib/screens/home/tabs/reservations_tab.dart
-import 'dart:math' as math;
-import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:share_plus/share_plus.dart';
-
-import 'package:flutter/material.dart';
-import 'dart:typed_data';
 import 'dart:io';
+import 'dart:math' as math;
+import 'dart:typed_data';
+
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/material.dart';
+import 'package:open_file/open_file.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:open_file/open_file.dart';
-import 'package:wedding_reservation_app/screens/groom/create_reservation_screen.dart';
-import 'package:wedding_reservation_app/screens/groom/groom_home_screen.dart';
+import 'package:share_plus/share_plus.dart';
+
 import '../../../services/api_service.dart';
 import '../../../utils/colors.dart';
-  
-import '../../utils/colors.dart'; 
-import '../../widgets/theme_toggle_button.dart';
 
 class ReservationsTab extends StatefulWidget {
   const ReservationsTab({super.key});
@@ -1546,58 +1542,118 @@ Widget _buildEmptyState({
   }
 
   
-  Future<void> _cancelReservation(int reservationId) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('تأكيد الإلغاء'),
-        content: const Text('هل أنت متأكد من رغبتك في إلغاء هذا الحجز؟\nلا يمكن التراجع عن هذا الإجراء.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('إلغاء'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('تأكيد الإلغاء'),
-          ),
-        ],
-      ),
-    );
+  // Future<void> _cancelReservation(int reservationId) async {
+  //   final confirmed = await showDialog<bool>(
+  //     context: context,
+  //     builder: (context) => AlertDialog(
+  //       title: const Text('تأكيد الإلغاء'),
+  //       content: const Text('هل أنت متأكد من رغبتك في إلغاء هذا الحجز؟\nلا يمكن التراجع عن هذا الإجراء.'),
+  //       actions: [
+  //         TextButton(
+  //           onPressed: () => Navigator.pop(context, false),
+  //           child: const Text('إلغاء'),
+  //         ),
+  //         ElevatedButton(
+  //           onPressed: () => Navigator.pop(context, true),
+  //           style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+  //           child: const Text('تأكيد الإلغاء'),
+  //         ),
+  //       ],
+  //     ),
+  //   );
 
-    if (confirmed == true) {
-      try {
-        final connectivityResult = await Connectivity().checkConnectivity();
+  //   if (confirmed == true) {
+  //     try {
+  //       final connectivityResult = await Connectivity().checkConnectivity();
         
-        if (connectivityResult.contains(ConnectivityResult.none)) {
-          _showNoInternetDialog();
-          return;
-        }
+  //       if (connectivityResult.contains(ConnectivityResult.none)) {
+  //         _showNoInternetDialog();
+  //         return;
+  //       }
         
-        await ApiService.cancelMyReservation(reservationId);
+  //       await ApiService.cancelMyReservation(reservationId);
         
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('تم إلغاء الحجز بنجاح'),
-              backgroundColor: Colors.green,
-            ),
-          );
-          _refreshReservations();
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('خطأ في إلغاء الحجز: ${e.toString()}'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
+  //       if (mounted) {
+  //         ScaffoldMessenger.of(context).showSnackBar(
+  //           const SnackBar(
+  //             content: Text('تم إلغاء الحجز بنجاح'),
+  //             backgroundColor: Colors.green,
+  //           ),
+  //         );
+  //         _refreshReservations();
+  //       }
+  //     } catch (e) {
+  //       if (mounted) {
+  //         ScaffoldMessenger.of(context).showSnackBar(
+  //           SnackBar(
+  //             content: Text('خطأ في إلغاء الحجز: ${e.toString()}'),
+  //             backgroundColor: Colors.red,
+  //           ),
+  //         );
+  //       }
+  //     }
+  //   }
+  // }
+// Replace the existing _cancelReservation method with this updated version:
+
+Future<void> _cancelReservation(int reservationId) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('تأكيد الإلغاء'),
+      content: const Text('هل أنت متأكد من رغبتك في إلغاء هذا الحجز؟\nلا يمكن التراجع عن هذا الإجراء.'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('إلغاء'),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(context, true),
+          style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+          child: const Text('تأكيد الإلغاء'),
+        ),
+      ],
+    ),
+  );
+
+  if (confirmed == true) {
+    try {
+      final connectivityResult = await Connectivity().checkConnectivity();
+      
+      if (connectivityResult.contains(ConnectivityResult.none)) {
+        _showNoInternetDialog();
+        return;
+      }
+      
+      await ApiService.cancelMyReservation(reservationId);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تم إلغاء الحجز بنجاح'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+        
+        // Navigate to home page after successful cancellation
+        Navigator.of(context).pushNamedAndRemoveUntil(
+          '/groom_home',
+          (route) => false, // Remove all previous routes
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطأ في إلغاء الحجز: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }
+}
 
 String _generatePdfFileName(int reservationId, Map<String, dynamic>? reservation) {
   String groomName = 'العريس';

@@ -5249,6 +5249,40 @@ static Map<String, String> validateNotificationData({
 /// 
 /// Returns:
 /// - message: Success message with count of users notified
+// static Future<Map<String, dynamic>> createNotificationForRole_grooms_reserved({
+//   required String title,
+//   required String message,
+//   required bool isGroom,
+// }) async {
+//   try {
+//     final response = await http.post(
+//       Uri.parse('$baseUrl/notifications/create_notification_grooms_reserved'),
+//       headers: await _headers,
+//       body: json.encode({
+//         'title': title,
+//         'message': message,
+//         'is_groom': isGroom,
+//       }),
+//     );
+
+//     print('Create notification for role response: ${response.statusCode}');
+//     print('Create notification for role body: ${response.body}');
+
+//     if (response.statusCode == 200) {
+//       return json.decode(response.body);
+//     } else if (response.statusCode == 403) {
+//       throw Exception('غير مصرح لك بإرسال الإشعارات');
+//     } else {
+//       final error = json.decode(response.body);
+//       throw Exception(error['detail'] ?? 'فشل في إرسال الإشعار');
+//     }
+//   } catch (e) {
+//     throw Exception('خطأ في إرسال الإشعار: $e');
+//   }
+// }
+
+
+
 static Future<Map<String, dynamic>> createNotificationForRole({
   required String title,
   required String message,
@@ -5257,6 +5291,38 @@ static Future<Map<String, dynamic>> createNotificationForRole({
   try {
     final response = await http.post(
       Uri.parse('$baseUrl/notifications/create_notification'),
+      headers: await _headers,
+      body: json.encode({
+        'title': title,
+        'message': message,
+        'is_groom': isGroom,
+      }),
+    );
+
+    print('Create notification for role response: ${response.statusCode}');
+    print('Create notification for role body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else if (response.statusCode == 403) {
+      throw Exception('غير مصرح لك بإرسال الإشعارات');
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل في إرسال الإشعار');
+    }
+  } catch (e) {
+    throw Exception('خطأ في إرسال الإشعار: $e');
+  }
+}
+
+static Future<Map<String, dynamic>> createNotificationForValidReserv({
+  required String title,
+  required String message,
+  required bool isGroom,
+}) async {
+  try {
+    final response = await http.post(
+      Uri.parse('$baseUrl/notifications/create_notification_grooms_reserved'),
       headers: await _headers,
       body: json.encode({
         'title': title,

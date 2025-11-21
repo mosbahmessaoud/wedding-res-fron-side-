@@ -1,5 +1,6 @@
 // lib/screens/super_admin/notifications_tab.dart
 import 'package:flutter/material.dart';
+
 import '../../services/api_service.dart';
 import '../../utils/colors.dart';
 
@@ -7,15 +8,15 @@ class NotificationsTab extends StatefulWidget {
   const NotificationsTab({super.key});
 
   @override
-  _NotificationsTabState createState() => _NotificationsTabState();
+  NotificationsTabState createState() => NotificationsTabState();
 }
 
-class _NotificationsTabState extends State<NotificationsTab> {
+class NotificationsTabState extends State<NotificationsTab> {
   final _titleController = TextEditingController();
   final _messageController = TextEditingController();
   final _versionController = TextEditingController();
   bool _isLoading = false;
-  String? _selectedRecipient = 'all'; // 'all', 'grooms', 'clan_admins'
+  String? _selectedRecipient = 'all'; // 'all', 'grooms', 'clan_admins', 'grooms_reserved'
 
   @override
   void dispose() {
@@ -23,6 +24,9 @@ class _NotificationsTabState extends State<NotificationsTab> {
     _messageController.dispose();
     _versionController.dispose();
     super.dispose();
+  }
+  void refreshData(){
+    setState((){});
   }
 
   Future<void> _sendNotification() async {
@@ -42,22 +46,19 @@ class _NotificationsTabState extends State<NotificationsTab> {
     try {
       Map<String, dynamic> result;
       
-      if (_selectedRecipient == 'all') {
-        result = await ApiService.sendNotificationToAllUsers(
-          title: _titleController.text.trim(),
-          message: _messageController.text.trim(),
-        );
-        _showSuccessMessage('تم إرسال الإشعار إلى ${result['total_count']} مستخدم');
-      } else if (_selectedRecipient == 'grooms') {
+      if (_selectedRecipient == 'grooms') {
         result = await ApiService.sendNotificationToAllGrooms(
           title: _titleController.text.trim(),
           message: _messageController.text.trim(),
         );
         _showSuccessMessage(result['message']);
-      } else {
-        result = await ApiService.sendNotificationToAllClanAdmins(
+      
+      } else if (_selectedRecipient == 'grooms_reserved') {
+        // Call the reserved grooms endpoint
+        result = await ApiService.createNotificationForValidReserv(
           title: _titleController.text.trim(),
           message: _messageController.text.trim(),
+          isGroom: true, // Set to true for grooms with reservations
         );
         _showSuccessMessage(result['message']);
       }
@@ -170,9 +171,9 @@ class _NotificationsTabState extends State<NotificationsTab> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   // Quick Action: App Update
-                  _buildQuickActionCard(isDark),
+                  // _buildQuickActionCard(isDark),
                   
-                  SizedBox(height: 24),
+                  // SizedBox(height: 24),
                   
                   // Custom Notification Form
                   _buildCustomNotificationCard(isDark),
@@ -185,68 +186,68 @@ class _NotificationsTabState extends State<NotificationsTab> {
     );
   }
 
-  Widget _buildQuickActionCard(bool isDark) {
-    return Card(
-      elevation: 2,
-      child: Padding(
-        padding: EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.system_update, color: AppColors.primary),
-                SizedBox(width: 8),
-                Text(
-                  'إشعار تحديث التطبيق',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: 16),
+  // Widget _buildQuickActionCard(bool isDark) {
+  //   return Card(
+  //     elevation: 2,
+  //     child: Padding(
+  //       padding: EdgeInsets.all(16),
+  //       child: Column(
+  //         crossAxisAlignment: CrossAxisAlignment.start,
+  //         children: [
+  //           Row(
+  //             children: [
+  //               Icon(Icons.system_update, color: AppColors.primary),
+  //               SizedBox(width: 8),
+  //               Text(
+  //                 'إشعار تحديث التطبيق',
+  //                 style: TextStyle(
+  //                   fontSize: 18,
+  //                   fontWeight: FontWeight.bold,
+  //                 ),
+  //               ),
+  //             ],
+  //           ),
+  //           SizedBox(height: 16),
             
-            TextField(
-              controller: _versionController,
-              decoration: InputDecoration(
-                labelText: 'رقم الإصدار',
-                hintText: 'مثال: 2.5.0',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.tag),
-              ),
-            ),
+  //           TextField(
+  //             controller: _versionController,
+  //             decoration: InputDecoration(
+  //               labelText: 'رقم الإصدار',
+  //               hintText: 'مثال: 2.5.0',
+  //               border: OutlineInputBorder(),
+  //               prefixIcon: Icon(Icons.tag),
+  //             ),
+  //           ),
             
-            SizedBox(height: 12),
+  //           SizedBox(height: 12),
             
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: _isLoading ? null : _sendAppUpdateNotification,
-                icon: _isLoading 
-                    ? SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                        ),
-                      )
-                    : Icon(Icons.send),
-                label: Text('إرسال إشعار التحديث لجميع المستخدمين'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: isDark ? Colors.white : AppColors.textPrimary,
-                  padding: EdgeInsets.symmetric(vertical: 16),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  //           SizedBox(
+  //             width: double.infinity,
+  //             child: ElevatedButton.icon(
+  //               onPressed: _isLoading ? null : _sendAppUpdateNotification,
+  //               icon: _isLoading 
+  //                   ? SizedBox(
+  //                       width: 16,
+  //                       height: 16,
+  //                       child: CircularProgressIndicator(
+  //                         strokeWidth: 2,
+  //                         valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+  //                       ),
+  //                     )
+  //                   : Icon(Icons.send),
+  //               label: Text('إرسال إشعار التحديث لجميع المستخدمين'),
+  //               style: ElevatedButton.styleFrom(
+  //                 backgroundColor: AppColors.primary,
+  //                 foregroundColor: isDark ? Colors.white : AppColors.textPrimary,
+  //                 padding: EdgeInsets.symmetric(vertical: 16),
+  //               ),
+  //             ),
+  //           ),
+  //         ],
+  //       ),
+  //     ),
+  //   );
+  // }
 
   Widget _buildCustomNotificationCard(bool isDark) {
     return Card(
@@ -292,10 +293,10 @@ class _NotificationsTabState extends State<NotificationsTab> {
                   SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
+                    runSpacing: 8,
                     children: [
-                      _buildRecipientChip('الجميع', 'all', isDark),
-                      _buildRecipientChip('العرسان فقط', 'grooms', isDark),
-                      _buildRecipientChip('مدراء العشائر فقط', 'clan_admins', isDark),
+                      _buildRecipientChip(' إرسال إشعار للجميع ', 'grooms', isDark),
+                      _buildRecipientChip('إرسال إشعار لكل عريس لديه حجز', 'grooms_reserved', isDark),
                     ],
                   ),
                 ],

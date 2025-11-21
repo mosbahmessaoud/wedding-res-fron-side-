@@ -9,6 +9,7 @@ import 'package:wedding_reservation_app/screens/clan%20admin/clan_settings_tab.d
 import 'package:wedding_reservation_app/screens/clan%20admin/food_menu_tab.dart';
 import 'package:wedding_reservation_app/screens/clan%20admin/grooms_tab.dart';
 import 'package:wedding_reservation_app/screens/clan%20admin/home_tab.dart';
+import 'package:wedding_reservation_app/screens/clan%20admin/notifications_tab.dart'; // Added
 import 'package:wedding_reservation_app/screens/clan%20admin/reservations_tab.dart';
 import 'package:wedding_reservation_app/screens/clan%20admin/special_reservations_tab.dart';
 import 'package:wedding_reservation_app/services/notification_manager.dart';
@@ -17,7 +18,6 @@ import '../../providers/theme_provider.dart';
 import '../../services/api_service.dart';
 import '../../utils/colors.dart';
 import '../../utils/constants.dart';
-import 'admin_otp_screen.dart';
 
 class ClanAdminHomeScreen extends StatefulWidget {
   const ClanAdminHomeScreen({super.key});
@@ -44,9 +44,10 @@ class _ClanAdminHomeScreenState extends State<ClanAdminHomeScreen>
   final GlobalKey<ReservationsTabState> _reservationsTabKey = GlobalKey<ReservationsTabState>();
   final GlobalKey<FoodTabState> _foodTabKey = GlobalKey<FoodTabState>();
   final GlobalKey<SettingsTabState> _settingsTabKey = GlobalKey<SettingsTabState>();
-  final GlobalKey<AdminOTPScreenState> _otpTabKey = GlobalKey<AdminOTPScreenState>();
+  final GlobalKey<NotificationsTabState> _notifTabKey = GlobalKey<NotificationsTabState>();
   final GlobalKey<ClanRulesPageState> _rulesTabKey = GlobalKey<ClanRulesPageState>();
   final GlobalKey<SpecialReservationsTabState> _reserv_special = GlobalKey<SpecialReservationsTabState>();
+  final GlobalKey<NotificationsTabState> _notificationsTabKey = GlobalKey<NotificationsTabState>(); // Added
 
   @override
   void initState() {
@@ -138,7 +139,7 @@ class _ClanAdminHomeScreenState extends State<ClanAdminHomeScreen>
         _settingsTabKey.currentState?.refreshData();
         break;
       case 6:
-        _otpTabKey.currentState?.refreshData();
+        _notifTabKey.currentState?.refreshData();
         break;
       case 7:
         _rulesTabKey.currentState?.refreshData();
@@ -147,6 +148,9 @@ class _ClanAdminHomeScreenState extends State<ClanAdminHomeScreen>
         _reserv_special.currentState?.refreshData();
         break;
       case 9:
+        _notificationsTabKey.currentState?.refreshData(); // Added
+        break;
+      case 10:
         break;
     }
   }
@@ -214,9 +218,8 @@ Widget build(BuildContext context) {
   final isMobile = screenSize.width <= 480;
 
   return PopScope(
-    canPop: false, // ✅ Back button already disabled
+    canPop: false,
     onPopInvokedWithResult: (bool didPop, dynamic result) {
-      // Do nothing - completely blocks all back button attempts
       return;
     },
     child: Scaffold(
@@ -243,12 +246,14 @@ Widget build(BuildContext context) {
                         ReservationsTab(key: _reservationsTabKey),
                         FoodTab(key: _foodTabKey),
                         SettingsTab(key: _settingsTabKey),
-                        AdminOTPScreen(key: _otpTabKey),
+                        NotificationsTab(key: _notifTabKey),    
+                        
                         if (_clanId != null && _clanName != null)
                           ClanRulesPage(key: _rulesTabKey)
                         else
                           Center(child: CircularProgressIndicator(color: AppColors.primary)),
                         SpecialReservationsTab(key: _reserv_special),
+                        NotificationsTab(key: _notificationsTabKey), // Added
                         _buildProfileTab(isDark),
                       ],
                     ),
@@ -271,8 +276,8 @@ Widget build(BuildContext context) {
     ),
   );
 }
-  Widget _buildRightNavigation(bool isDark) {
 
+  Widget _buildRightNavigation(bool isDark) {
     return Container(
       width: 280,
       decoration: BoxDecoration(
@@ -363,8 +368,9 @@ Widget build(BuildContext context) {
                       _buildRightNavItem(Icons.settings_outlined, 'الإعدادات', 5, isDark),
                       // _buildRightNavItem(Icons.lock_outline, 'رموز التحقق', 6, isDark),
                       _buildRightNavItem(Icons.rule_outlined, 'قوانين العشيرة', 7, isDark),
-                      _buildRightNavItem(Icons.star_border_outlined, 'الحجوزات الخاصة', 8, isDark), // Added
-                      _buildRightNavItem(Icons.person_outline, 'الملف الشخصي', 9, isDark), // Changed from 8 to 9                    
+                      _buildRightNavItem(Icons.star_border_outlined, 'الحجوزات الخاصة', 8, isDark),
+                      _buildRightNavItem(Icons.notifications_outlined, 'الإشعارات', 9, isDark), // Added
+                      _buildRightNavItem(Icons.person_outline, 'الملف الشخصي', 10, isDark), // Changed from 9 to 10                  
                     ],
                   ),
                 ),
@@ -548,7 +554,7 @@ Widget build(BuildContext context) {
             ],
           ),
           onPressed: () {
-            // TODO: Navigate to notifications
+            _navigateToTab(9); // Navigate to notifications tab
           },
         ),
         const SizedBox(width: 4),
@@ -566,7 +572,6 @@ Widget build(BuildContext context) {
             ),
           ),
           onPressed: () {
-            // Toggle theme using the provider
             final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
             themeProvider.toggleTheme();
           },
@@ -641,9 +646,7 @@ Widget build(BuildContext context) {
                   _buildNavItem(Icons.home_rounded, 'الرئيسية', 0, isDark),
                   _buildNavItem(Icons.restaurant_menu_outlined, 'الطعام', 4, isDark),
                   _buildNavItem(Icons.settings_outlined, 'الإعدادات', 5, isDark),
-                  // _buildNavItem(Icons.lock_outline, 'OTP', 6, isDark),
-                  _buildNavItem(Icons.star_border_outlined, 'حجز خاص', 8, isDark),
-                  // _buildNavItem(Icons.rule_outlined, 'القوانين', 7, isDark),
+                  _buildNavItem(Icons.notifications_outlined, 'الإشعارات', 9, isDark), // Added
                 ],
               ),
             ),
@@ -718,6 +721,7 @@ Widget build(BuildContext context) {
       ),
     );
   }
+
 String _getAppBarTitle() {
   switch (_currentIndex) {
     case 0:
@@ -737,13 +741,16 @@ String _getAppBarTitle() {
     case 7:
       return 'قوانين العشيرة';
     case 8:
-      return 'الحجوزات الخاصة'; // Added
+      return 'الحجوزات الخاصة';
     case 9:
-      return 'الملف الشخصي'; // Changed from case 8
+      return 'الإشعارات'; // Added
+    case 10:
+      return 'الملف الشخصي'; // Changed from case 9 to 10
     default:
       return AppConstants.appName;
   }
 }
+
   Widget _buildProfileTab(bool isDark) {
     return Container(
       width: double.infinity,

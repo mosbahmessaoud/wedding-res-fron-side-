@@ -904,7 +904,7 @@ Widget _buildQuickActions(BuildContext context) {
     (Icons.group_outlined, 'العرسان', '${_dashboardData['grooms_count']} مسجل', Color(0xFF42B72A), 2),
     (Icons.book_outlined, 'الحجوزات', '${_dashboardData['pending_reservations']} معلق', Color(0xFFE4405F), 3),
     (Icons.restaurant_outlined, 'قوائم الطعام', '${_dashboardData['menus_count']} قائمة', Color(0xFFFF6F00), 4),
-    (Icons.lock_outline, 'رموز التحقق', 'بحث عن رموز', Color(0xFF9C27B0), 6),
+    (Icons.lock_outline, 'ارسال إشعار', ' ', Color(0xFF9C27B0), 6),
   ];
 
   return Column(

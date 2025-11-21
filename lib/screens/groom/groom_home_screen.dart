@@ -77,8 +77,162 @@ class _GroomHomeScreenState extends State<GroomHomeScreen> {
       
     });
   }
+/// Show notification details dialog
+void _showNotificationDetailsDialog(Map<String, dynamic> notification, bool isDark) {
+  showDialog(
+    context: context,
+    builder: (context) => Dialog(
+      backgroundColor: Colors.transparent,
+      child: Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.7,
+          maxWidth: 500,
+        ),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: isDark ? Colors.grey[850] : Colors.grey[100],
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(20),
+                  topRight: Radius.circular(20),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'تفاصيل الإشعار',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 18,
+                        color: isDark ? Colors.white : Colors.black87,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(
+                      Icons.close,
+                      color: isDark ? Colors.white70 : Colors.black54,
+                    ),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+            
+            // Content
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Title
+                    Text(
+                      notification['title'] ?? 'إشعار',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 20,
+                        color: isDark ? Colors.white : Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    
+                    // Date
+                    Text(
+                      _formatDateTime(notification['created_at']),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark ? Colors.grey[500] : Colors.grey[500],
+                      ),
+                    ),
+                    
+                    const SizedBox(height: 20),
+                    const Divider(),
+                    const SizedBox(height: 20),
+                    
+                    // Message
+                    Text(
+                      notification['message'] ?? '',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: isDark ? Colors.grey[300] : Colors.grey[800],
+                        height: 1.6,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            
+            // Footer
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: isDark ? Colors.grey[850] : Colors.grey[100],
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(20),
+                  bottomRight: Radius.circular(20),
+                ),
+              ),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text(
+                    'موافق',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
 
-
+/// Helper to format datetime for notification details
+String _formatDateTime(String? dateTimeStr) {
+  if (dateTimeStr == null) return '';
+  
+  try {
+    final dateTime = DateTime.parse(dateTimeStr);
+    final now = DateTime.now();
+    final difference = now.difference(dateTime);
+    
+    if (difference.inDays > 0) {
+      return 'منذ ${difference.inDays} ${difference.inDays == 1 ? 'يوم' : 'أيام'}';
+    } else if (difference.inHours > 0) {
+      return 'منذ ${difference.inHours} ${difference.inHours == 1 ? 'ساعة' : 'ساعات'}';
+    } else if (difference.inMinutes > 0) {
+      return 'منذ ${difference.inMinutes} ${difference.inMinutes == 1 ? 'دقيقة' : 'دقائق'}';
+    } else {
+      return 'الآن';
+    }
+  } catch (e) {
+    return '';
+  }
+}
   /// Load unread notification count
   Future<void> _loadUnreadNotificationCount() async {
     if (_isLoadingNotifications) return;
@@ -264,7 +418,13 @@ class _GroomHomeScreenState extends State<GroomHomeScreen> {
                               notification: notification,
                               isDark: isDark,
                               onTap: () async {
-                                // Mark as read
+                                // FIRST: Close the notifications list dialog
+                                Navigator.pop(context);
+                                
+                                // THEN: Show the detail dialog
+                                _showNotificationDetailsDialog(notification, isDark);
+                                
+                                // Mark as read if unread
                                 if (notification['is_read'] == false) {
                                   try {
                                     await ApiService.markNotificationAsRead(
@@ -450,6 +610,8 @@ class _GroomHomeScreenState extends State<GroomHomeScreen> {
                         ),
                     ],
                   ),
+
+
                   const SizedBox(height: 4),
                   Text(
                     notification['message'] ?? '',
@@ -485,6 +647,8 @@ class _GroomHomeScreenState extends State<GroomHomeScreen> {
     final now = DateTime.now();
     final difference = now.difference(dateTime);
     
+
+
     if (difference.inDays > 365) {
       final years = (difference.inDays / 365).floor();
       return 'منذ $years ${years == 1 ? 'سنة' : 'سنوات'}';
@@ -2042,6 +2206,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     final isUnread = notification['is_read'] == false;
     
     return GestureDetector(
+
       onTap: () async {
         if (isUnread) {
           try {
@@ -2053,6 +2218,21 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           }
         }
       },
+        // onTap: () async {
+        //   // Show full notification details in popup
+        //   _showNotificationDetailsDialog(notification, isDark);
+          
+        //   // Mark as read if unread
+        //   if (isUnread) {
+        //     try {
+        //       await ApiService.markNotificationAsRead(notification['id']);
+        //       widget.onNotificationRead(); // This calls the callback to parent
+        //       _loadNotifications(); // Refresh the list
+        //     } catch (e) {
+        //       print('Error marking as read: $e');
+        //     }
+        //   }
+        // },
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -2081,6 +2261,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       fontSize: 16,
                       color: isDark ? Colors.white : Colors.black87,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 if (isUnread)
@@ -2096,13 +2278,15 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              notification['message'] ?? '',
-              style: TextStyle(
-                fontSize: 14,
-                color: isDark ? Colors.grey[400] : Colors.grey[600],
-                height: 1.4,
+                notification['message'] ?? '',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: isDark ? Colors.grey[400] : Colors.grey[600],
+                  height: 1.4,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
-            ),
             const SizedBox(height: 8),
             Text(
               _formatDateTime(notification['created_at']),

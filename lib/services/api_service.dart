@@ -4682,6 +4682,37 @@ static Future<List<dynamic>> getNotifications({
     throw Exception('خطأ في جلب الإشعارات: $e');
   }
 }
+static Future<List<dynamic>> getSendedNotifications({
+  bool unreadOnly = false,
+  int limit = 50,
+}) async {
+  try {
+    final queryParams = {
+      'unread_only': unreadOnly.toString(),
+      'limit': limit.toString(),
+    };
+
+    final uri = Uri.parse('$baseUrl/notifications/sended')
+        .replace(queryParameters: queryParams);
+
+    final response = await http.get(
+      uri,
+      headers: await _headers,
+    );
+
+    print('Get notifications response: ${response.statusCode}');
+    print('Get notifications body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body) as List<dynamic>;
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل في جلب الإشعارات');
+    }
+  } catch (e) {
+    throw Exception('خطأ في جلب الإشعارات: $e');
+  }
+}
 
 /// Get notification statistics for the current user
 /// GET /notifications/stats
@@ -4858,6 +4889,7 @@ static Future<Map<String, dynamic>> deleteNotification(int notificationId) async
       Uri.parse('$baseUrl/notifications/$notificationId'),
       headers: await _headers,
     );
+
 
     print('Delete notification response: ${response.statusCode}');
     print('Delete notification body: ${response.body}');

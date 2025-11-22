@@ -1,12 +1,12 @@
 // lib/screens/home/tabs/home_tab.dart
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../../../providers/theme_provider.dart';
 import '../../../services/api_service.dart';
 import '../../../utils/colors.dart';
-import '../../../providers/theme_provider.dart';
 
 class HomeTab extends StatefulWidget { 
   final Function(int)? onTabChanged;
@@ -1176,7 +1176,7 @@ Widget _buildQuickActions(bool isDark) {
     },
     {
       'icon': Icons.rule_outlined,
-      'title': 'قوانين العشيرة',
+      'title': 'اللوازم',
       'subtitle': 'اطلع على القوانين والقواعد',
       'onTap': () => widget.onTabChanged!(5)
     },
@@ -1293,7 +1293,7 @@ Widget _buildQuickActions(bool isDark) {
 
   Widget _buildReservationCard(Map<String, dynamic> reservation, bool isDark) {
     final status = reservation['status'] ?? 'pending';
-    final date = reservation['wedding_date'] ?? 'غير محدد';
+    final date = reservation['date1'] ?? 'غير محدد';
     final hall = reservation['hall_name'] ?? 'غير محدد';
     
     Color color = Colors.orange;

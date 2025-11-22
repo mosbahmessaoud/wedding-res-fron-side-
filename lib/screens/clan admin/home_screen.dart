@@ -2,7 +2,6 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:wedding_reservation_app/screens/clan%20admin/HallsTab.dart';
 import 'package:wedding_reservation_app/screens/clan%20admin/clan_rules_management_page.dart';
 import 'package:wedding_reservation_app/screens/clan%20admin/clan_settings_tab.dart';
@@ -14,7 +13,6 @@ import 'package:wedding_reservation_app/screens/clan%20admin/reservations_tab.da
 import 'package:wedding_reservation_app/screens/clan%20admin/special_reservations_tab.dart';
 import 'package:wedding_reservation_app/services/notification_manager.dart';
 
-import '../../providers/theme_provider.dart';
 import '../../services/api_service.dart';
 import '../../utils/colors.dart';
 import '../../utils/constants.dart';
@@ -367,10 +365,10 @@ Widget build(BuildContext context) {
                       _buildRightNavItem(Icons.restaurant_menu_outlined, 'قوائم الطعام', 4, isDark),
                       _buildRightNavItem(Icons.settings_outlined, 'الإعدادات', 5, isDark),
                       // _buildRightNavItem(Icons.lock_outline, 'رموز التحقق', 6, isDark),
-                      _buildRightNavItem(Icons.rule_outlined, 'قوانين العشيرة', 7, isDark),
+                      _buildRightNavItem(Icons.rule_outlined, 'اللوازم ', 7, isDark),
                       _buildRightNavItem(Icons.star_border_outlined, 'الحجوزات الخاصة', 8, isDark),
                       _buildRightNavItem(Icons.notifications_outlined, 'الإشعارات', 9, isDark), // Added
-                      _buildRightNavItem(Icons.person_outline, 'الملف الشخصي', 10, isDark), // Changed from 9 to 10                  
+                      // _buildRightNavItem(Icons.person_outline, 'الملف الشخصي', 10, isDark), // Changed from 9 to 10                  
                     ],
                   ),
                 ),
@@ -506,98 +504,98 @@ Widget build(BuildContext context) {
     );
   }
 
-  PreferredSizeWidget _buildAppBar(bool isMobile, bool isDark) {
-    return AppBar(
-      title: Text(
-        _getAppBarTitle(),
-        style: TextStyle(
-          fontSize: 20,
-          fontWeight: FontWeight.w700,
-          letterSpacing: -0.5,
-          color: isDark ? Colors.white : Colors.black87,
-        ),
-      ),
-      backgroundColor: isDark 
-          ? AppColors.surfaceVariant.withOpacity(0.9)
-          : const Color.fromARGB(201, 255, 255, 255),
-      foregroundColor: isDark ? Colors.white : Colors.black87,
-      elevation: 0,
-      automaticallyImplyLeading: false,
-      actions: [
-        IconButton(
-          icon: Stack(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: isDark ? Colors.grey[800] : Colors.grey[100],
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  Icons.notifications_outlined,
-                  size: 20,
-                  color: isDark ? Colors.white : Colors.black87,
-                ),
-              ),
-              Positioned(
-                right: 4,
-                top: 4,
-                child: Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          onPressed: () {
-            _navigateToTab(9); // Navigate to notifications tab
-          },
-        ),
-        const SizedBox(width: 4),
-        IconButton(
-          icon: Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: isDark ? Colors.grey[800] : Colors.grey[100],
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(
-              isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
-              size: 20,
-              color: isDark ? Colors.white : Colors.black87,
-            ),
-          ),
-          onPressed: () {
-            final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
-            themeProvider.toggleTheme();
-          },
-          tooltip: isDark ? 'الوضع الفاتح' : 'الوضع الداكن',
-        ),
-        const SizedBox(width: 8),
-        IconButton(
-          icon: Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: isDark ? Colors.grey[800] : Colors.grey[100],
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(
-              Icons.logout_outlined,
-              size: 20,
-              color: isDark ? Colors.white : Colors.black87,
-            ),
-          ),
-          onPressed: _showLogoutDialog,
-          tooltip: 'تسجيل الخروج',
-        ),
-        const SizedBox(width: 8),
-      ],
-    );
-  }
+  // PreferredSizeWidget _buildAppBar(bool isMobile, bool isDark) {
+  //   return AppBar(
+  //     title: Text(
+  //       _getAppBarTitle(),
+  //       style: TextStyle(
+  //         fontSize: 20,
+  //         fontWeight: FontWeight.w700,
+  //         letterSpacing: -0.5,
+  //         color: isDark ? Colors.white : Colors.black87,
+  //       ),
+  //     ),
+  //     backgroundColor: isDark 
+  //         ? AppColors.surfaceVariant.withOpacity(0.9)
+  //         : const Color.fromARGB(201, 255, 255, 255),
+  //     foregroundColor: isDark ? Colors.white : Colors.black87,
+  //     elevation: 0,
+  //     automaticallyImplyLeading: false,
+  //     actions: [
+  //       IconButton(
+  //         icon: Stack(
+  //           children: [
+  //             Container(
+  //               padding: const EdgeInsets.all(6),
+  //               decoration: BoxDecoration(
+  //                 color: isDark ? Colors.grey[800] : Colors.grey[100],
+  //                 borderRadius: BorderRadius.circular(8),
+  //               ),
+  //               child: Icon(
+  //                 Icons.notifications_outlined,
+  //                 size: 20,
+  //                 color: isDark ? Colors.white : Colors.black87,
+  //               ),
+  //             ),
+  //             Positioned(
+  //               right: 4,
+  //               top: 4,
+  //               child: Container(
+  //                 width: 8,
+  //                 height: 8,
+  //                 decoration: BoxDecoration(
+  //                   color: AppColors.primary,
+  //                   shape: BoxShape.circle,
+  //                 ),
+  //               ),
+  //             ),
+  //           ],
+  //         ),
+  //         onPressed: () {
+  //           _navigateToTab(9); // Navigate to notifications tab
+  //         },
+  //       ),
+  //       const SizedBox(width: 4),
+  //       IconButton(
+  //         icon: Container(
+  //           padding: const EdgeInsets.all(6),
+  //           decoration: BoxDecoration(
+  //             color: isDark ? Colors.grey[800] : Colors.grey[100],
+  //             borderRadius: BorderRadius.circular(8),
+  //           ),
+  //           child: Icon(
+  //             isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
+  //             size: 20,
+  //             color: isDark ? Colors.white : Colors.black87,
+  //           ),
+  //         ),
+  //         onPressed: () {
+  //           final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+  //           themeProvider.toggleTheme();
+  //         },
+  //         tooltip: isDark ? 'الوضع الفاتح' : 'الوضع الداكن',
+  //       ),
+  //       const SizedBox(width: 8),
+  //       IconButton(
+  //         icon: Container(
+  //           padding: const EdgeInsets.all(6),
+  //           decoration: BoxDecoration(
+  //             color: isDark ? Colors.grey[800] : Colors.grey[100],
+  //             borderRadius: BorderRadius.circular(8),
+  //           ),
+  //           child: Icon(
+  //             Icons.logout_outlined,
+  //             size: 20,
+  //             color: isDark ? Colors.white : Colors.black87,
+  //           ),
+  //         ),
+  //         onPressed: _showLogoutDialog,
+  //         tooltip: 'تسجيل الخروج',
+  //       ),
+  //       const SizedBox(width: 8),
+  //     ],
+  //   );
+  // }
 
   Widget _buildModernBottomNav(bool isMobile, bool isDark) {
     return Container(

@@ -11,8 +11,9 @@ import 'package:wedding_reservation_app/screens/groom/create_reservation_screen.
 import 'package:wedding_reservation_app/screens/groom/groom_home_screen.dart';
 import 'package:wedding_reservation_app/services/api_service.dart';
 import 'package:wedding_reservation_app/services/connectivity_service.dart';
-import 'screens/auth/splash_screen.dart';
+
 import 'screens/auth/login_screen.dart';
+import 'screens/auth/splash_screen.dart';
 import 'utils/colors.dart';
 
 void main() async {
@@ -82,7 +83,7 @@ class WeddingReservationApp extends StatelessWidget {
               '/clan_admin_home': (context) => const ClanAdminHomeScreen(),
               '/creat_new_reservation': (context) => const CreateReservationScreen(),
               '/groom_home': (context) => const GroomHomeScreen(
-                initialTabIndex: 1
+                initialTabIndex: 0
               ),
             },
             

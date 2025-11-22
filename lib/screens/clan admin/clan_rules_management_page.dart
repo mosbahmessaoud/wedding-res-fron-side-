@@ -1,17 +1,19 @@
-import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'dart:io';
+
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:open_file/open_file.dart';
-import 'package:share_plus/share_plus.dart';
-import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import '../../utils/colors.dart';
-import '../../services/api_service.dart';
-import '../../widgets/theme_toggle_button.dart';
+import 'package:open_file/open_file.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
+
 import '../../providers/theme_provider.dart';
+import '../../services/api_service.dart';
+import '../../utils/colors.dart';
+import '../../widgets/theme_toggle_button.dart';
 
 class ClanRulesPage extends StatefulWidget {
   const ClanRulesPage({Key? key}) : super(key: key);
@@ -756,7 +758,7 @@ void _showNoInternetDialog() {
                     if (_rules == null || _isEditing) ...[
                       _buildTextField(
                         controller: _generalRuleController,
-                        label: 'القاعدة العامة *',
+                        label: 'قواعد عامة *',
                         required: true,
                         maxLines: 5,
                         isDark: isDark,
@@ -764,21 +766,21 @@ void _showNoInternetDialog() {
                       const SizedBox(height: 16),
                       _buildTextField(
                         controller: _groomSuppliesController,
-                        label: 'لوازم العريس',
+                        label: 'ملابس ولوازم العريس',
                         maxLines: 3,
                         isDark: isDark,
                       ),
                       const SizedBox(height: 16),
-                      _buildTextField(
-                        controller: _clothingController,
-                        label: 'قواعد الملابس',
-                        maxLines: 3,
-                        isDark: isDark,
-                      ),
-                      const SizedBox(height: 16),
+                      // _buildTextField(
+                      //   controller: _clothingController,
+                      //   label: 'قواعد الملابس',
+                      //   maxLines: 3,
+                      //   isDark: isDark,
+                      // ),
+                      // const SizedBox(height: 16),
                       _buildTextField(
                         controller: _kitchenwareController,
-                        label: 'قواعد أدوات المطبخ',
+                        label: 'لوازم المطبخ',
                         maxLines: 3,
                         isDark: isDark,
                       ),
@@ -823,26 +825,48 @@ void _showNoInternetDialog() {
             ),
     );
   }
-  
+
   Widget _buildTextField({
-    required TextEditingController controller,
-    required String label,
-    required bool isDark,
-    bool required = false,
-    int maxLines = 1,
-  }) {
-    return TextFormField(
-      controller: controller,
-      decoration: InputDecoration(
-        labelText: label,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-        filled: true,
-        fillColor: isDark ? AppColors.darkInputBackground : AppColors.surface,
+  required TextEditingController controller,
+  required String label,
+  required bool isDark,
+  bool required = false,
+  int maxLines = 1,
+}) {
+  return TextFormField(
+    controller: controller,
+    decoration: InputDecoration(
+      labelText: label,
+      alignLabelWithHint: true,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.grey.shade300),
       ),
-      maxLines: maxLines,
-      validator: required ? (v) => v?.trim().isEmpty ?? true ? 'هذا الحقل مطلوب' : null : null,
-    );
-  }
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.grey.shade300),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: AppColors.primary, width: 2),
+      ),
+      filled: true,
+      fillColor: isDark ? AppColors.darkInputBackground : AppColors.surface,
+      contentPadding: EdgeInsets.symmetric(
+        horizontal: 16,
+        vertical: 16,
+      ),
+    ),
+    maxLines: null,
+    minLines: maxLines > 1 ? 5 : 1,
+    keyboardType: TextInputType.multiline,
+    textAlignVertical: TextAlignVertical.top,
+    style: TextStyle(fontSize: 16, height: 1.5),
+    expands: false,
+    validator: null, // No validation - all fields optional
+  );
+}
+
 
   Widget _buildPdfSection(bool isDark, {bool isEditing = false}) {
     final hasPdf = _pdfUrl != null || _pendingPdfFile != null;
@@ -969,13 +993,13 @@ void _showNoInternetDialog() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildInfoCard('القاعدة العامة', _rules!['general_rule'], Icons.rule),
+        _buildInfoCard('قواعد عامة', _rules!['general_rule'], Icons.rule),
         if (_rules!['groom_supplies']?.toString().isNotEmpty ?? false)
-          _buildInfoCard('لوازم العريس', _rules!['groom_supplies'], Icons.shopping_bag),
+          _buildInfoCard('ملابس ولوازم العريس', _rules!['groom_supplies'], Icons.shopping_bag),
         if (_rules!['rule_about_clothing']?.toString().isNotEmpty ?? false)
           _buildInfoCard('قواعد الملابس', _rules!['rule_about_clothing'], Icons.checkroom),
         if (_rules!['rule_about_kitchenware']?.toString().isNotEmpty ?? false)
-          _buildInfoCard('قواعد أدوات المطبخ', _rules!['rule_about_kitchenware'], Icons.kitchen),
+          _buildInfoCard('لوازم المطبخ', _rules!['rule_about_kitchenware'], Icons.kitchen),
         if (_pdfUrl != null) _buildPdfSection(isDark, isEditing: false),
       ],
     );

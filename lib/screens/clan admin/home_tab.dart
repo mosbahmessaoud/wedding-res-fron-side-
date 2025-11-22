@@ -597,17 +597,17 @@ PreferredSizeWidget _buildSliverAppBar(bool isMobile) {
           }
         },
         itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-          PopupMenuItem<String>(
-            value: 'profile',
-            child: Row(
-              children: [
-                Icon(Icons.person_outline, color: AppColors.primary),
-                SizedBox(width: 8),
-                Text('الملف الشخصي'),
-              ],
-            ),
-          ),
-          PopupMenuDivider(),
+          // PopupMenuItem<String>(
+          //   value: 'profile',
+          //   child: Row(
+          //     children: [
+          //       Icon(Icons.person_outline, color: AppColors.primary),
+          //       SizedBox(width: 8),
+          //       Text('الملف الشخصي'),
+          //     ],
+          //   ),
+          // ),
+          // PopupMenuDivider(),
           PopupMenuItem<String>(
             value: 'logout',
             child: Row(
@@ -899,14 +899,17 @@ Widget _buildQuickActions(BuildContext context) {
   final crossAxisCount = screenWidth < 600 ? 2 : screenWidth < 900 ? 3 : screenWidth < 1200 ? 4 : 5;
   final isDark = Theme.of(context).brightness == Brightness.dark;
   
-  final actions = [
-    (Icons.castle_outlined, 'القاعات', '${_dashboardData['halls_count']} قاعة', Color(0xFF1877F2), 1),
-    (Icons.group_outlined, 'العرسان', '${_dashboardData['grooms_count']} مسجل', Color(0xFF42B72A), 2),
-    (Icons.book_outlined, 'الحجوزات', '${_dashboardData['pending_reservations']} معلق', Color(0xFFE4405F), 3),
-    (Icons.restaurant_outlined, 'قوائم الطعام', '${_dashboardData['menus_count']} قائمة', Color(0xFFFF6F00), 4),
-    (Icons.lock_outline, 'ارسال إشعار', ' ', Color(0xFF9C27B0), 6),
-  ];
-
+final actions = [
+  (Icons.castle_outlined, 'القاعات', '${_dashboardData['halls_count']} قاعة', Color(0xFF1877F2), 1),
+  (Icons.group_outlined, 'العرسان', '${_dashboardData['grooms_count']} مسجل', Color(0xFF42B72A), 2),
+  (Icons.book_outlined, 'الحجوزات', '${_dashboardData['pending_reservations']} معلق', Color(0xFFE4405F), 3),
+  (Icons.restaurant_outlined, 'قوائم الطعام', '${_dashboardData['menus_count']} قائمة', Color(0xFFFF6F00), 4),
+  (Icons.settings_outlined, 'الإعدادات', ' إعداد النضام', Color(0xFF1565C0), 5),
+  (Icons.notifications_outlined, 'الإشعارات', ' إرسال إشعارات', Color(0xFF9C27B0), 9),
+  (Icons.rule_outlined, 'اللوازم ', ' لوازم العريس ', Color(0xFF00BCD4), 7),
+  (Icons.star_border_outlined, 'الحجوزات الخاصة', ' حجز أيام خاصة بالعشيرة', Color(0xFFF57C00), 8),
+  // (Icons.person_outline, 'الملف الشخصي', ' ', Color(0xFF6A1B9A), 10),
+];
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [

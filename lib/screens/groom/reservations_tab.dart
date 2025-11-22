@@ -1777,28 +1777,125 @@ Future<void> _sharePdf(int reservationId, Uint8List pdfBytes) async {
     return await ApiService.downloadPdf(reservationId);
   }
 
-// Add this new method to show PDF action options
+// // Add this new method to show PDF action options
+// void _showPdfActionsDialog(String filePath, int reservationId, Uint8List pdfBytes) {
+//   if (!mounted) return;
+  
+//   showDialog(
+//     context: context,
+//     builder: (context) => AlertDialog(
+//       title: const Text('تم تحميل الملف'),
+//       content: Column(
+//         mainAxisSize: MainAxisSize.min,
+//         crossAxisAlignment: CrossAxisAlignment.start,
+//         children: [
+//           const Text('تم حفظ ملف PDF بنجاح. '),
+//           const SizedBox(height: 16),
+//           Row(
+//             children: [
+//               Icon(Icons.info, color: Colors.blue, size: 16),
+//               SizedBox(width: 8),
+//               Expanded(
+//                 child: Text(
+//                   'الملف محفوظ في مجلد التحميلات',
+//                   style: TextStyle(fontSize: 12, color: Colors.blue.shade700),
+//                 ),
+//               ),
+//             ],
+//           ),
+//         ],
+//       ),
+//       actions: [
+//         TextButton(
+//           onPressed: () => Navigator.pop(context),
+//           child: const Text('إغلاق'),
+//         ),
+//         ElevatedButton.icon(
+//           onPressed: () async {
+//             Navigator.pop(context);
+//             await _sharePdf(reservationId, pdfBytes);
+//           },
+//           icon: const Icon(Icons.share),
+//           label: const Text('مشاركة'),
+//           style: ElevatedButton.styleFrom(
+//             backgroundColor: Colors.blue,
+//             foregroundColor: Colors.white,
+//           ),
+//         ),
+//         ElevatedButton.icon(
+//           onPressed: () async {
+//             Navigator.pop(context);
+//             try {
+//               await OpenFile.open(filePath);
+//             } catch (e) {
+//               _showSnackBar('لا يمكن فتح الملف تلقائياً', Colors.orange);
+//             }
+//           },
+//           icon: const Icon(Icons.open_in_new),
+//           label: const Text('فتح'),
+//           style: ElevatedButton.styleFrom(
+//             backgroundColor: Colors.green,
+//             foregroundColor: Colors.white,
+//           ),
+//         ),
+//       ],
+//     ),
+//   );
+// }
+
+// Replace the _showPdfActionsDialog method with this updated version:
 void _showPdfActionsDialog(String filePath, int reservationId, Uint8List pdfBytes) {
   if (!mounted) return;
+  
+  final isDesktop = Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+  final isDark = Theme.of(context).brightness == Brightness.dark;
   
   showDialog(
     context: context,
     builder: (context) => AlertDialog(
-      title: const Text('تم تحميل الملف'),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Row(
+        children: [
+          Icon(Icons.check_circle, color: Colors.green, size: 28),
+          SizedBox(width: 8),
+          Text('تم التحميل بنجاح'),
+        ],
+      ),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('تم حفظ ملف PDF بنجاح. '),
-          const SizedBox(height: 16),
+          Text('تم حفظ الملف في:', style: TextStyle(color: _getTextColor(context))),
+          SizedBox(height: 8),
+          Container(
+            padding: EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: isDark ? Colors.grey[800] : Colors.grey[200],
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+              ),
+            ),
+            child: SelectableText(
+              filePath,
+              style: TextStyle(
+                fontSize: 12,
+                fontFamily: 'monospace',
+                color: _getTextColor(context),
+              ),
+            ),
+          ),
+          SizedBox(height: 16),
           Row(
             children: [
-              Icon(Icons.info, color: Colors.blue, size: 16),
+              Icon(Icons.folder, color: Colors.blue, size: 18),
               SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'الملف محفوظ في مجلد التحميلات',
-                  style: TextStyle(fontSize: 12, color: Colors.blue.shade700),
+                  isDesktop 
+                      ? 'الملف محفوظ في مجلد التحميلات'
+                      : 'الملف محفوظ في مجلد التحميلات',
+                  style: TextStyle(fontSize: 12, color: Colors.blue[700]),
                 ),
               ),
             ],
@@ -1810,39 +1907,48 @@ void _showPdfActionsDialog(String filePath, int reservationId, Uint8List pdfByte
           onPressed: () => Navigator.pop(context),
           child: const Text('إغلاق'),
         ),
-        ElevatedButton.icon(
-          onPressed: () async {
-            Navigator.pop(context);
-            await _sharePdf(reservationId, pdfBytes);
-          },
-          icon: const Icon(Icons.share),
-          label: const Text('مشاركة'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.blue,
-            foregroundColor: Colors.white,
+        if (!isDesktop)
+          ElevatedButton.icon(
+            onPressed: () async {
+              Navigator.pop(context);
+              await _sharePdf(reservationId, pdfBytes);
+            },
+            icon: const Icon(Icons.share, size: 18),
+            label: const Text('مشاركة'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
           ),
-        ),
         ElevatedButton.icon(
           onPressed: () async {
             Navigator.pop(context);
             try {
-              await OpenFile.open(filePath);
+              final result = await OpenFile.open(filePath);
+              if (result.type != ResultType.done) {
+                _showSnackBar('لا يمكن فتح الملف تلقائياً', Colors.orange);
+              }
             } catch (e) {
-              _showSnackBar('لا يمكن فتح الملف تلقائياً', Colors.orange);
+              _showSnackBar('خطأ في فتح الملف', Colors.red);
             }
           },
-          icon: const Icon(Icons.open_in_new),
-          label: const Text('فتح'),
+          icon: const Icon(Icons.open_in_new, size: 18),
+          label: const Text('فتح الملف'),
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.green,
             foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
           ),
         ),
       ],
     ),
   );
 }
-
   // Save PDF file to device
 Future<File?> _savePdfFile(Uint8List pdfBytes, int reservationId, {Map<String, dynamic>? reservation}) async {
   try {

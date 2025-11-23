@@ -1842,7 +1842,6 @@ Future<void> _sharePdf(int reservationId, Uint8List pdfBytes) async {
 //     ),
 //   );
 // }
-
 // Replace the _showPdfActionsDialog method with this updated version:
 void _showPdfActionsDialog(String filePath, int reservationId, Uint8List pdfBytes) {
   if (!mounted) return;
@@ -1926,14 +1925,7 @@ void _showPdfActionsDialog(String filePath, int reservationId, Uint8List pdfByte
         ElevatedButton.icon(
           onPressed: () async {
             Navigator.pop(context);
-            try {
-              final result = await OpenFile.open(filePath);
-              if (result.type != ResultType.done) {
-                _showSnackBar('لا يمكن فتح الملف تلقائياً', Colors.orange);
-              }
-            } catch (e) {
-              _showSnackBar('خطأ في فتح الملف', Colors.red);
-            }
+            await _openPdfFile(filePath);
           },
           icon: const Icon(Icons.open_in_new, size: 18),
           label: const Text('فتح الملف'),
@@ -1948,6 +1940,43 @@ void _showPdfActionsDialog(String filePath, int reservationId, Uint8List pdfByte
       ],
     ),
   );
+}
+
+// Add this helper method for opening PDF files
+Future<void> _openPdfFile(String filePath) async {
+  try {
+    // Check if file exists
+    final file = File(filePath);
+    if (!await file.exists()) {
+      _showSnackBar('الملف غير موجود', Colors.red);
+      return;
+    }
+
+    // Try to open the file
+    final result = await OpenFile.open(filePath);
+    
+    // Handle different result types
+    switch (result.type) {
+      case ResultType.done:
+        // File opened successfully
+        break;
+      case ResultType.fileNotFound:
+        _showSnackBar('الملف غير موجود', Colors.red);
+        break;
+      case ResultType.noAppToOpen:
+        _showSnackBar('لا يوجد تطبيق لفتح ملفات PDF. يرجى تثبيت قارئ PDF', Colors.orange);
+        break;
+      case ResultType.permissionDenied:
+        _showSnackBar('تم رفض الصلاحية لفتح الملف', Colors.red);
+        break;
+      case ResultType.error:
+        _showSnackBar('خطأ في فتح الملف: ${result.message}', Colors.red);
+        break;
+    }
+  } catch (e) {
+    print('Error opening PDF: $e');
+    _showSnackBar('خطأ في فتح الملف', Colors.red);
+  }
 }
   // Save PDF file to device
 Future<File?> _savePdfFile(Uint8List pdfBytes, int reservationId, {Map<String, dynamic>? reservation}) async {

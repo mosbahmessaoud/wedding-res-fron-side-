@@ -1,11 +1,11 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     
-        <!-- Add these permission lines -->
+    <!-- Add these permission lines -->
 
     <!-- <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"/> -->
 
-        <!-- For Android 13+ -->
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <!-- For Android 13+ -->
     <!-- <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" /> -->
     <!-- <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" /> -->
     <!-- For older Android versions -->
@@ -19,7 +19,19 @@
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
 
-   
+    
+    <!-- Storage permissions for Android 13+ (API 33+) -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+    
+    <!-- For accessing all files (Android 11+, requires special approval from Google Play) -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage" />
+
+    <!-- For Android 12 and below -->
+    
+
     <application
         android:label=" ASULI أسُولِي"
         android:icon="@mipmap/ic_launcher">

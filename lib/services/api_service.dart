@@ -3112,24 +3112,24 @@ static Future<String?> savePdfToDevice(
 }
 
 /// Download and save PDF in one operation
-static Future<String?> downloadAndSavePdf(
-  int reservationId,
-  {String? customFileName}
-) async {
-  try {
-    // Download the PDF
-    final pdfBytes = await downloadPdf(reservationId);
+// static Future<String?> downloadAndSavePdf(
+//   int reservationId,
+//   {String? customFileName}
+// ) async {
+//   try {
+//     // Download the PDF
+//     final pdfBytes = await downloadPdf(reservationId);
     
-    // Generate filename if not provided
-    final fileName = customFileName ?? 'reservation_$reservationId.pdf';
+//     // Generate filename if not provided
+//     final fileName = customFileName ?? 'reservation_$reservationId.pdf';
     
-    // Save to device
-    return await savePdfToDevice(reservationId, pdfBytes, fileName);
-  } catch (e) {
-    print('Error in downloadAndSavePdf: $e');
-    throw Exception('فشل في تحميل وحفظ PDF: $e');
-  }
-}
+//     // Save to device
+//     return await savePdfToDevice(reservationId, pdfBytes, fileName);
+//   } catch (e) {
+//     print('Error in downloadAndSavePdf: $e');
+//     throw Exception('فشل في تحميل وحفظ PDF: $e');
+//   }
+// }
 
 /// Check PDF generation status with retry
 /// Useful when PDF generation might take time
@@ -3784,122 +3784,122 @@ static Future<Map<String, dynamic>> refreshClanRulesCache(int clanId) async {
 //   }
 // }
 
-static Future<Map<String, dynamic>> uploadPdfFile(
-  File file, {
-  int? clanId,
-}) async {
-  try {
-    final fileName = path.basename(file.path);
-    final fileSize = await file.length();
+// static Future<Map<String, dynamic>> uploadPdfFile(
+//   File file, {
+//   int? clanId,
+// }) async {
+//   try {
+//     final fileName = path.basename(file.path);
+//     final fileSize = await file.length();
 
-    print('=== Upload Debug ===');
-    print('Base URL: $baseUrl');
-    print('File: $fileName');
-    print('Size: $fileSize bytes');
-    if (clanId != null) print('Clan ID: $clanId');
+//     print('=== Upload Debug ===');
+//     print('Base URL: $baseUrl');
+//     print('File: $fileName');
+//     print('Size: $fileSize bytes');
+//     if (clanId != null) print('Clan ID: $clanId');
 
-    // Create multipart request with optional clan_id as FORM FIELD
-    var uri = Uri.parse('$baseUrl/pdf/api/upload/pdf/');
-    var request = http.MultipartRequest('POST', uri);
+//     // Create multipart request with optional clan_id as FORM FIELD
+//     var uri = Uri.parse('$baseUrl/pdf/api/upload/pdf/');
+//     var request = http.MultipartRequest('POST', uri);
 
-    // Add auth header
-    if (_token != null) {
-      request.headers['Authorization'] = 'Bearer $_token';
-    }
+//     // Add auth header
+//     if (_token != null) {
+//       request.headers['Authorization'] = 'Bearer $_token';
+//     }
 
-    // Add clan_id as a form field if provided
-    if (clanId != null) {
-      request.fields['clan_id'] = clanId.toString();
-    }
+//     // Add clan_id as a form field if provided
+//     if (clanId != null) {
+//       request.fields['clan_id'] = clanId.toString();
+//     }
 
-    // Add file
-    request.files.add(await http.MultipartFile.fromPath(
-      'file',
-      file.path,
-      filename: fileName,
-    ));
+//     // Add file
+//     request.files.add(await http.MultipartFile.fromPath(
+//       'file',
+//       file.path,
+//       filename: fileName,
+//     ));
 
-    print('Sending request to: ${request.url}');
-    if (clanId != null) print('With clan_id field: $clanId');
+//     print('Sending request to: ${request.url}');
+//     if (clanId != null) print('With clan_id field: $clanId');
 
-    // Send request with longer timeout for file upload
-    var streamedResponse = await request.send().timeout(
-      const Duration(seconds: 60),
-    );
+//     // Send request with longer timeout for file upload
+//     var streamedResponse = await request.send().timeout(
+//       const Duration(seconds: 60),
+//     );
 
-    var response = await http.Response.fromStream(streamedResponse);
+//     var response = await http.Response.fromStream(streamedResponse);
 
-    print('Response status: ${response.statusCode}');
-    print('Response body: ${response.body}');
+//     print('Response status: ${response.statusCode}');
+//     print('Response body: ${response.body}');
 
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      if (data['success'] == true) {
-        print('✅ Upload successful!');
-        print('📄 Full URL: ${data['url']}');
-        print('💾 Saved to DB: ${data['saved_to_database']}');
+//     if (response.statusCode == 200) {
+//       final data = json.decode(response.body);
+//       if (data['success'] == true) {
+//         print('✅ Upload successful!');
+//         print('📄 Full URL: ${data['url']}');
+//         print('💾 Saved to DB: ${data['saved_to_database']}');
         
-        // IMPORTANT: Return the full URL exactly as provided by backend
-        // Don't modify or reconstruct it
-        return {
-          'success': true,
-          'url': data['url'], // Use this exact URL
-          'filename': data['filename'],
-          'file_id': data['file_id'],
-          'size': data['size'],
-          'clan_id': data['clan_id'],
-          'saved_to_database': data['saved_to_database'],
-        };
-      }
-      throw Exception(data['detail'] ?? 'فشل التحميل');
-    } else {
-      final error = json.decode(response.body);
-      throw Exception(error['detail'] ?? 'خطأ في التحميل');
-    }
-  } catch (e) {
-    print('❌ Upload error: $e');
-    rethrow;
-  }
-}
+//         // IMPORTANT: Return the full URL exactly as provided by backend
+//         // Don't modify or reconstruct it
+//         return {
+//           'success': true,
+//           'url': data['url'], // Use this exact URL
+//           'filename': data['filename'],
+//           'file_id': data['file_id'],
+//           'size': data['size'],
+//           'clan_id': data['clan_id'],
+//           'saved_to_database': data['saved_to_database'],
+//         };
+//       }
+//       throw Exception(data['detail'] ?? 'فشل التحميل');
+//     } else {
+//       final error = json.decode(response.body);
+//       throw Exception(error['detail'] ?? 'خطأ في التحميل');
+//     }
+//   } catch (e) {
+//     print('❌ Upload error: $e');
+//     rethrow;
+//   }
+// }
 
 /// Delete PDF file and optionally remove from ClanRules
 /// 
 /// [url] - The full URL of the PDF file
 /// [clanId] - Optional clan ID to remove PDF URL from ClanRules table
-static Future<void> deletePdfByUrl(String url, {int? clanId}) async {
-  try {
-    final fileId = url.split('/').last;
+// static Future<void> deletePdfByUrl(String url, {int? clanId}) async {
+//   try {
+//     final fileId = url.split('/').last;
 
-    // Keep using query parameters for DELETE requests - this is correct
-    var uri = Uri.parse('$baseUrl/pdf/api/upload/pdf/$fileId');
-    if (clanId != null) {
-      uri = uri.replace(queryParameters: {'clan_id': clanId.toString()});
-    }
+//     // Keep using query parameters for DELETE requests - this is correct
+//     var uri = Uri.parse('$baseUrl/pdf/api/upload/pdf/$fileId');
+//     if (clanId != null) {
+//       uri = uri.replace(queryParameters: {'clan_id': clanId.toString()});
+//     }
 
-    print('Delete URL: $uri');
+//     print('Delete URL: $uri');
 
-    final response = await http.delete(
-      uri,
-      headers: await _headers,
-    ).timeout(const Duration(seconds: 30));
+//     final response = await http.delete(
+//       uri,
+//       headers: await _headers,
+//     ).timeout(const Duration(seconds: 30));
 
-    print('Delete response: ${response.statusCode}');
-    print('Delete response body: ${response.body}');
+//     print('Delete response: ${response.statusCode}');
+//     print('Delete response body: ${response.body}');
 
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      if (data['success'] != true) {
-        throw Exception('فشل الحذف');
-      }
-    } else {
-      final error = json.decode(response.body);
-      throw Exception(error['detail'] ?? 'فشل حذف الملف');
-    }
-  } catch (e) {
-    print('Delete error: $e');
-    rethrow;
-  }
-}
+//     if (response.statusCode == 200) {
+//       final data = json.decode(response.body);
+//       if (data['success'] != true) {
+//         throw Exception('فشل الحذف');
+//       }
+//     } else {
+//       final error = json.decode(response.body);
+//       throw Exception(error['detail'] ?? 'فشل حذف الملف');
+//     }
+//   } catch (e) {
+//     print('Delete error: $e');
+//     rethrow;
+//   }
+// }
 
 /// Delete PDF file by file ID
 /// 
@@ -3945,53 +3945,53 @@ static Future<void> deletePdfById(String fileId, {int? clanId}) async {
 /// - success: bool
 /// - pdf_url: String
 /// - clan_id: int
-static Future<Map<String, dynamic>> getClanRulesPdf(int clanId) async {
-  try {
-    print('Fetching clan rules PDF for clan: $clanId');
+// static Future<Map<String, dynamic>> getClanRulesPdf(int clanId) async {
+//   try {
+//     print('Fetching clan rules PDF for clan: $clanId');
 
-    final response = await http.get(
-      Uri.parse('$baseUrl/pdf/api/clan/$clanId/rules/pdf'),
-      headers: await _headers,
-    ).timeout(const Duration(seconds: 30));
+//     final response = await http.get(
+//       Uri.parse('$baseUrl/pdf/api/clan/$clanId/rules/pdf'),
+//       headers: await _headers,
+//     ).timeout(const Duration(seconds: 30));
 
-    print('Response status: ${response.statusCode}');
-    print('Response body: ${response.body}');
+//     print('Response status: ${response.statusCode}');
+//     print('Response body: ${response.body}');
 
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      if (data['success'] == true) {
-        return {
-          'success': data['success'],
-          'pdf_url': data['pdf_url'],
-          'clan_id': data['clan_id'],
-        };
-      }
-      throw Exception('فشل في جلب ملف PDF');
-    } else if (response.statusCode == 404) {
-      throw Exception('لا يوجد ملف PDF لقواعد هذه العشيرة');
-    } else {
-      final error = json.decode(response.body);
-      throw Exception(error['detail'] ?? 'خطأ في جلب الملف');
-    }
-  } catch (e) {
-    print('Get clan rules PDF error: $e');
-    rethrow;
-  }
-}
+//     if (response.statusCode == 200) {
+//       final data = json.decode(response.body);
+//       if (data['success'] == true) {
+//         return {
+//           'success': data['success'],
+//           'pdf_url': data['pdf_url'],
+//           'clan_id': data['clan_id'],
+//         };
+//       }
+//       throw Exception('فشل في جلب ملف PDF');
+//     } else if (response.statusCode == 404) {
+//       throw Exception('لا يوجد ملف PDF لقواعد هذه العشيرة');
+//     } else {
+//       final error = json.decode(response.body);
+//       throw Exception(error['detail'] ?? 'خطأ في جلب الملف');
+//     }
+//   } catch (e) {
+//     print('Get clan rules PDF error: $e');
+//     rethrow;
+//   }
+// }
 
 /// Check if a clan has a rules PDF
 /// 
 /// [clanId] - The clan ID
 /// 
 /// Returns true if clan has a PDF, false otherwise
-static Future<bool> clanHasRulesPdf(int clanId) async {
-  try {
-    await getClanRulesPdf(clanId);
-    return true;
-  } catch (e) {
-    return false;
-  }
-}
+// static Future<bool> clanHasRulesPdf(int clanId) async {
+//   try {
+//     await getClanRulesPdf(clanId);
+//     return true;
+//   } catch (e) {
+//     return false;
+//   }
+// }
 
 /// Download and open PDF file
 /// 
@@ -4022,52 +4022,52 @@ static Future<List<int>> downloadPdfe(String filename) async {
 }
 
 /// Check storage health
-static Future<Map<String, dynamic>> checkStorageHealth() async {
-  try {
-    final response = await http.get(
-      Uri.parse('$baseUrl/pdf/api/upload/health'),
-      headers: await _headers,
-    ).timeout(const Duration(seconds: 30));
+// static Future<Map<String, dynamic>> checkStorageHealth() async {
+//   try {
+//     final response = await http.get(
+//       Uri.parse('$baseUrl/pdf/api/upload/health'),
+//       headers: await _headers,
+//     ).timeout(const Duration(seconds: 30));
 
-    if (response.statusCode == 200) {
-      return json.decode(response.body);
-    } else {
-      throw Exception('فشل فحص حالة التخزين');
-    }
-  } catch (e) {
-    print('Health check error: $e');
-    rethrow;
-  }
-}
+//     if (response.statusCode == 200) {
+//       return json.decode(response.body);
+//     } else {
+//       throw Exception('فشل فحص حالة التخزين');
+//     }
+//   } catch (e) {
+//     print('Health check error: $e');
+//     rethrow;
+//   }
+// }
 
 /// Debug: Check what's saved in ClanRules table for a specific clan
 /// 
 /// [clanId] - The clan ID to check
 /// 
 /// Returns the complete ClanRules data including the PDF URL
-static Future<Map<String, dynamic>> debugClanRules(int clanId) async {
-  try {
-    print('🔍 DEBUG: Checking ClanRules for clan: $clanId');
+// static Future<Map<String, dynamic>> debugClanRules(int clanId) async {
+//   try {
+//     print('🔍 DEBUG: Checking ClanRules for clan: $clanId');
 
-    final response = await http.get(
-      Uri.parse('$baseUrl/pdf/api/debug/clan/$clanId/rules'),
-      headers: await _headers,
-    ).timeout(const Duration(seconds: 30));
+//     final response = await http.get(
+//       Uri.parse('$baseUrl/pdf/api/debug/clan/$clanId/rules'),
+//       headers: await _headers,
+//     ).timeout(const Duration(seconds: 30));
 
-    print('Debug response status: ${response.statusCode}');
-    print('Debug response body: ${response.body}');
+//     print('Debug response status: ${response.statusCode}');
+//     print('Debug response body: ${response.body}');
 
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      return data;
-    } else {
-      throw Exception('فشل في جلب بيانات التصحيح');
-    }
-  } catch (e) {
-    print('Debug error: $e');
-    rethrow;
-  }
-}
+//     if (response.statusCode == 200) {
+//       final data = json.decode(response.body);
+//       return data;
+//     } else {
+//       throw Exception('فشل في جلب بيانات التصحيح');
+//     }
+//   } catch (e) {
+//     print('Debug error: $e');
+//     rethrow;
+//   }
+// }
 
 
 
@@ -4249,24 +4249,24 @@ static Future<List<dynamic>> getSpecialReservations() async {
 }
 
 // Add this to your ApiService class
-static Future<Uint8List?> downloadPdfFromUrl(String pdfUrl) async {
-  try {
-    final response = await http.get(
-      Uri.parse(pdfUrl),
-      headers: await _headers,
-    );
+// static Future<Uint8List?> downloadPdfFromUrl(String pdfUrl) async {
+//   try {
+//     final response = await http.get(
+//       Uri.parse(pdfUrl),
+//       headers: await _headers,
+//     );
 
-    if (response.statusCode == 200) {
-      return response.bodyBytes;
-    } else {
-      print('Failed to download PDF: ${response.statusCode}');
-      return null;
-    }
-  } catch (e) {
-    print('Error downloading PDF: $e');
-    return null;
-  }
-}
+//     if (response.statusCode == 200) {
+//       return response.bodyBytes;
+//     } else {
+//       print('Failed to download PDF: ${response.statusCode}');
+//       return null;
+//     }
+//   } catch (e) {
+//     print('Error downloading PDF: $e');
+//     return null;
+//   }
+// }
 
 
 
@@ -5556,7 +5556,527 @@ static Future<List<Map<String, dynamic>>> getNotificationHistory({
 
 
 
+//////////////////// pdf routes /////////////////////
+///
+// ==================== UPDATED PDF UPLOAD/MANAGEMENT ENDPOINTS ====================
+// Replace the existing PDF methods in your api_service.dart with these updated versions
 
+/// Upload PDF file to backend with optional clan association
+/// Now saves file PATH to database instead of URL
+/// 
+/// [file] - The PDF file to upload
+/// [clanId] - Optional clan ID to save PDF path to ClanRules table
+/// 
+/// Returns a map containing:
+/// - success: bool
+/// - url: String (PDF access URL for viewing)
+/// - path: String (relative path saved in database)
+/// - filename: String
+/// - file_id: String
+/// - size: int
+/// - clan_id: int? (if provided)
+/// - saved_to_database: bool
+static Future<Map<String, dynamic>> uploadPdfFile(
+  File file, {
+  int? clanId,
+}) async {
+  try {
+    final fileName = path.basename(file.path);
+    final fileSize = await file.length();
+
+    print('=== Upload Debug ===');
+    print('Base URL: $baseUrl');
+    print('File: $fileName');
+    print('Size: $fileSize bytes');
+    if (clanId != null) print('Clan ID: $clanId');
+
+    // Create multipart request - clan_id as FORM FIELD
+    var uri = Uri.parse('$baseUrl/pdf/api/upload/pdf/');
+    var request = http.MultipartRequest('POST', uri);
+
+    // Add auth header
+    if (_token != null) {
+      request.headers['Authorization'] = 'Bearer $_token';
+    }
+
+    // Add clan_id as a form field if provided
+    if (clanId != null) {
+      request.fields['clan_id'] = clanId.toString();
+    }
+
+    // Add file
+    request.files.add(await http.MultipartFile.fromPath(
+      'file',
+      file.path,
+      filename: fileName,
+    ));
+
+    print('Sending request to: ${request.url}');
+    if (clanId != null) print('With clan_id field: $clanId');
+
+    // Send request with timeout
+    var streamedResponse = await request.send().timeout(
+      const Duration(seconds: 60),
+    );
+
+    var response = await http.Response.fromStream(streamedResponse);
+
+    print('Response status: ${response.statusCode}');
+    print('Response body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      if (data['success'] == true) {
+        print('✅ Upload successful!');
+        print('📄 Access URL: ${data['url']}');
+        print('💾 Database Path: ${data['path']}');
+        print('🔗 Saved to DB: ${data['saved_to_database']}');
+        
+        return {
+          'success': true,
+          'url': data['url'],              // URL for accessing the file
+          'path': data['path'],            // Path saved in database
+          'filename': data['filename'],
+          'file_id': data['file_id'],
+          'size': data['size'],
+          'clan_id': data['clan_id'],
+          'saved_to_database': data['saved_to_database'],
+        };
+      }
+      throw Exception(data['detail'] ?? 'فشل التحميل');
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'خطأ في التحميل');
+    }
+  } catch (e) {
+    print('❌ Upload error: $e');
+    rethrow;
+  }
+}
+
+/// Delete PDF file by filename and optionally remove from ClanRules
+/// 
+/// [filename] - The PDF filename to delete
+/// [clanId] - Optional clan ID to remove PDF path from ClanRules table
+static Future<void> deletePdfByFilename(String filename, {int? clanId}) async {
+  try {
+    var uri = Uri.parse('$baseUrl/pdf/api/upload/pdf/$filename');
+    if (clanId != null) {
+      uri = uri.replace(queryParameters: {'clan_id': clanId.toString()});
+    }
+
+    print('Delete URL: $uri');
+
+    final response = await http.delete(
+      uri,
+      headers: await _headers,
+    ).timeout(const Duration(seconds: 30));
+
+    print('Delete response: ${response.statusCode}');
+    print('Delete response body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      if (data['success'] != true) {
+        throw Exception('فشل الحذف');
+      }
+      print('✅ PDF deleted successfully');
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل حذف الملف');
+    }
+  } catch (e) {
+    print('Delete error: $e');
+    rethrow;
+  }
+}
+
+/// Delete PDF file by extracting filename from URL
+/// 
+/// [url] - The full URL of the PDF file
+/// [clanId] - Optional clan ID to remove PDF path from ClanRules table
+static Future<void> deletePdfByUrl(String url, {int? clanId}) async {
+  try {
+    // Extract filename from URL (last segment)
+    final filename = url.split('/').last;
+    await deletePdfByFilename(filename, clanId: clanId);
+  } catch (e) {
+    print('Delete by URL error: $e');
+    rethrow;
+  }
+}
+
+/// Get the PDF information for a specific clan's rules book
+/// Returns both the URL (for viewing) and path (from database)
+/// 
+/// [clanId] - The clan ID
+/// 
+/// Returns a map containing:
+/// - success: bool
+/// - pdf_url: String (URL to access the file)
+/// - pdf_path: String (path stored in database)
+/// - clan_id: int
+/// - file_exists: bool
+static Future<Map<String, dynamic>> getClanRulesPdf(int clanId) async {
+  try {
+    print('Fetching clan rules PDF for clan: $clanId');
+
+    final response = await http.get(
+      Uri.parse('$baseUrl/pdf/api/clan/$clanId/rules/pdf'),
+      headers: await _headers,
+    ).timeout(const Duration(seconds: 30));
+
+    print('Response status: ${response.statusCode}');
+    print('Response body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      if (data['success'] == true) {
+        return {
+          'success': data['success'],
+          'pdf_url': data['pdf_url'],           // URL for viewing
+          'pdf_path': data['pdf_path'],         // Path from database
+          'clan_id': data['clan_id'],
+          'file_exists': data['file_exists'],
+        };
+      }
+      throw Exception('فشل في جلب ملف PDF');
+    } else if (response.statusCode == 404) {
+      throw Exception('لا يوجد ملف PDF لقواعد هذه العشيرة');
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'خطأ في جلب الملف');
+    }
+  } catch (e) {
+    print('Get clan rules PDF error: $e');
+    rethrow;
+  }
+}
+
+/// Check if a clan has a rules PDF
+/// 
+/// [clanId] - The clan ID
+/// 
+/// Returns true if clan has a PDF, false otherwise
+static Future<bool> clanHasRulesPdf(int clanId) async {
+  try {
+    final result = await getClanRulesPdf(clanId);
+    return result['file_exists'] == true;
+  } catch (e) {
+    return false;
+  }
+}
+
+/// Download PDF file by filename
+/// 
+/// [filename] - The unique filename
+/// 
+/// Returns the PDF file bytes
+static Future<Uint8List> downloadPdfByFilename(String filename) async {
+  try {
+    print('Downloading PDF: $filename');
+
+    final response = await http.get(
+      Uri.parse('$baseUrl/pdf/api/files/$filename'),
+      headers: await _headers,
+    ).timeout(const Duration(seconds: 60));
+
+    print('Download response status: ${response.statusCode}');
+
+    if (response.statusCode == 200) {
+      return response.bodyBytes;
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل تحميل الملف');
+    }
+  } catch (e) {
+    print('Download error: $e');
+    rethrow;
+  }
+}
+
+/// Download PDF from full URL
+/// Extracts filename and downloads
+static Future<Uint8List> downloadPdfFromUrl(String url) async {
+  try {
+    final filename = url.split('/').last;
+    return await downloadPdfByFilename(filename);
+  } catch (e) {
+    print('Download from URL error: $e');
+    rethrow;
+  }
+}
+
+/// Check storage health
+static Future<Map<String, dynamic>> checkStorageHealth() async {
+  try {
+    final response = await http.get(
+      Uri.parse('$baseUrl/pdf/api/upload/health'),
+      headers: await _headers,
+    ).timeout(const Duration(seconds: 30));
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('فشل فحص حالة التخزين');
+    }
+  } catch (e) {
+    print('Health check error: $e');
+    rethrow;
+  }
+}
+
+/// Debug: Check what's saved in ClanRules table for a specific clan
+/// 
+/// [clanId] - The clan ID to check
+/// 
+/// Returns the complete ClanRules data including the PDF path
+static Future<Map<String, dynamic>> debugClanRules(int clanId) async {
+  try {
+    print('🔍 DEBUG: Checking ClanRules for clan: $clanId');
+
+    final response = await http.get(
+      Uri.parse('$baseUrl/pdf/api/debug/clan/$clanId/rules'),
+      headers: await _headers,
+    ).timeout(const Duration(seconds: 30));
+
+    print('Debug response status: ${response.statusCode}');
+    print('Debug response body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      
+      // Log detailed debug information
+      if (data['status'] == 'found') {
+        final rules = data['clan_rules'];
+        print('📋 ClanRules found:');
+        print('  - ID: ${rules['id']}');
+        print('  - Clan ID: ${rules['clan_id']}');
+        print('  - PDF Path: ${rules['rules_book_of_clan_pdf']}');
+        print('  - PDF in DB: ${rules['pdf_exists_in_db']}');
+        print('  - PDF on Disk: ${rules['pdf_exists_on_disk']}');
+        print('  - Full File Path: ${rules['full_file_path']}');
+      }
+      
+      return data;
+    } else {
+      throw Exception('فشل في جلب بيانات التصحيح');
+    }
+  } catch (e) {
+    print('Debug error: $e');
+    rethrow;
+  }
+}
+
+// ==================== CONVENIENCE METHODS ====================
+
+/// Upload PDF and get just the URL for immediate display
+static Future<String?> uploadPdfAndGetUrl(
+  File file, {
+  int? clanId,
+}) async {
+  try {
+    final result = await uploadPdfFile(file, clanId: clanId);
+    return result['url'] as String?;
+  } catch (e) {
+    print('Error uploading PDF and getting URL: $e');
+    return null;
+  }
+}
+
+/// Upload PDF and get the database path
+static Future<String?> uploadPdfAndGetPath(
+  File file, {
+  int? clanId,
+}) async {
+  try {
+    final result = await uploadPdfFile(file, clanId: clanId);
+    return result['path'] as String?;
+  } catch (e) {
+    print('Error uploading PDF and getting path: $e');
+    return null;
+  }
+}
+
+/// Get just the URL for a clan's rules PDF
+static Future<String?> getClanRulesPdfUrl(int clanId) async {
+  try {
+    final result = await getClanRulesPdf(clanId);
+    return result['pdf_url'] as String?;
+  } catch (e) {
+    print('Error getting clan rules PDF URL: $e');
+    return null;
+  }
+}
+
+/// Get just the path for a clan's rules PDF (from database)
+static Future<String?> getClanRulesPdfPath(int clanId) async {
+  try {
+    final result = await getClanRulesPdf(clanId);
+    return result['pdf_path'] as String?;
+  } catch (e) {
+    print('Error getting clan rules PDF path: $e');
+    return null;
+  }
+}
+
+/// Download and save PDF to device
+/// 
+/// [url] - PDF URL to download
+/// [savePath] - Local path to save the file
+static Future<File?> downloadAndSavePdf(String url, String savePath) async {
+  try {
+    final bytes = await downloadPdfFromUrl(url);
+    final file = File(savePath);
+    await file.writeAsBytes(bytes);
+    print('✅ PDF saved to: $savePath');
+    return file;
+  } catch (e) {
+    print('Error downloading and saving PDF: $e');
+    return null;
+  }
+}
+
+/// Replace existing PDF for a clan
+/// Deletes old PDF and uploads new one
+static Future<Map<String, dynamic>?> replaceClanRulesPdf(
+  int clanId,
+  File newFile,
+) async {
+  try {
+    // Get existing PDF info
+    final existingPdf = await getClanRulesPdf(clanId);
+    
+    if (existingPdf['file_exists'] == true) {
+      // Delete old PDF
+      final oldUrl = existingPdf['pdf_url'] as String;
+      await deletePdfByUrl(oldUrl, clanId: clanId);
+      print('🗑️ Deleted old PDF');
+    }
+    
+    // Upload new PDF
+    final result = await uploadPdfFile(newFile, clanId: clanId);
+    print('✅ Uploaded new PDF');
+    
+    return result;
+  } catch (e) {
+    print('Error replacing clan rules PDF: $e');
+    return null;
+  }
+}
+
+/// Validate PDF file before upload
+static Map<String, String> validatePdfFile(File file) {
+  final errors = <String, String>{};
+  
+  // Check if file exists
+  if (!file.existsSync()) {
+    errors['file'] = 'الملف غير موجود';
+    return errors;
+  }
+  
+  // Check file extension
+  final extension = path.extension(file.path).toLowerCase();
+  if (extension != '.pdf') {
+    errors['file'] = 'يجب أن يكون الملف بصيغة PDF';
+  }
+  
+  // Check file size (10MB max)
+  final fileSize = file.lengthSync();
+  const maxSize = 10 * 1024 * 1024; // 10MB
+  if (fileSize > maxSize) {
+    errors['file'] = 'حجم الملف كبير جداً (الحد الأقصى 10 ميجابايت)';
+  }
+  
+  if (fileSize == 0) {
+    errors['file'] = 'الملف فارغ';
+  }
+  
+  return errors;
+}
+
+/// Batch upload multiple PDFs
+static Future<List<Map<String, dynamic>>> batchUploadPdfs(
+  List<File> files, {
+  List<int?>? clanIds,
+}) async {
+  final results = <Map<String, dynamic>>[];
+  
+  for (int i = 0; i < files.length; i++) {
+    try {
+      final clanId = clanIds != null && i < clanIds.length ? clanIds[i] : null;
+      final result = await uploadPdfFile(files[i], clanId: clanId);
+      
+      results.add({
+        'success': true,
+        'index': i,
+        'data': result,
+      });
+    } catch (e) {
+      print('Failed to upload PDF at index $i: $e');
+      results.add({
+        'success': false,
+        'index': i,
+        'error': e.toString(),
+      });
+    }
+    
+    // Small delay between uploads
+    if (i < files.length - 1) {
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
+  }
+  
+  return results;
+}
+
+/// Get storage statistics
+static Future<Map<String, dynamic>> getStorageStats() async {
+  try {
+    final health = await checkStorageHealth();
+    
+    return {
+      'status': health['status'],
+      'files_count': health['files_stored'],
+      'total_size_mb': health['total_size_mb'],
+      'max_file_size_mb': health['max_file_size_mb'],
+      'volume_mounted': health['volume_mounted'],
+      'upload_dir_exists': health['upload_dir_exists'],
+    };
+  } catch (e) {
+    print('Error getting storage stats: $e');
+    return {
+      'status': 'error',
+      'error': e.toString(),
+    };
+  }
+}
+
+/// Extract filename from URL or path
+static String extractFilename(String urlOrPath) {
+  return urlOrPath.split('/').last;
+}
+
+/// Build full PDF URL from filename
+static String buildPdfUrl(String filename) {
+  return '$baseUrl/pdf/api/files/$filename';
+}
+
+/// Check if URL/path is a valid PDF
+static bool isValidPdfUrl(String url) {
+  return url.toLowerCase().endsWith('.pdf') && url.contains('/pdf/api/files/');
+}
+
+/// Format file size for display
+static String formatFileSize(int bytes) {
+  if (bytes < 1024) {
+    return '$bytes بايت';
+  } else if (bytes < 1024 * 1024) {
+    return '${(bytes / 1024).toStringAsFixed(1)} كيلوبايت';
+  } else {
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} ميجابايت';
+  }
+}
 
 
 }

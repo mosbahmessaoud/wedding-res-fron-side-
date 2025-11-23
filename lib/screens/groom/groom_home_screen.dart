@@ -1333,7 +1333,7 @@ IconButton(
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
-              const Text('الإصدار: 1.0.1'),
+              const Text('الإصدار: 1.0.7'),
               const SizedBox(height: 16),
               const Text(
                 'يسرّنا أن نرحب بكم في تطبيق الأعراس،\nونضع بين أيديكم وسيلة ميسرة لتنظيم و حجز العرس الخاص بكم',
@@ -1351,7 +1351,7 @@ IconButton(
               const Divider(),
               const SizedBox(height: 8),
               const Text(
-                'معلومات المطور:',
+                'معلومات عن المطورين:',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
@@ -1360,7 +1360,7 @@ IconButton(
                   const Icon(Icons.email, size: 18),
                   const SizedBox(width: 8),
                   const Expanded(
-                    child: Text('mosbah07messaoud@gmail.com'),
+                    child: Text('iTriDev.Soft@gmail.com'),
                   ),
                 ],
               ),
@@ -1386,7 +1386,7 @@ IconButton(
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        '   لأي ملاحظات أو استفسارات عن التطبيق، \n يرجى التواصل عبر الواتساب (0658890501)'   ,
+                        '   لأي ملاحظات أو استفسارات عن التطبيق،  \n  عبر البريد الإلكتروني iTriDev.Soft@gmail.com '     ,
                         style: TextStyle(fontSize: 13, color: isDark ?AppColors.darkTextPrimary : AppColors.darkBorder),
                       ),
                     ),
@@ -1429,7 +1429,7 @@ IconButton(
                   const Icon(Icons.email, size: 18),
                   const SizedBox(width: 8),
                   const Expanded(
-                    child: Text('mosbah07messaoud@gmail.com'),
+                    child: Text('iTriDev.Soft@gmail.com'),
                   ),
                 ],
               ),
@@ -1455,7 +1455,7 @@ IconButton(
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        '   لأي ملاحظات أو استفسارات عن التطبيق، \n يرجى التواصل عبر الواتساب (0658890501)'   ,
+                        '   لأي ملاحظات أو استفسارات عن التطبيق،  \n  عبر البريد الإلكتروني iTriDev.Soft@gmail.com '     ,
                         style: TextStyle(fontSize: 13, color: isDark ?AppColors.darkTextPrimary : AppColors.darkBorder),
                       ),
                     ),

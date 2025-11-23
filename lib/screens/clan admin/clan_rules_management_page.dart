@@ -136,71 +136,66 @@ void _showNoInternetDialog() {
           : rules['rules_book_of_clan_pdf'];
     });
   }
-  
   Future<void> _save() async {
-    if (!_formKey.currentState!.validate()) return;
-    if (_clanId == null) {
-      _showError('معرف العشيرة غير موجود');
-      return;
+  if (!_formKey.currentState!.validate()) return;
+  if (_clanId == null) {
+    _showError('معرف العشيرة غير موجود');
+    return;
+  }
+  
+  setState(() => _isLoading = true);
+  try {
+    Map<String, dynamic> result;
+    
+    // Step 1: Handle PDF upload first if there's a pending file
+    String? uploadedPdfPath;
+    if (_pendingPdfFile != null) {
+      print('📤 Uploading PDF file first...');
+      final uploadResult = await ApiService.uploadPdfFile(
+        _pendingPdfFile!,
+        clanId: _clanId!,
+      );
+      uploadedPdfPath = uploadResult['path']; // Use PATH, not URL
+      print('✅ PDF uploaded, path: $uploadedPdfPath');
     }
     
-    setState(() => _isLoading = true);
-    try {
-      Map<String, dynamic> result;
-      
-      if (_rules == null) {
-        print('🔵 Creating clan rules...');
-        result = await ApiService.createClanRulesWithDetails(
-          clanId: _clanId!,
-          generalRule: _generalRuleController.text.trim(),
-          groomSupplies: _groomSuppliesController.text.trim().isEmpty ? null : _groomSuppliesController.text.trim(),
-          ruleAboutClothing: _clothingController.text.trim().isEmpty ? null : _clothingController.text.trim(),
-          ruleAboutKitchenware: _kitchenwareController.text.trim().isEmpty ? null : _kitchenwareController.text.trim(),
-          rulesBookOfClanPdfs: _pdfUrl,
-        );
-      } else {
-        print('🔵 Updating clan rules...');
-        result = await ApiService.updateClanRulesDetails(
-          _rules!['id'],
-          generalRule: _generalRuleController.text.trim(),
-          groomSupplies: _groomSuppliesController.text.trim().isEmpty ? null : _groomSuppliesController.text.trim(),
-          ruleAboutClothing: _clothingController.text.trim().isEmpty ? null : _clothingController.text.trim(),
-          ruleAboutKitchenware: _kitchenwareController.text.trim().isEmpty ? null : _kitchenwareController.text.trim(),
-          rulesBookOfClanPdfs: _pdfUrl,
-        );
-      }
-      
-      if (_pendingPdfFile != null) {
-        print('🔵 Uploading PDF file...');
-        final uploadResult = await ApiService.uploadPdfFile(
-          _pendingPdfFile!,
-          clanId: _clanId!,
-        );
-        final uploadedPdfUrl = uploadResult['url'];
-        
-        result = await ApiService.updateClanRulesDetails(
-          result['id'],
-          generalRule: _generalRuleController.text.trim(),
-          groomSupplies: _groomSuppliesController.text.trim().isEmpty ? null : _groomSuppliesController.text.trim(),
-          ruleAboutClothing: _clothingController.text.trim().isEmpty ? null : _clothingController.text.trim(),
-          ruleAboutKitchenware: _kitchenwareController.text.trim().isEmpty ? null : _kitchenwareController.text.trim(),
-          rulesBookOfClanPdfs: uploadedPdfUrl,
-        );
-      }
-      
-      _pendingPdfFile = null;
-      _pendingPdfFileName = null;
-      
-      _populateFields(result);
-      setState(() => _isEditing = false);
-      _showSuccess(_rules == null ? 'تم الإنشاء بنجاح' : 'تم التحديث بنجاح');
-    } catch (e) {
-      print('❌ Save error: $e');
-      _showError('فشل الحفظ: ${_cleanError(e)}');
-    } finally {
-      setState(() => _isLoading = false);
+    // Step 2: Create or update clan rules with PDF path
+    if (_rules == null) {
+      print('🔵 Creating clan rules...');
+      result = await ApiService.createClanRulesWithDetails(
+        clanId: _clanId!,
+        generalRule: _generalRuleController.text.trim(),
+        groomSupplies: _groomSuppliesController.text.trim().isEmpty ? null : _groomSuppliesController.text.trim(),
+        ruleAboutClothing: _clothingController.text.trim().isEmpty ? null : _clothingController.text.trim(),
+        ruleAboutKitchenware: _kitchenwareController.text.trim().isEmpty ? null : _kitchenwareController.text.trim(),
+        rulesBookOfClanPdfs: uploadedPdfPath ?? _pdfUrl, // Use new path or existing
+      );
+    } else {
+      print('🔵 Updating clan rules...');
+      result = await ApiService.updateClanRulesDetails(
+        _rules!['id'],
+        generalRule: _generalRuleController.text.trim(),
+        groomSupplies: _groomSuppliesController.text.trim().isEmpty ? null : _groomSuppliesController.text.trim(),
+        ruleAboutClothing: _clothingController.text.trim().isEmpty ? null : _clothingController.text.trim(),
+        ruleAboutKitchenware: _kitchenwareController.text.trim().isEmpty ? null : _kitchenwareController.text.trim(),
+        rulesBookOfClanPdfs: uploadedPdfPath ?? _pdfUrl, // Use new path or existing
+      );
     }
+    
+    // Clear pending file
+    _pendingPdfFile = null;
+    _pendingPdfFileName = null;
+    
+    _populateFields(result);
+    setState(() => _isEditing = false);
+    _showSuccess(_rules == null ? 'تم الإنشاء بنجاح' : 'تم التحديث بنجاح');
+  } catch (e) {
+    print('❌ Save error: $e');
+    _showError('فشل الحفظ: ${_cleanError(e)}');
+  } finally {
+    setState(() => _isLoading = false);
   }
+}
   
   Future<void> _delete() async {
     if (_rules == null) return;
@@ -249,221 +244,222 @@ void _showNoInternetDialog() {
   }
   
   Future<void> _deletePdf() async {
-    if (_pendingPdfFile != null) {
-      setState(() {
-        _pendingPdfFile = null;
-        _pendingPdfFileName = null;
-      });
-      _showSuccess('تم إلغاء اختيار الملف');
-      return;
-    }
-    
-    if (_pdfUrl == null || _clanId == null) return;
-
-    final confirm = await _showConfirmDialog('هل تريد حذف هذا الملف؟');
-    if (!confirm) return;
-    
-    setState(() => _isLoading = true);
-    try {
-      await ApiService.deletePdfByUrl(_pdfUrl!, clanId: _clanId!);
-      setState(() {
-        _pdfUrl = null;
-        _isLoading = false;
-      });
-      _showSuccess('تم حذف الملف بنجاح');
-    } catch (e) {
-      setState(() => _isLoading = false);
-      _showError('فشل حذف الملف: ${_cleanError(e)}');
-    }
+  if (_pendingPdfFile != null) {
+    setState(() {
+      _pendingPdfFile = null;
+      _pendingPdfFileName = null;
+    });
+    _showSuccess('تم إلغاء اختيار الملف');
+    return;
   }
   
-  /// Universal PDF download method that tries multiple approaches
-  Future<List<int>?> _downloadPdfUniversal(String url) async {
-    print('🔵 Starting universal PDF download from: $url');
+  if (_pdfUrl == null || _clanId == null) return;
+
+  final confirm = await _showConfirmDialog('هل تريد حذف هذا الملف؟');
+  if (!confirm) return;
+  
+  setState(() => _isLoading = true);
+  try {
+    // Extract filename from the stored path or URL
+    final filename = _pdfUrl!.split('/').last;
     
-    // Method 1: Try ApiService.downloadPdfFromUrl
-    try {
-      print('📥 Method 1: Using ApiService.downloadPdfFromUrl');
-      final bytes = await ApiService.downloadPdfFromUrl(url);
-      if (bytes != null && bytes.isNotEmpty) {
-        print('✅ Method 1 succeeded: ${bytes.length} bytes');
-        return bytes;
-      }
-    } catch (e) {
-      print('⚠️ Method 1 failed: $e');
-    }
+    print('🗑️ Deleting PDF: $filename for clan: $_clanId');
     
-    // Method 2: Try extracting file ID and using downloadPdfe
-    try {
-      print('📥 Method 2: Using ApiService.downloadPdfe with file ID');
-      final fileId = url.split('/').last;
-      print('📄 Extracted File ID: $fileId');
-      final bytes = await ApiService.downloadPdfe(fileId);
-      if (bytes.isNotEmpty) {
-        print('✅ Method 2 succeeded: ${bytes.length} bytes');
-        return bytes;
-      }
-    } catch (e) {
-      print('⚠️ Method 2 failed: $e');
-    }
+    await ApiService.deletePdfByFilename(filename, clanId: _clanId!);
     
-    // Method 3: Direct HTTP GET request
-    try {
-      print('📥 Method 3: Direct HTTP GET request');
-      final token = await ApiService.getToken();
-      final headers = {
-        'Content-Type': 'application/json',
-        if (token != null) 'Authorization': 'Bearer $token',
-      };
-      
-      final response = await http.get(
-        Uri.parse(url),
-        headers: headers,
-      );
-      
-      print('📊 HTTP Response status: ${response.statusCode}');
-      
-      if (response.statusCode == 200) {
-        print('✅ Method 3 succeeded: ${response.bodyBytes.length} bytes');
-        return response.bodyBytes;
-      } else {
-        print('❌ Method 3 failed with status: ${response.statusCode}');
-      }
-    } catch (e) {
-      print('⚠️ Method 3 failed: $e');
-    }
-    
-    // Method 4: Try without /pdf prefix if it exists
-    if (url.contains('/pdf/')) {
-      try {
-        print('📥 Method 4: Trying URL without /pdf prefix');
-        final alternateUrl = url.replaceFirst('/pdf/', '/');
-        final token = await ApiService.getToken();
-        final headers = {
-          'Content-Type': 'application/json',
-          if (token != null) 'Authorization': 'Bearer $token',
-        };
-        
-        final response = await http.get(
-          Uri.parse(alternateUrl),
-          headers: headers,
-        );
-        
-        if (response.statusCode == 200) {
-          print('✅ Method 4 succeeded: ${response.bodyBytes.length} bytes');
-          return response.bodyBytes;
-        }
-      } catch (e) {
-        print('⚠️ Method 4 failed: $e');
-      }
-    }
-    
-    print('❌ All download methods failed');
-    return null;
+    setState(() {
+      _pdfUrl = null;
+      _isLoading = false;
+    });
+    _showSuccess('تم حذف الملف بنجاح');
+  } catch (e) {
+    print('❌ Delete PDF error: $e');
+    setState(() => _isLoading = false);
+    _showError('فشل حذف الملف: ${_cleanError(e)}');
   }
+}
+  
+  Future<List<int>?> _downloadPdfUniversal(String pathOrUrl) async {
+  print('🔵 Starting universal PDF download from: $pathOrUrl');
+  
+  // Determine if it's a path or full URL
+  String filename;
+  if (pathOrUrl.startsWith('http')) {
+    // It's a full URL, extract filename
+    filename = pathOrUrl.split('/').last;
+    print('📄 Extracted filename from URL: $filename');
+  } else if (pathOrUrl.contains('/')) {
+    // It's a path like "uploads/pdfs/abc-123.pdf"
+    filename = pathOrUrl.split('/').last;
+    print('📄 Extracted filename from path: $filename');
+  } else {
+    // It's already just a filename
+    filename = pathOrUrl;
+    print('📄 Using filename directly: $filename');
+  }
+  
+  // Method 1: Try ApiService.downloadPdfByFilename (NEW METHOD)
+  try {
+    print('📥 Method 1: Using ApiService.downloadPdfByFilename');
+    final bytes = await ApiService.downloadPdfByFilename(filename);
+    if (bytes.isNotEmpty) {
+      print('✅ Method 1 succeeded: ${bytes.length} bytes');
+      return bytes;
+    }
+  } catch (e) {
+    print('⚠️ Method 1 failed: $e');
+  }
+  
+  // Method 2: Try building full URL and using downloadPdfFromUrl
+  try {
+    print('📥 Method 2: Building URL and using downloadPdfFromUrl');
+    final url = '${ApiService.baseUrl}/pdf/api/files/$filename';
+    print('🔗 Built URL: $url');
+    final bytes = await ApiService.downloadPdfFromUrl(url);
+    if (bytes.isNotEmpty) {
+      print('✅ Method 2 succeeded: ${bytes.length} bytes');
+      return bytes;
+    }
+  } catch (e) {
+    print('⚠️ Method 2 failed: $e');
+  }
+  
+  // Method 3: Direct HTTP GET request
+  try {
+    print('📥 Method 3: Direct HTTP GET request');
+    final token = ApiService.getToken();
+    final headers = {
+      'Content-Type': 'application/json',
+      if (token != null) 'Authorization': 'Bearer $token',
+    };
+    
+    final url = '${ApiService.baseUrl}/pdf/api/files/$filename';
+    print('🔗 Direct GET URL: $url');
+    
+    final response = await http.get(
+      Uri.parse(url),
+      headers: headers,
+    );
+    
+    print('📊 HTTP Response status: ${response.statusCode}');
+    
+    if (response.statusCode == 200) {
+      print('✅ Method 3 succeeded: ${response.bodyBytes.length} bytes');
+      return response.bodyBytes;
+    } else {
+      print('❌ Method 3 failed with status: ${response.statusCode}');
+      print('Response body: ${response.body}');
+    }
+  } catch (e) {
+    print('⚠️ Method 3 failed: $e');
+  }
+  
+  print('❌ All download methods failed');
+  return null;
+}
   
   /// View/Open PDF (Quick preview)
-  Future<void> _viewPdf(String url) async {
-    setState(() {
-      _isDownloadingPdf = true;
-      _downloadProgress = 0.0;
-    });
+  Future<void> _viewPdf(String pathOrUrl) async {
+  setState(() {
+    _isDownloadingPdf = true;
+    _downloadProgress = 0.0;
+  });
+  
+  try {
+    print('🔵 Viewing PDF from: $pathOrUrl');
     
-    try {
-      print('🔵 Viewing PDF from: $url');
-      
-      final pdfBytes = await _downloadPdfUniversal(url);
-      
-      if (pdfBytes == null || pdfBytes.isEmpty) {
-        throw Exception('فشل تحميل الملف من الخادم');
-      }
-      
-      setState(() => _downloadProgress = 0.5);
-      
-      print('✅ PDF downloaded, size: ${pdfBytes.length} bytes');
-      
-      // Save to temporary directory
-      final tempDir = await getTemporaryDirectory();
-      final fileName = _generateFileName(url);
-      final tempFile = File('${tempDir.path}/$fileName');
-      
-      await tempFile.writeAsBytes(pdfBytes);
-      
-      setState(() => _downloadProgress = 1.0);
-      
-      print('✅ PDF saved to temp: ${tempFile.path}');
-      
-      setState(() => _isDownloadingPdf = false);
-      
-      // Open the file
-      final result = await OpenFile.open(tempFile.path);
-      
-      if (result.type != ResultType.done) {
-        _showError('لا يمكن فتح الملف: ${result.message}');
-      }
-      
-    } catch (e) {
-      print('❌ View PDF error: $e');
-      setState(() => _isDownloadingPdf = false);
-      _showError('فشل فتح الملف: ${_cleanError(e)}');
+    final pdfBytes = await _downloadPdfUniversal(pathOrUrl);
+    
+    if (pdfBytes == null || pdfBytes.isEmpty) {
+      throw Exception('فشل تحميل الملف من الخادم');
     }
+    
+    setState(() => _downloadProgress = 0.5);
+    
+    print('✅ PDF downloaded, size: ${pdfBytes.length} bytes');
+    
+    // Save to temporary directory
+    final tempDir = await getTemporaryDirectory();
+    final fileName = _generateFileName(pathOrUrl);
+    final tempFile = File('${tempDir.path}/$fileName');
+    
+    await tempFile.writeAsBytes(pdfBytes);
+    
+    setState(() => _downloadProgress = 1.0);
+    
+    print('✅ PDF saved to temp: ${tempFile.path}');
+    
+    setState(() => _isDownloadingPdf = false);
+    
+    // Open the file
+    final result = await OpenFile.open(tempFile.path);
+    
+    if (result.type != ResultType.done) {
+      _showError('لا يمكن فتح الملف: ${result.message}');
+    }
+    
+  } catch (e) {
+    print('❌ View PDF error: $e');
+    setState(() => _isDownloadingPdf = false);
+    _showError('فشل فتح الملف: ${_cleanError(e)}');
   }
+}
   
   /// Download PDF to device storage (Permanent save)
-  Future<void> _downloadPdfToDevice(String url) async {
-    // Request permissions for Android
-    if (Platform.isAndroid) {
-      var status = await Permission.storage.status;
+  Future<void> _downloadPdfToDevice(String pathOrUrl) async {
+  // Request permissions for Android
+  if (Platform.isAndroid) {
+    var status = await Permission.storage.status;
+    if (!status.isGranted) {
+      status = await Permission.storage.request();
       if (!status.isGranted) {
-        status = await Permission.storage.request();
+        status = await Permission.manageExternalStorage.request();
         if (!status.isGranted) {
-          status = await Permission.manageExternalStorage.request();
-          if (!status.isGranted) {
-            _showError('يجب منح صلاحية الوصول للتخزين');
-            return;
-          }
+          _showError('يجب منح صلاحية الوصول للتخزين');
+          return;
         }
       }
     }
+  }
 
+  setState(() {
+    _isDownloadingPdf = true;
+    _downloadProgress = 0.0;
+  });
+
+  try {
+    print('🔵 Downloading PDF to device from: $pathOrUrl');
+    _showSuccess('جاري التحميل...');
+    
+    final pdfBytes = await _downloadPdfUniversal(pathOrUrl);
+    
+    if (pdfBytes == null || pdfBytes.isEmpty) {
+      throw Exception('فشل تحميل الملف من الخادم');
+    }
+    
+    setState(() => _downloadProgress = 0.6);
+    
+    print('✅ PDF downloaded, size: ${pdfBytes.length} bytes');
+
+    final savedFile = await _savePdfToDevice(pdfBytes, pathOrUrl);
+    
     setState(() {
-      _isDownloadingPdf = true;
-      _downloadProgress = 0.0;
+      _downloadProgress = 1.0;
+      _isDownloadingPdf = false;
     });
 
-    try {
-      print('🔵 Downloading PDF to device from: $url');
-      _showSuccess('جاري التحميل...');
-      
-      final pdfBytes = await _downloadPdfUniversal(url);
-      
-      if (pdfBytes == null || pdfBytes.isEmpty) {
-        throw Exception('فشل تحميل الملف من الخادم');
-      }
-      
-      setState(() => _downloadProgress = 0.6);
-      
-      print('✅ PDF downloaded, size: ${pdfBytes.length} bytes');
-
-      final savedFile = await _savePdfToDevice(pdfBytes, url);
-      
-      setState(() {
-        _downloadProgress = 1.0;
-        _isDownloadingPdf = false;
-      });
-
-      if (savedFile != null) {
-        print('✅ PDF saved to: ${savedFile.path}');
-        _showDownloadSuccessDialog(savedFile.path, pdfBytes);
-      } else {
-        throw Exception('فشل حفظ الملف في الجهاز');
-      }
-    } catch (e) {
-      print('❌ Download error: $e');
-      setState(() => _isDownloadingPdf = false);
-      _showError('خطأ في التحميل: ${_cleanError(e)}');
+    if (savedFile != null) {
+      print('✅ PDF saved to: ${savedFile.path}');
+      _showDownloadSuccessDialog(savedFile.path, pdfBytes);
+    } else {
+      throw Exception('فشل حفظ الملف في الجهاز');
     }
+  } catch (e) {
+    print('❌ Download error: $e');
+    setState(() => _isDownloadingPdf = false);
+    _showError('خطأ في التحميل: ${_cleanError(e)}');
   }
+}
 
   /// Save PDF to device storage
   Future<File?> _savePdfToDevice(List<int> pdfBytes, String url) async {
@@ -537,11 +533,29 @@ void _showNoInternetDialog() {
   }
 
   /// Generate a proper filename
-  String _generateFileName(String url) {
-    final timestamp = DateTime.now().millisecondsSinceEpoch;
-    final clanName = _rules?['clan_name'] ?? 'العشيرة';
-    return 'قوانين_${clanName.replaceAll(' ', '_')}_$timestamp.pdf';
+  String _generateFileName(String pathOrUrl) {
+  final timestamp = DateTime.now().millisecondsSinceEpoch;
+  final clanName = _rules?['clan_name'] ?? 'العشيرة';
+  
+  // Try to preserve original filename if it exists in the path
+  String originalName = 'قوانين';
+  try {
+    if (pathOrUrl.contains('/')) {
+      final parts = pathOrUrl.split('/');
+      if (parts.isNotEmpty) {
+        final lastPart = parts.last;
+        if (lastPart.contains('.pdf')) {
+          // Keep the UUID part for uniqueness
+          originalName = lastPart.replaceAll('.pdf', '');
+        }
+      }
+    }
+  } catch (e) {
+    print('⚠️ Could not extract original filename: $e');
   }
+  
+  return 'قوانين_${clanName.replaceAll(' ', '_')}_$timestamp.pdf';
+}
 
   /// Share PDF
   Future<void> _sharePdf(List<int> pdfBytes, String url) async {

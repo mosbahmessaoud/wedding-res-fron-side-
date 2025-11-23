@@ -2,13 +2,14 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:open_file/open_file.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:wedding_reservation_app/services/api_service.dart';
-
+import 'package:wedding_reservation_app/utils/colors.dart';
 class GroomClanRulesPage extends StatefulWidget {
   final int? clanId;
   final String? clanName;
@@ -40,6 +41,7 @@ class GroomClanRulesPageState extends State<GroomClanRulesPage> {
   // Reservation check state
   bool _hasValidReservation = false;
   bool _isCheckingReservation = true;
+String? _clanRulesPdfPath;  // NEW: Store the database path
 
   @override
   void initState() {
@@ -186,31 +188,43 @@ class GroomClanRulesPageState extends State<GroomClanRulesPage> {
   }
 
   Future<void> _checkForClanRulesPdf() async {
-    if (_resolvedClanId == null) return;
+  if (_resolvedClanId == null) return;
 
-    try {
-      final hasPdf = await ApiService.clanHasRulesPdf(_resolvedClanId!);
+  try {
+    print('🔍 Checking for clan rules PDF for clan: $_resolvedClanId');
+    
+    final hasPdf = await ApiService.clanHasRulesPdf(_resolvedClanId!);
+    
+    if (hasPdf) {
+      final pdfData = await ApiService.getClanRulesPdf(_resolvedClanId!);
       
-      if (hasPdf) {
-        final pdfData = await ApiService.getClanRulesPdf(_resolvedClanId!);
-        setState(() {
-          _hasClanRulesPdf = true;
-          _clanRulesPdfUrl = pdfData['pdf_url'];
-        });
-      } else {
-        setState(() {
-          _hasClanRulesPdf = false;
-          _clanRulesPdfUrl = null;
-        });
-      }
-    } catch (e) {
-      print('Error checking for clan rules PDF: $e');
+      print('✅ PDF found for clan $_resolvedClanId');
+      print('📄 PDF URL: ${pdfData['pdf_url']}');
+      print('💾 PDF Path: ${pdfData['pdf_path']}');
+      print('🔗 File exists: ${pdfData['file_exists']}');
+      
+      setState(() {
+        _hasClanRulesPdf = true;
+        _clanRulesPdfUrl = pdfData['pdf_url'];
+        _clanRulesPdfPath = pdfData['pdf_path'];  // NEW
+      });
+    } else {
+      print('⚠️ No PDF found for clan $_resolvedClanId');
       setState(() {
         _hasClanRulesPdf = false;
         _clanRulesPdfUrl = null;
+        _clanRulesPdfPath = null;  // NEW
       });
     }
+  } catch (e) {
+    print('❌ Error checking for clan rules PDF: $e');
+    setState(() {
+      _hasClanRulesPdf = false;
+      _clanRulesPdfUrl = null;
+      _clanRulesPdfPath = null;  // NEW
+    });
   }
+}
 
   Future<void> _loadClanRules() async {
     setState(() {
@@ -284,148 +298,366 @@ class GroomClanRulesPageState extends State<GroomClanRulesPage> {
       return null;
     }
   }
-
-  Future<void> _openPdf(String pdfUrl) async {
-    try {
-      _showSnackBar('جاري فتح الملف...', Colors.blue.shade400);
-      
-      // Download and open the PDF
-      final pdfBytes = await ApiService.downloadPdfFromUrl(pdfUrl);
-      
-      if (pdfBytes == null || pdfBytes.isEmpty) {
-        throw Exception('فشل تحميل الملف');
-      }
-
-      // Save to temporary directory
-      final tempDir = await getTemporaryDirectory();
-      final fileName = pdfUrl.split('/').last;
-      final tempFile = File('${tempDir.path}/$fileName');
-      
-      await tempFile.writeAsBytes(pdfBytes);
-
-      // Open the file
-      final result = await OpenFile.open(tempFile.path);
-      
-      if (result.type != ResultType.done) {
-        _showSnackBar('لا يوجد تطبيق لفتح ملفات PDF', Colors.orange);
-      }
-    } catch (e) {
-      print('Error opening PDF: $e');
-      _showSnackBar('خطأ في فتح الملف: $e', Colors.red);
+Future<void> _openPdf(String pdfUrl) async {
+  try {
+    _showSnackBar('جاري فتح الملف...', Colors.blue.shade400);
+    
+    print('📖 Opening PDF from URL: $pdfUrl');
+    
+    // Download using the new API method
+    final pdfBytes = await ApiService.downloadPdfFromUrl(pdfUrl);
+    
+    if (pdfBytes.isEmpty) {
+      throw Exception('فشل تحميل الملف');
     }
+
+    print('✅ PDF downloaded successfully: ${pdfBytes.length} bytes');
+
+    // Save to temporary directory
+    final tempDir = await getTemporaryDirectory();
+    final fileName = pdfUrl.split('/').last;
+    final tempFile = File('${tempDir.path}/$fileName');
+    
+    await tempFile.writeAsBytes(pdfBytes);
+    print('💾 PDF saved to: ${tempFile.path}');
+
+    // Open the file
+    final result = await OpenFile.open(tempFile.path);
+    
+    if (result.type != ResultType.done) {
+      _showSnackBar('لا يوجد تطبيق لفتح ملفات PDF', Colors.orange);
+    } else {
+      print('✅ PDF opened successfully');
+    }
+  } catch (e) {
+    print('❌ Error opening PDF: $e');
+    _showSnackBar('خطأ في فتح الملف: $e', Colors.red);
   }
+}
+
 
   Future<void> _openClanRulesPdf() async {
-    if (_clanRulesPdfUrl == null) {
-      _showSnackBar('لا يوجد رابط PDF', Colors.red);
-      return;
+  if (_clanRulesPdfUrl == null) {
+    _showSnackBar('لا يوجد رابط PDF', Colors.red);
+    return;
+  }
+
+  setState(() {
+    _isDownloading = true;
+    _downloadProgress = 0.0;
+  });
+
+  try {
+    print('📖 Opening clan rules PDF from: $_clanRulesPdfUrl');
+    
+    // Download the PDF using the URL
+    final pdfBytes = await ApiService.downloadPdfFromUrl(_clanRulesPdfUrl!);
+    
+    if (pdfBytes.isEmpty) {
+      throw Exception('فشل تحميل البيانات');
     }
 
+    print('✅ Downloaded ${pdfBytes.length} bytes');
+
+    // Save to temporary directory
+    final tempDir = await getTemporaryDirectory();
+    final fileName = _generatePdfFileName();
+    final tempFile = File('${tempDir.path}/$fileName');
+    
+    await tempFile.writeAsBytes(pdfBytes);
+    print('💾 Saved to: ${tempFile.path}');
+    
     setState(() {
-      _isDownloading = true;
+      _isDownloading = false;
       _downloadProgress = 0.0;
     });
 
-    try {
-      // Download the PDF first
-      final pdfBytes = await ApiService.downloadPdfFromUrl(_clanRulesPdfUrl!);
-      
-      if (pdfBytes == null || pdfBytes.isEmpty) {
-        throw Exception('فشل تحميل البيانات');
-      }
-
-      // Save to temporary directory
-      final tempDir = await getTemporaryDirectory();
-      final fileName = _generatePdfFileName();
-      final tempFile = File('${tempDir.path}/$fileName');
-      
-      await tempFile.writeAsBytes(pdfBytes);
-      
-      setState(() {
-        _isDownloading = false;
-        _downloadProgress = 0.0;
-      });
-
-      // Open the file using the system's default PDF viewer
-      final result = await OpenFile.open(tempFile.path);
-      
-      if (result.type != ResultType.done) {
-        _showSnackBar('لا يوجد تطبيق لفتح ملفات PDF', Colors.orange);
-      }
-    } catch (e) {
-      print('Error opening PDF: $e');
-      setState(() {
-        _isDownloading = false;
-        _downloadProgress = 0.0;
-      });
-      _showSnackBar('خطأ في فتح الملف: $e', Colors.red);
+    // Open the file
+    final result = await OpenFile.open(tempFile.path);
+    
+    if (result.type != ResultType.done) {
+      _showSnackBar('لا يوجد تطبيق لفتح ملفات PDF', Colors.orange);
+    } else {
+      print('✅ PDF opened successfully');
     }
+  } catch (e) {
+    print('❌ Error opening clan rules PDF: $e');
+    setState(() {
+      _isDownloading = false;
+      _downloadProgress = 0.0;
+    });
+    _showSnackBar('خطأ في فتح الملف: $e', Colors.red);
+  }
+}
+
+
+// Future<void> _downloadClanRulesPdf() async {
+//   if (_clanRulesPdfUrl == null) {
+//     _showSnackBar('لا يوجد رابط PDF', Colors.red);
+//     return;
+//   }
+
+//   // Request storage permission first
+//   if (Platform.isAndroid) {
+//     var status = await Permission.storage.status;
+//     if (!status.isGranted) {
+//       status = await Permission.storage.request();
+//       if (!status.isGranted) {
+//         status = await Permission.manageExternalStorage.request();
+//         if (!status.isGranted) {
+//           _showSnackBar('يجب منح صلاحية الوصول للتخزين', Colors.red);
+//           return;
+//         }
+//       }
+//     }
+//   }
+
+//   setState(() {
+//     _isDownloading = true;
+//     _downloadProgress = 0.0;
+//   });
+
+//   try {
+//     _showSnackBar('جاري التحميل...', Colors.blue.shade400);
+    
+//     print('⬇️ Downloading clan rules PDF from: $_clanRulesPdfUrl');
+    
+//     // Download the PDF using the new API method
+//     final pdfBytes = await ApiService.downloadPdfFromUrl(_clanRulesPdfUrl!);
+    
+//     if (pdfBytes.isEmpty) {
+//       throw Exception('فشل تحميل البيانات');
+//     }
+
+//     print('✅ Downloaded ${pdfBytes.length} bytes');
+
+//     setState(() {
+//       _downloadProgress = 0.5;
+//     });
+
+//     // Save to device storage
+//     final savedFile = await _savePdfFile(pdfBytes);
+    
+//     setState(() {
+//       _isDownloading = false;
+//       _downloadProgress = 0.0;
+//     });
+
+//     if (savedFile != null) {
+//       print('✅ PDF saved successfully to: ${savedFile.path}');
+//       _showPdfActionsDialog(savedFile.path, pdfBytes);
+//     } else {
+//       throw Exception('فشل حفظ الملف');
+//     }
+//   } catch (e) {
+//     print('❌ Download error: $e');
+//     setState(() {
+//       _isDownloading = false;
+//       _downloadProgress = 0.0;
+//     });
+//     _showSnackBar('خطأ في التحميل: $e', Colors.red);
+//   }
+// }
+
+Future<void> _downloadClanRulesPdf() async {
+  if (_clanRulesPdfUrl == null) {
+    _showSnackBar('لا يوجد رابط PDF', Colors.red);
+    return;
   }
 
-  Future<void> _downloadClanRulesPdf() async {
-    if (_clanRulesPdfUrl == null) {
-      _showSnackBar('لا يوجد رابط PDF', Colors.red);
-      return;
+  // Request storage permission silently
+  final hasPermission = await _requestStoragePermissionWithRetry();
+  
+  if (!hasPermission) {
+    // Permission was handled by the system (either denied or settings opened)
+    return;
+  }
+
+  setState(() {
+    _isDownloading = true;
+    _downloadProgress = 0.0;
+  });
+
+  try {
+    _showSnackBar('جاري التحميل...', Colors.blue.shade400);
+    
+    print('⬇️ Downloading clan rules PDF from: $_clanRulesPdfUrl');
+    
+    final pdfBytes = await ApiService.downloadPdfFromUrl(_clanRulesPdfUrl!);
+    
+    if (pdfBytes.isEmpty) {
+      throw Exception('فشل تحميل البيانات');
     }
 
-    // Request storage permission first
-    if (Platform.isAndroid) {
-      var status = await Permission.storage.status;
-      if (!status.isGranted) {
-        status = await Permission.storage.request();
-        if (!status.isGranted) {
-          // Try manage external storage for Android 11+
-          status = await Permission.manageExternalStorage.request();
-          if (!status.isGranted) {
-            _showSnackBar('يجب منح صلاحية الوصول للتخزين', Colors.red);
-            return;
-          }
-        }
-      }
-    }
+    print('✅ Downloaded ${pdfBytes.length} bytes');
 
     setState(() {
-      _isDownloading = true;
+      _downloadProgress = 0.5;
+    });
+
+    final savedFile = await _savePdfFile(pdfBytes);
+    
+    setState(() {
+      _isDownloading = false;
       _downloadProgress = 0.0;
     });
 
-    try {
-      _showSnackBar('جاري التحميل...', Colors.blue.shade400);
-      
-      // Download the PDF
-      final pdfBytes = await ApiService.downloadPdfFromUrl(_clanRulesPdfUrl!);
-      
-      if (pdfBytes == null || pdfBytes.isEmpty) {
-        throw Exception('فشل تحميل البيانات');
-      }
-
-      setState(() {
-        _downloadProgress = 0.5;
-      });
-
-      // Save to device storage
-      final savedFile = await _savePdfFile(pdfBytes);
-      
-      setState(() {
-        _isDownloading = false;
-        _downloadProgress = 0.0;
-      });
-
-      if (savedFile != null) {
-        _showPdfActionsDialog(savedFile.path, pdfBytes);
-      } else {
-        throw Exception('فشل حفظ الملف');
-      }
-    } catch (e) {
-      print('Download error: $e');
-      setState(() {
-        _isDownloading = false;
-        _downloadProgress = 0.0;
-      });
-      _showSnackBar('خطأ في التحميل: $e', Colors.red);
+    if (savedFile != null) {
+      print('✅ PDF saved successfully to: ${savedFile.path}');
+      _showPdfActionsDialog(savedFile.path, pdfBytes);
+    } else {
+      throw Exception('فشل حفظ الملف');
     }
+  } catch (e) {
+    print('❌ Download error: $e');
+    setState(() {
+      _isDownloading = false;
+      _downloadProgress = 0.0;
+    });
+    _showSnackBar('خطأ في التحميل: $e', Colors.red);
+  }
+}
+Future<bool> _requestStoragePermissionWithRetry() async {
+  if (!Platform.isAndroid) {
+    return true; // iOS doesn't need explicit storage permission
   }
 
+  try {
+    // Check current storage permission status
+    PermissionStatus storageStatus = await Permission.storage.status;
+    PermissionStatus manageStorageStatus = await Permission.manageExternalStorage.status;
+    
+    // If already granted, return true
+    if (storageStatus.isGranted || manageStorageStatus.isGranted) {
+      print('✅ Storage permission already granted');
+      return true;
+    }
+    
+    // Check if permanently denied
+    if (storageStatus.isPermanentlyDenied || manageStorageStatus.isPermanentlyDenied) {
+      print('❌ Storage permission permanently denied');
+      await openAppSettings();
+      return false;
+    }
+    
+    // Request storage permission based on Android version
+    final androidInfo = await DeviceInfoPlugin().androidInfo;
+    final sdkInt = androidInfo.version.sdkInt;
+    
+    if (sdkInt >= 33) {
+      // Android 13+ - Try manage external storage first
+      final manageStatus = await Permission.manageExternalStorage.request();
+      
+      if (manageStatus.isGranted) {
+        print('✅ Manage external storage permission granted');
+        return true;
+      } else if (manageStatus.isPermanentlyDenied) {
+        print('❌ Manage external storage permission permanently denied');
+        await openAppSettings();
+        return false;
+      }
+      
+      // Fallback to regular storage permission
+      final status = await Permission.storage.request();
+      if (status.isGranted) {
+        print('✅ Storage permission granted (fallback)');
+        return true;
+      } else if (status.isPermanentlyDenied) {
+        print('❌ Storage permission permanently denied');
+        await openAppSettings();
+        return false;
+      }
+      
+      print('⚠️ Storage permission denied');
+      return false;
+    } else {
+      // Android 12 and below - Use regular storage permission
+      final status = await Permission.storage.request();
+      
+      if (status.isGranted) {
+        print('✅ Storage permission granted');
+        return true;
+      } else if (status.isPermanentlyDenied) {
+        print('❌ Storage permission permanently denied');
+        await openAppSettings();
+        return false;
+      }
+      
+      print('⚠️ Storage permission denied');
+      return false;
+    }
+  } catch (e) {
+    print('❌ Error requesting storage permission: $e');
+    return false;
+  }
+}
+void _showPermissionSettingsDialog() {
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Row(
+        children: [
+          Icon(Icons.settings, color: Colors.orange, size: 28),
+          SizedBox(width: 12),
+          Expanded(child: Text('صلاحية التخزين مطلوبة')),
+        ],
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'لحفظ ملفات PDF، نحتاج إلى صلاحية الوصول للتخزين',
+            style: TextStyle(fontSize: 15),
+          ),
+          SizedBox(height: 12),
+          Container(
+            padding: EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.orange[50],
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.orange[200]!),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, color: Colors.orange[700], size: 20),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'يرجى تفعيل صلاحية التخزين من إعدادات التطبيق',
+                    style: TextStyle(fontSize: 13, color: Colors.orange[900]),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text('إلغاء'),
+        ),
+        ElevatedButton.icon(
+          onPressed: () async {
+            Navigator.pop(context);
+            await openAppSettings();
+          },
+          icon: Icon(Icons.settings, size: 18),
+          label: Text('فتح الإعدادات'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
   String _generatePdfFileName() {
     final clanName = widget.clanName ?? _clanRules?['clan_name'] ?? 'العشيرة';
     final timestamp = DateTime.now().millisecondsSinceEpoch;
@@ -764,106 +996,123 @@ void _showPdfActionsDialog(String filePath, Uint8List pdfBytes) {
       ),
     );
   }
+Widget _buildClanRulesPdfCard() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-  Widget _buildClanRulesPdfCard() {
-    if (!_hasClanRulesPdf) {
-      return const SizedBox.shrink();
-    }
+  if (!_hasClanRulesPdf) {
+    return const SizedBox.shrink();
+  }
 
-    return Card(
-      elevation: 3,
-      margin: const EdgeInsets.only(bottom: 16),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-               const Color(0xFF1E1E1E) ,
-               const Color.fromARGB(145, 73, 73, 73) 
-            ],
-          ),
-          borderRadius: BorderRadius.circular(12),
+  return Card(
+    
+    elevation: 3,
+    margin: const EdgeInsets.only(bottom: 16),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    child: Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+              isDark ? AppColors.darkBackground  : AppColors.background,
+              isDark ? AppColors.darkBackground  : AppColors.background,
+          ],
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.primary 
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: isDark ? AppColors.primary.withOpacity(0.3) : AppColors.primary.withOpacity(0.3),
+            spreadRadius: 1,
+            blurRadius: 6,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.picture_as_pdf,
+                  color: isDark ? AppColors.border  : AppColors.primary,
+                  size: 32,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'كتاب اللوازم الرسمي',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? AppColors.border  : AppColors.primary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'الكتاب الرسمي لاللوازم متاح للعرض والتحميل',
+              style: TextStyle(
+                fontSize: 14,
+                color: isDark ? AppColors.border  : AppColors.primary,
+              ),
+            ),
+            
+            // DEBUG: Show path info (remove in production if not needed)
+            if (_clanRulesPdfPath != null)
+     
+            
+            const SizedBox(height: 16),
+            if (_isDownloading)
+              Column(
+                children: [
+                  LinearProgressIndicator(
+                    value: _downloadProgress > 0 ? _downloadProgress : null,
+                    backgroundColor: AppColors.primary,
+                    valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _downloadProgress > 0
+                        ? 'جاري التحميل: ${(_downloadProgress * 100).toInt()}%'
+                        : 'جاري التحميل...',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ],
+              )
+            else
               Row(
                 children: [
-                  const Icon(
-                    Icons.picture_as_pdf,
-                    color: Colors.white,
-                    size: 32,
-                  ),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Text(
-                      'كتاب اللوازم الرسمي',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: _downloadClanRulesPdf,
+                      icon: const Icon(Icons.download, size: 20),
+                      label: const Text('تحميل'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
-              const Text(
-                'الكتاب الرسمي لاللوازم متاح للعرض والتحميل',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.white70,
-                ),
-              ),
-              const SizedBox(height: 16),
-              if (_isDownloading)
-                Column(
-                  children: [
-                    LinearProgressIndicator(
-                      value: _downloadProgress > 0 ? _downloadProgress : null,
-                      backgroundColor: Colors.white30,
-                      valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      _downloadProgress > 0
-                          ? 'جاري التحميل: ${(_downloadProgress * 100).toInt()}%'
-                          : 'جاري التحميل...',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Colors.white70,
-                      ),
-                    ),
-                  ],
-                )
-              else
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: _downloadClanRulesPdf,
-                        icon: const Icon(Icons.download, size: 20),
-                        label: const Text('تحميل'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: Colors.red[700],
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-            ],
-          ),
+          ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildPdfSection() {
     if (_pdfUrls.isEmpty) {

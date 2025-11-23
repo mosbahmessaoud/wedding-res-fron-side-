@@ -326,7 +326,9 @@ Future<bool> _checkConnectivity() async {
 }
 
 void _showNoInternetDialog() {
-  final isDark = Provider.of<ThemeProvider>(context, listen: false).isDarkMode;
+  // final isDark = Provider.of<ThemeProvider>(context, listen: false).isDarkMode;
+      final isDark = Theme.of(context).brightness == Brightness.dark;
+
   final screenWidth = MediaQuery.of(context).size.width;
   final isSmallScreen = screenWidth < 360;
   
@@ -619,8 +621,9 @@ void _navigateToExternalScreen(Widget screen, String title) async {
 
   @override
   Widget build(BuildContext context) {
-    final themeProvider = Provider.of<ThemeProvider>(context);
-    final isDark = themeProvider.isDarkMode;
+    // final themeProvider = Provider.of<ThemeProvider>(context);
+    // final isDark = themeProvider.isDarkMode;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
 
     return WillPopScope(
@@ -1318,6 +1321,7 @@ IconButton(
 
   void _showAboutApp() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+
 
     showDialog(
       context: context,

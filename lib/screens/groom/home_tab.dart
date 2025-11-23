@@ -2,9 +2,7 @@
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 
-import '../../../providers/theme_provider.dart';
 import '../../../services/api_service.dart';
 import '../../../utils/colors.dart';
 
@@ -329,8 +327,10 @@ void _showExitDialog(bool isDark) {
 
 @override
 Widget build(BuildContext context) {
-  final themeProvider = Provider.of<ThemeProvider>(context);
-  final isDark = themeProvider.isDarkMode;
+  // final themeProvider = Provider.of<ThemeProvider>(context);
+  // final isDark = themeProvider.isDarkMode;
+      final isDark = Theme.of(context).brightness == Brightness.dark;
+
 
   return PopScope(
     canPop: false,

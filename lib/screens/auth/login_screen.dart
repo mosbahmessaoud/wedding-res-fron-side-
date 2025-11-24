@@ -711,22 +711,40 @@ class _LoginForm extends StatelessWidget {
               
               if (isLargeScreen) SizedBox(height: screenHeight * 0.15) else SizedBox(height: screenHeight * 0.05),
 
-              // Phone Number
-              _AnimatedWidget(
-                slideAnimation: slideAnimation,
-                fadeAnimation: fadeAnimation,
-                slideMultiplier: 0.5,
-                child: CustomTextField(
-                  controller: phoneController,
-                  label: 'رقم هاتف العريس',
-                  labelColor: isDark ? Colors.white : Colors.black,
-                  boxcolor: isDark ? const Color.fromARGB(255, 157, 42, 42) : Colors.black,
-                  keyboardType: TextInputType.phone,
-                  validator: validatePhone,
-                  prefixIcon: Icons.phone,
-                  hint: '0xxxxxxxx',
-                ),
-              ),
+              // // Phone Number
+              // _AnimatedWidget(
+              //   slideAnimation: slideAnimation,
+              //   fadeAnimation: fadeAnimation,
+              //   slideMultiplier: 0.5,
+              //   child: CustomTextField(
+              //     controller: phoneController,
+              //     label: 'رقم الهاتف (رقم الهاتف) ',
+              //     labelColor: isDark ? Colors.white : Colors.black,
+              //     boxcolor: isDark ? const Color.fromARGB(255, 157, 42, 42) : Colors.black,
+              //     keyboardType: TextInputType.phone,
+              //     validator: validatePhone,
+              //     prefixIcon: Icons.phone,
+              //     hint: '0xxxxxxxx',
+              //   ),
+              // ),
+
+              // Replace this section (around line 485 in your code):
+// Phone Number
+_AnimatedWidget(
+  slideAnimation: slideAnimation,
+  fadeAnimation: fadeAnimation,
+  slideMultiplier: 0.5,
+  child: _AnimatedUnderlineTextField(
+    controller: phoneController,
+    label: 'رقم الهاتف (رقم هاتف العريس) ',
+    labelColor: isDark ? Colors.white : Colors.black,
+    boxcolor: isDark ? const Color.fromARGB(255, 157, 42, 42) : Colors.black,
+    keyboardType: TextInputType.phone,
+    validator: validatePhone,
+    prefixIcon: Icons.phone,
+    hint: '0xxxxxxxx',
+  ),
+),
               
               const SizedBox(height: 20),
 
@@ -874,6 +892,148 @@ class _LoginForm extends StatelessWidget {
         );
       },
     );
+  }
+}
+
+// Replace the _AnimatedUnderlineTextField widget with this updated version:
+class _AnimatedUnderlineTextField extends StatefulWidget {
+  final TextEditingController controller;
+  final String label;
+  final Color labelColor;
+  final Color boxcolor;
+  final TextInputType keyboardType;
+  final String? Function(String?)? validator;
+  final IconData prefixIcon;
+  final String hint;
+
+  const _AnimatedUnderlineTextField({
+    required this.controller,
+    required this.label,
+    required this.labelColor,
+    required this.boxcolor,
+    required this.keyboardType,
+    this.validator,
+    required this.prefixIcon,
+    required this.hint,
+  });
+
+  @override
+  State<_AnimatedUnderlineTextField> createState() => _AnimatedUnderlineTextFieldState();
+}
+
+class _AnimatedUnderlineTextFieldState extends State<_AnimatedUnderlineTextField> 
+    with SingleTickerProviderStateMixin {
+  late AnimationController _underlineController;
+  late Animation<double> _underlineAnimation;
+  final GlobalKey _labelKey = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    _underlineController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    )..repeat(reverse: true);
+
+    _underlineAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _underlineController,
+        curve: Curves.easeInOut,
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _underlineController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Label with animated underline
+        Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Text(
+              widget.label,
+              key: _labelKey,
+              style: TextStyle(
+                color: widget.labelColor,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            Positioned(
+              bottom: -4,
+              left: 0,
+              right: 0,
+              child: AnimatedBuilder(
+                animation: _underlineAnimation,
+                builder: (context, child) {
+                  return CustomPaint(
+                    size: Size(double.infinity, 3),
+                    painter: _MovingUnderlinePainter(
+                      progress: _underlineAnimation.value,
+                      color: Colors.red,
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        // Text field without label
+        CustomTextField(
+          controller: widget.controller,
+          label: '', // Empty label since we show it above
+          labelColor: widget.labelColor,
+          boxcolor: widget.boxcolor,
+          keyboardType: widget.keyboardType,
+          validator: widget.validator,
+          prefixIcon: widget.prefixIcon,
+          hint: widget.hint,
+        ),
+      ],
+    );
+  }
+}
+
+// Keep the _MovingUnderlinePainter class as is (no changes needed)
+class _MovingUnderlinePainter extends CustomPainter {
+  final double progress;
+  final Color color;
+
+  _MovingUnderlinePainter({
+    required this.progress,
+    required this.color,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 3
+      ..strokeCap = StrokeCap.round;
+
+    final lineWidth = size.width * 0.3; // 30% of total width
+    final startX = (size.width - lineWidth) * progress;
+    final endX = startX + lineWidth;
+
+    canvas.drawLine(
+      Offset(startX, size.height / 2),
+      Offset(endX, size.height / 2),
+      paint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_MovingUnderlinePainter oldDelegate) {
+    return oldDelegate.progress != progress;
   }
 }
 

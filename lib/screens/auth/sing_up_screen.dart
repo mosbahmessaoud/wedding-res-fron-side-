@@ -2,11 +2,12 @@
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+
+import '../../models/clan.dart';
+import '../../models/county.dart';
+import '../../services/api_service.dart';
 import '../../utils/colors.dart';
 import '../../utils/constants.dart';
-import '../../services/api_service.dart';
-import '../../models/county.dart';
-import '../../models/clan.dart';
 import '../../widgets/common/custom_text_field.dart' hide AppColors;
 import 'otp_verification_screen.dart';
 
@@ -68,7 +69,7 @@ class _MultiStepSignupScreenState extends State<MultiStepSignupScreen>
   List<Clan> _clans = [];
   List<Clan> _filteredClans = [];
   // bool _hasInternet = true;
-
+  bool _isLoadingClans = false;
 
 // Also update the _checkConnectivity method to be more reliable
 Future<bool> _checkConnectivity() async {
@@ -252,7 +253,26 @@ Future<void> _loadCounties() async {
   }
 }
 
-// Update _loadClans method
+// // Update _loadClans method
+// Future<void> _loadClans() async {
+//   if (_clans.isNotEmpty) return;
+  
+//   final hasInternet = await _checkConnectivity();
+//   if (!hasInternet) {
+//     _showNoInternetDialog();
+//     return;
+//   }
+  
+//   try {
+//     final clans = await ApiService.getAllClans();
+//     setState(() {
+//       _clans = clans;
+//     });
+//   } catch (e) {
+//     _showErrorDialog('فشل في تحميل العشائر: $e');
+//   }
+// }
+
 Future<void> _loadClans() async {
   if (_clans.isNotEmpty) return;
   
@@ -262,27 +282,51 @@ Future<void> _loadClans() async {
     return;
   }
   
+  setState(() {
+    _isLoadingClans = true;
+  });
+  
   try {
     final clans = await ApiService.getAllClans();
     setState(() {
       _clans = clans;
+      _isLoadingClans = false;
     });
   } catch (e) {
+    setState(() {
+      _isLoadingClans = false;
+    });
     _showErrorDialog('فشل في تحميل العشائر: $e');
   }
 }
 
 
+
+  // void _filterClansByCounty() {
+  //   if (_selectedCounty != null) {
+  //     _filteredClans = _clans.where((clan) => 
+  //       clan.countyId == _selectedCounty!.id
+  //     ).toList();
+  //     _selectedClan = null;
+  //   } else {
+  //     _filteredClans = [];
+  //   }
+  // }
+
   void _filterClansByCounty() {
-    if (_selectedCounty != null) {
-      _filteredClans = _clans.where((clan) => 
-        clan.countyId == _selectedCounty!.id
-      ).toList();
-      _selectedClan = null;
-    } else {
-      _filteredClans = [];
-    }
+  if (_selectedCounty != null) {
+    _filteredClans = _clans.where((clan) => 
+      clan.countyId == _selectedCounty!.id
+    ).toList();
+    
+    // Sort clans by ID in ascending order
+    _filteredClans.sort((a, b) => a.id.compareTo(b.id));
+    
+    _selectedClan = null;
+  } else {
+    _filteredClans = [];
   }
+}
 
   void _onCountyChanged(County? county) {
     setState(() {
@@ -706,23 +750,38 @@ Widget build(BuildContext context) {
             _buildStepTitle('المعلومات الشخصية للعريس'),
             SizedBox(height: 32),
 
-            CustomTextField(
-              controller: _phoneController,
-              label: 'رقم الهاتف',
-              keyboardType: TextInputType.phone,
-              validator: _validatePhone,
-              prefixIcon: Icons.phone,
-              hint: '0xxxxxxxxx',
-            ),
-            SizedBox(height: 20),
+            // CustomTextField(
+            //   controller: _phoneController,
+            //   label: 'رقم الهاتف (سيتم إرسال رمز التحقق  SMS إلي هذا الرقم)',
+            //   keyboardType: TextInputType.phone,
+            //   validator: _validatePhone,
+            //   prefixIcon: Icons.phone,
+            //   hint: '0xxxxxxxxx',
+            // ),
+            // SizedBox(height: 20),
+
+            // In _buildPersonalInfoStep method, replace the phone field section with:
+
+_AnimatedUnderlineTextField(
+  controller: _phoneController,
+  label: 'رقم الهاتف (سيتم إرسال رمز التحقق  SMS إلي هذا الرقم)',
+  labelColor: AppColors.textPrimary,
+  boxcolor: AppColors.primary,
+  keyboardType: TextInputType.phone,
+  validator: _validatePhone,
+  prefixIcon: Icons.phone,
+  hint: '0xxxxxxxxx',
+),
+SizedBox(height: 20),
+
 
             Row(
               children: [
                 Expanded(
                   child: CustomTextField(
                     controller: _firstNameController,
-                    label: 'الاسم ',
-                    validator: (value) => _validateRequired(value, 'الاسم '),
+                    label: 'الإسم ',
+                    validator: (value) => _validateRequired(value, 'الإسم '),
                     prefixIcon: Icons.person,
                   ),
                 ),
@@ -741,16 +800,16 @@ Widget build(BuildContext context) {
 
             CustomTextField(
               controller: _fatherNameController,
-              label: 'اسم الأب',
-              validator: (value) => _validateRequired(value, 'اسم الأب'),
+              label: 'إسم الأب',
+              validator: (value) => _validateRequired(value, 'إسم الأب'),
               prefixIcon: Icons.family_restroom,
             ),
             SizedBox(height: 20),
 
             CustomTextField(
               controller: _grandfatherNameController,
-              label: 'اسم الجد',
-              validator: (value) => _validateRequired(value, 'اسم الجد'),
+              label: 'إسم الجد الاول و الثاني',
+              validator: (value) => _validateRequired(value, 'إسم الجد'),
               prefixIcon: Icons.elderly,
             ),
             SizedBox(height: 20),
@@ -796,58 +855,229 @@ Widget _buildLocationStep() {
         _buildStepTitle('معلومات الجهة'),
         SizedBox(height: 32),
 
-        Theme(
-          data: Theme.of(context).copyWith(
-            hintColor:  Colors.grey.shade600,
-            canvasColor:  Colors.white,
-          ),
-          child: CustomDropdown<County>(
-            label: 'القصر',
-            value: _selectedCounty,
-            hint: ' اختر القصر الذي تنتمي اليه ',
-            items: _counties.map((county) => DropdownMenuItem<County>(
-              value: county,
+        // Theme(
+        //   data: Theme.of(context).copyWith(
+        //     hintColor:  Colors.grey.shade600,
+        //     canvasColor:  Colors.white,
+        //   ),
+        //   child: CustomDropdown<County>(
+        //     label: 'القصر',
+        //     value: _selectedCounty,
+        //     hint: ' اختر القصر الذي تنتمي اليه ',
+        //     items: _counties.map((county) => DropdownMenuItem<County>(
+        //       value: county,
+        //       child: Text(
+        //         county.name,
+        //         style: TextStyle(
+        //           color:  Colors.black87,
+        //         ),
+        //       ),
+        //     )).toList(),
+        //     onChanged: _onCountyChanged,
+        //     prefixIcon: Icons.location_city,
+        //   ),
+        // ),
+        // SizedBox(height: 20),
+
+        // Theme(
+        //   data: Theme.of(context).copyWith(
+        //     hintColor:   Colors.grey.shade600,
+        //     canvasColor:  Colors.white,
+        //   ),
+        //   child: CustomDropdown<Clan>(
+        //     label: 'العشيرة',
+        //     value: _selectedClan,
+        //     hint: ' اختر العشيرة التي تنتمي اليها ',
+        //     items: _filteredClans.map((clan) => DropdownMenuItem<Clan>(
+        //       value: clan,
+        //       child: Text(
+        //         clan.name,
+        //         style: TextStyle(
+        //           color:  Colors.black87,
+        //         ),
+        //       ),
+        //     )).toList(),
+        //     onChanged: (clan) {
+        //       setState(() {
+        //         _selectedClan = clan;
+        //       });
+        //     },
+        //     prefixIcon: Icons.groups,
+        //     enabled: _filteredClans.isNotEmpty,
+        //   ),
+        // ),
+Theme(
+  data: Theme.of(context).copyWith(
+    canvasColor: Colors.white,
+  ),
+  child: DropdownButtonFormField<County>(
+    value: _selectedCounty,
+    isExpanded: true,
+    decoration: InputDecoration(
+      labelText: 'القصر *',
+      labelStyle: TextStyle(
+        color: AppColors.textSecondary,
+        fontSize: 14,
+        fontWeight: FontWeight.w500,
+      ),
+      prefixIcon: Container(
+        padding: EdgeInsets.all(12),
+        child: Icon(
+          Icons.location_city,
+          color: AppColors.primary,
+          size: 20,
+        ),
+      ),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide(color: AppColors.border),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide(color: AppColors.border),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide(color: AppColors.primary, width: 2),
+      ),
+      filled: true,
+      fillColor: Colors.white,
+      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+    ),
+    items: _counties.map((county) {
+      return DropdownMenuItem<County>(
+        value: county,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SizedBox(
+              width: constraints.maxWidth,
               child: Text(
                 county.name,
                 style: TextStyle(
-                  color:  Colors.black87,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black87,
                 ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
               ),
-            )).toList(),
-            onChanged: _onCountyChanged,
-            prefixIcon: Icons.location_city,
-          ),
+            );
+          },
         ),
-        SizedBox(height: 20),
-
-        Theme(
-          data: Theme.of(context).copyWith(
-            hintColor:   Colors.grey.shade600,
-            canvasColor:  Colors.white,
-          ),
-          child: CustomDropdown<Clan>(
-            label: 'العشيرة',
-            value: _selectedClan,
-            hint: ' اختر العشيرة التي تنتمي اليها ',
-            items: _filteredClans.map((clan) => DropdownMenuItem<Clan>(
-              value: clan,
+      );
+    }).toList(),
+    onChanged: _onCountyChanged,
+    hint: Text(
+      'اختر القصر الذي تنتمي اليه',
+      style: TextStyle(
+        color: AppColors.textSecondary,
+        fontSize: 14,
+      ),
+    ),
+    icon: Icon(
+      Icons.keyboard_arrow_down,
+      color: AppColors.textSecondary,
+    ),
+    dropdownColor: Colors.white,
+  ),
+),
+SizedBox(height: 20),
+// Replace the entire clan CustomDropdown Theme widget with this:
+Theme(
+  data: Theme.of(context).copyWith(
+    canvasColor: Colors.white,
+  ),
+  child: DropdownButtonFormField<Clan>(
+    value: _selectedClan,
+    isExpanded: true,
+    decoration: InputDecoration(
+      labelText: 'العشيرة *',
+      labelStyle: TextStyle(
+        color: AppColors.textSecondary,
+        fontSize: 14,
+        fontWeight: FontWeight.w500,
+      ),
+      prefixIcon: Container(
+        padding: EdgeInsets.all(12),
+        child: Icon(
+          Icons.groups,
+          color: AppColors.primary,
+          size: 20,
+        ),
+      ),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide(color: AppColors.border),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide(color: AppColors.border),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide(color: AppColors.primary, width: 2),
+      ),
+      filled: true,
+      fillColor: Colors.white,
+      helperText: _filteredClans.isEmpty 
+          ? null 
+          : 'العشائر المتاحة في القصر المختار',
+      helperStyle: TextStyle(
+        color: AppColors.textSecondary,
+        fontSize: 12,
+      ),
+      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+    ),
+    items: _filteredClans.map((clan) {
+      return DropdownMenuItem<Clan>(
+        value: clan,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SizedBox(
+              width: constraints.maxWidth,
               child: Text(
                 clan.name,
                 style: TextStyle(
-                  color:  Colors.black87,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black87,
                 ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
               ),
-            )).toList(),
-            onChanged: (clan) {
-              setState(() {
-                _selectedClan = clan;
-              });
-            },
-            prefixIcon: Icons.groups,
-            enabled: _filteredClans.isNotEmpty,
-          ),
+            );
+          },
         ),
-
+      );
+    }).toList(),
+    onChanged: _filteredClans.isEmpty 
+        ? null 
+        : (clan) {
+            setState(() {
+              _selectedClan = clan;
+            });
+          },
+    hint: Text(
+      'اختر العشيرة التي تنتمي اليها',
+      style: TextStyle(
+        color: AppColors.textSecondary,
+        fontSize: 14,
+      ),
+    ),
+    icon: _isLoadingClans 
+        ? SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(
+              strokeWidth: 2.5,
+              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+            ),
+          )
+        : Icon(
+            Icons.keyboard_arrow_down,
+            color: AppColors.textSecondary,
+          ),
+    dropdownColor: Colors.white,
+  ),
+),
         if (_selectedCounty != null && _filteredClans.isEmpty) ...[
           SizedBox(height: 20),
           Container(
@@ -902,9 +1132,9 @@ Widget _buildGuardianInfoStep() {
 
           CustomTextField(
             controller: _guardianNameController,
-            label: 'الاسم الكامل',
-            hint: "  اللقب و الاسم, اسم الاب ,اسم الجد",
-            validator: (value) => _validateRequired(value, 'الاسم الكامل'),
+            label: 'الإسم الكامل',
+            hint: "الإسم و اللقب  ,إسم الاب ,إسم الجد الاول و الثاني",
+            validator: (value) => _validateRequired(value, 'الإسم الكامل'),
             prefixIcon: Icons.person_4,
           ),
           SizedBox(height: 20),
@@ -974,7 +1204,7 @@ Widget _buildGuardianInfoStep() {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildStepTitle('معلومات الأمان', 'أنشئ كلمة مرور قوية'),
+            _buildStepTitle('معلومات الأمان', 'أنشئ كلمة مرور لحسابك'), 
             SizedBox(height: 32),
 
             CustomTextField(
@@ -1015,36 +1245,36 @@ Widget _buildGuardianInfoStep() {
             ),
             SizedBox(height: 24),
 
-            Container(
-              padding: EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.05),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.primary.withOpacity(0.1)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.security, color: AppColors.primary),
-                      SizedBox(width: 8),
-                      Text(
-                        'متطلبات كلمة المرور',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 12),
-                  _buildPasswordRequirement('على الأقل 6 أحرف', _passwordController.text.length >= 6),
-                  _buildPasswordRequirement('تحتوي على أرقام', RegExp(r'[0-9]').hasMatch(_passwordController.text)),
-                  _buildPasswordRequirement('تحتوي على أحرف', RegExp(r'[a-zA-Z]').hasMatch(_passwordController.text)),
-                ],
-              ),
-            ),
+            // Container(
+            //   padding: EdgeInsets.all(16),
+            //   decoration: BoxDecoration(
+            //     color: AppColors.primary.withOpacity(0.05),
+            //     borderRadius: BorderRadius.circular(12),
+            //     border: Border.all(color: AppColors.primary.withOpacity(0.1)),
+            //   ),
+            //   child: Column(
+            //     crossAxisAlignment: CrossAxisAlignment.start,
+            //     children: [
+            //       Row(
+            //         children: [
+            //           Icon(Icons.security, color: AppColors.primary),
+            //           SizedBox(width: 8),
+            //           Text(
+            //             'متطلبات كلمة المرور',
+            //             style: TextStyle(
+            //               fontWeight: FontWeight.w600,
+            //               color: AppColors.primary,
+            //             ),
+            //           ),
+            //         ],
+            //       ),
+            //       SizedBox(height: 12),
+            //       _buildPasswordRequirement('على الأقل 6 أحرف', _passwordController.text.length >= 6),
+            //       _buildPasswordRequirement('تحتوي على أرقام', RegExp(r'[0-9]').hasMatch(_passwordController.text)),
+            //       _buildPasswordRequirement('تحتوي على أحرف', RegExp(r'[a-zA-Z]').hasMatch(_passwordController.text)),
+            //     ],
+            //   ),
+            // ),
           ],
         ),
       ),
@@ -1149,5 +1379,150 @@ Widget _buildGuardianInfoStep() {
     _confirmPasswordController.dispose();
     
     super.dispose();
+  }
+
+
+
+
+
+}
+
+// Add these widget classes at the end of your file
+
+class _AnimatedUnderlineTextField extends StatefulWidget {
+  final TextEditingController controller;
+  final String label;
+  final Color labelColor;
+  final Color boxcolor;
+  final TextInputType keyboardType;
+  final String? Function(String?)? validator;
+  final IconData prefixIcon;
+  final String hint;
+
+  const _AnimatedUnderlineTextField({
+    required this.controller,
+    required this.label,
+    required this.labelColor,
+    required this.boxcolor,
+    required this.keyboardType,
+    this.validator,
+    required this.prefixIcon,
+    required this.hint,
+  });
+
+  @override
+  State<_AnimatedUnderlineTextField> createState() => _AnimatedUnderlineTextFieldState();
+}
+
+class _AnimatedUnderlineTextFieldState extends State<_AnimatedUnderlineTextField> 
+    with SingleTickerProviderStateMixin {
+  late AnimationController _underlineController;
+  late Animation<double> _underlineAnimation;
+  final GlobalKey _labelKey = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    _underlineController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    )..repeat(reverse: true);
+
+    _underlineAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _underlineController,
+        curve: Curves.easeInOut,
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _underlineController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Text(
+              widget.label,
+              key: _labelKey,
+              style: TextStyle(
+                color: widget.labelColor,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            Positioned(
+              bottom: -4,
+              left: 0,
+              right: 0,
+              child: AnimatedBuilder(
+                animation: _underlineAnimation,
+                builder: (context, child) {
+                  return CustomPaint(
+                    size: Size(double.infinity, 3),
+                    painter: _MovingUnderlinePainter(
+                      progress: _underlineAnimation.value,
+                      color: Colors.green,
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        CustomTextField(
+          controller: widget.controller,
+          label: '',
+          labelColor: widget.labelColor,
+          boxcolor: widget.boxcolor,
+          keyboardType: widget.keyboardType,
+          validator: widget.validator,
+          prefixIcon: widget.prefixIcon,
+          hint: widget.hint,
+        ),
+      ],
+    );
+  }
+}
+
+class _MovingUnderlinePainter extends CustomPainter {
+  final double progress;
+  final Color color;
+
+  _MovingUnderlinePainter({
+    required this.progress,
+    required this.color,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 3
+      ..strokeCap = StrokeCap.round;
+
+    final lineWidth = size.width * 0.3;
+    final startX = (size.width - lineWidth) * progress;
+    final endX = startX + lineWidth;
+
+    canvas.drawLine(
+      Offset(startX, size.height / 2),
+      Offset(endX, size.height / 2),
+      paint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_MovingUnderlinePainter oldDelegate) {
+    return oldDelegate.progress != progress;
   }
 }

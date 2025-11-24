@@ -8,7 +8,7 @@ import 'package:wedding_reservation_app/screens/groom/groom_home_screen.dart';
 
 import '../../services/api_service.dart';
 import '../../utils/colors.dart';
-import 'custom_calendar_picker.dart'; // Import your custom calendar widget 
+import 'custom_calendar_picker.dart'; // Import your custom calendar widget
 class CreateReservationScreen extends StatefulWidget {
   final VoidCallback? onReservationCreated;
   
@@ -580,9 +580,12 @@ Widget _buildReservationInstructionWidget() {
         if (clanAdminStatus['has_admin']==false || clanAdminStatus['is_active']==false ) {
           if (mounted) {
             _showMessageDialog(
-              title: 'العشيرة غير مشتركة',
-              message: 'عذراً، عشيرة ${clanAdminStatus['clan_name']} غير مشتركة حالياً في التطبيق.\n\n'
-                      'يرجى التواصل مع إدارة العشيرة للانضمام إلى النظام.',
+              title: 'عشيرتك ليست في النضام حالياً',
+              // message:  'يرجى التواصل مع إدارة عشيرتك.',
+              message: 'عذراً،  ${clanAdminStatus['clan_name']} ليست في النضام حالياً.\n\n'
+                      'يرجى التواصل مع إدارة عشيرتك لمزيد من التفاصيل.',
+              // message: 'عذراً،  ${clanAdminStatus['clan_name']} غير مشتركة حالياً في التطبيق.\n\n'
+              //         'يرجى التواصل مع إدارة عشيرتك للانضمام إلى النظام.',
               icon: Icons.business_center_outlined,
               titleColor: Colors.orange,
               isError: true,
@@ -1978,8 +1981,8 @@ Widget _buildReservationDetailsStep() {
                 
                 SwitchListTile(
                   // title: const Text('السماح للآخرين بالانضمام'),
-                  title: const Text('هل تسمح للآخرين بالانضمام الى الغرس؟'),
-                  // subtitle: const Text('هل تسمح للآخرين بالانضمام الى الغرس ؟'),
+                  title: const Text('هل تسمح للآخرين بالانضمام الى العرس؟'),
+                  // subtitle: const Text('هل تسمح للآخرين بالانضمام الى العرس ؟'),
                   value: _allowOthers,
                   onChanged: (value) => setState(() => _allowOthers = value),
                   contentPadding: EdgeInsets.zero,

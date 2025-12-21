@@ -48,12 +48,45 @@ class HomeTabState extends State<HomeTab> with TickerProviderStateMixin {
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
 
-  @override
-  void initState() {
-    super.initState();
-    _initAnimations();
+    // Add these after the existing state variables (around line 16)
+  bool _hasValidReservation = false;
+  bool _isCheckingReservation = true;
+@override
+void initState() {
+  super.initState();
+  _initAnimations();
+  // MODIFIED: Check reservation first, then load data
+  _checkReservationStatus().then((_) {
     _loadDataInBackground();
+  });
+}
+
+/// Check if user has a valid reservation
+Future<void> _checkReservationStatus() async {
+  setState(() {
+    _isCheckingReservation = true;
+  });
+
+  try {
+    // Check for validated reservation
+    final validatedReservation = await ApiService.getMyValidatedReservation();
+    
+    if (validatedReservation != null && validatedReservation.isNotEmpty) {
+      setState(() {
+        _hasValidReservation = true;
+        _isCheckingReservation = false;
+      });
+      return;
+    }
+  } catch (e) {
+    print('No validated reservation found: $e');
   }
+
+  setState(() {
+    _hasValidReservation = false;
+    _isCheckingReservation = false;
+  });
+}
 
   // New method to load data in background without showing loading state
   void _loadDataInBackground() {
@@ -74,16 +107,19 @@ class HomeTabState extends State<HomeTab> with TickerProviderStateMixin {
   //   _isCountyChartExpanded = false;
 
   // }
-void refreshData() async {
-    final connectivityResult = await Connectivity().checkConnectivity();
-    
-    if (connectivityResult.contains(ConnectivityResult.none)) {
-      _showNoInternetDialog();
-      return;
-    }
-    
-    _loadDashboardData();
+
+  void refreshData() async {
+  final connectivityResult = await Connectivity().checkConnectivity();
+  
+  if (connectivityResult.contains(ConnectivityResult.none)) {
+    _showNoInternetDialog();
+    return;
   }
+  
+  // Re-check reservation status on refresh
+  await _checkReservationStatus();
+  _loadDashboardData();
+}
 
   Future<void> _loadData() async {
     try {
@@ -245,43 +281,52 @@ Future<void> _loadReservationStats() async {
       _reservationStats = {'total': 0, 'validated': 0, 'cancelled': 0, 'pending': 0};
     }
   }
-
 Future<void> _loadChartStatistics() async {
-    try {
-      final results = await Future.wait([
-        ApiService.getValidatedReservationsToday(),
-        ApiService.getValidatedReservationsMonth(),
-        ApiService.getValidatedReservationsYear(),
-        ApiService.getValidatedReservationsTodayCounty(),
-        ApiService.getValidatedReservationsMonthCounty(),
-        ApiService.getValidatedReservationsYearCounty(),
-      ]);
-      
-      if (mounted) {
-        setState(() {
-          _clanStats = {
-            'today': results[0]['count'] ?? 0,
-            'month': results[1]['count'] ?? 0,
-            'year': results[2]['count'] ?? 0,
-            'today_data': results[0]['reservations'] ?? [],
-            'month_data': results[1]['reservations'] ?? [],
-            'year_data': results[2]['reservations'] ?? [],
-          };
-          
-          _countyStats = {
-            'today': results[3]['count'] ?? 0,
-            'month': results[4]['count'] ?? 0,
-            'year': results[5]['count'] ?? 0,
-            'today_data': results[3]['reservations'] ?? [],
-            'month_data': results[4]['reservations'] ?? [],
-            'year_data': results[5]['reservations'] ?? [],
-          };
-        });
-      }
-    } catch (e) {
-    _clanStats = {'today': 0, 'month': 0, 'year': 0, 'today_data': [], 'month_data': [], 'year_data': []};
-    _countyStats = {'today': 0, 'month': 0, 'year': 0, 'today_data': [], 'month_data': [], 'year_data': []};    }
+  // Don't load chart data if no valid reservation
+  if (!_hasValidReservation) {
+    setState(() {
+      _clanStats = {'today': 0, 'month': 0, 'year': 0, 'today_data': [], 'month_data': [], 'year_data': []};
+      _countyStats = {'today': 0, 'month': 0, 'year': 0, 'today_data': [], 'month_data': [], 'year_data': []};
+    });
+    return;
   }
+
+  try {
+    final results = await Future.wait([
+      ApiService.getValidatedReservationsToday(),
+      ApiService.getValidatedReservationsMonth(),
+      ApiService.getValidatedReservationsYear(),
+      ApiService.getValidatedReservationsTodayCounty(),
+      ApiService.getValidatedReservationsMonthCounty(),
+      ApiService.getValidatedReservationsYearCounty(),
+    ]);
+    
+    if (mounted) {
+      setState(() {
+        _clanStats = {
+          'today': results[0]['count'] ?? 0,
+          'month': results[1]['count'] ?? 0,
+          'year': results[2]['count'] ?? 0,
+          'today_data': results[0]['reservations'] ?? [],
+          'month_data': results[1]['reservations'] ?? [],
+          'year_data': results[2]['reservations'] ?? [],
+        };
+        
+        _countyStats = {
+          'today': results[3]['count'] ?? 0,
+          'month': results[4]['count'] ?? 0,
+          'year': results[5]['count'] ?? 0,
+          'today_data': results[3]['reservations'] ?? [],
+          'month_data': results[4]['reservations'] ?? [],
+          'year_data': results[5]['reservations'] ?? [],
+        };
+      });
+    }
+  } catch (e) {
+    _clanStats = {'today': 0, 'month': 0, 'year': 0, 'today_data': [], 'month_data': [], 'year_data': []};
+    _countyStats = {'today': 0, 'month': 0, 'year': 0, 'today_data': [], 'month_data': [], 'year_data': []};
+  }
+}
 
 void _showExitDialog(bool isDark) {
     showDialog(
@@ -665,7 +710,54 @@ Widget build(BuildContext context) {
       ),
     );
   }
-Widget _buildStatsSection(bool isDark) {
+
+  Widget _buildStatsSection(bool isDark) {
+  // Don't show charts if no valid reservation
+  if (!_hasValidReservation) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isDark ? Colors.grey[800]! : Colors.grey[200]!,
+          ),
+        ),
+        child: Column(
+          children: [
+            Icon(
+              Icons.lock_outline,
+              size: 48,
+              color: isDark ? Colors.grey[600] : Colors.grey[400],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'الإحصائيات متاحة بعد تأكيد الحجز',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: isDark ? Colors.grey[400] : Colors.grey[600],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'قم بإنشاء حجز وانتظر التأكيد لعرض الإحصائيات',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                color: isDark ? Colors.grey[500] : Colors.grey[500],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Original stats section for users with valid reservation
   return Padding(
     padding: const EdgeInsets.symmetric(horizontal: 16),
     child: Column(
@@ -707,6 +799,8 @@ Widget _buildStatsSection(bool isDark) {
     ),
   );
 }
+
+
 Widget _buildChartCard({
   required String title,
   required IconData icon,

@@ -6,6 +6,7 @@ import 'package:wedding_reservation_app/screens/clan%20admin/HallsTab.dart';
 import 'package:wedding_reservation_app/screens/clan%20admin/clan_rules_management_page.dart';
 import 'package:wedding_reservation_app/screens/clan%20admin/clan_settings_tab.dart';
 import 'package:wedding_reservation_app/screens/clan%20admin/food_menu_tab.dart';
+import 'package:wedding_reservation_app/screens/clan%20admin/groom_access_password_page.dart';
 import 'package:wedding_reservation_app/screens/clan%20admin/grooms_tab.dart';
 import 'package:wedding_reservation_app/screens/clan%20admin/home_tab.dart';
 import 'package:wedding_reservation_app/screens/clan%20admin/notifications_tab.dart'; // Added
@@ -17,6 +18,7 @@ import '../../services/api_service.dart';
 import '../../utils/colors.dart';
 import '../../utils/constants.dart';
 
+import 'package:wedding_reservation_app/screens/clan%20admin/clan_admin_statistics_page.dart';
 class ClanAdminHomeScreen extends StatefulWidget {
   const ClanAdminHomeScreen({super.key});
 
@@ -35,18 +37,27 @@ class _ClanAdminHomeScreenState extends State<ClanAdminHomeScreen>
   int? _clanId;
   String? _clanName;
 
+
+  // ADD THESE NEW VARIABLES:
+  bool _hasAccessPassword = false;
+  bool _isVerifyingAccess = false;
+  
+  // List of protected tab indices
+  final List<int> _protectedTabs = [1, 2, 5, 6, 7, 8, 10,11]; // Halls, Grooms, Settings, Notif, Rules, Special Reserv, Password Management
+  
   // Tab keys for refreshing specific tabs
+  final GlobalKey<FoodTabState> _foodTabKey = GlobalKey<FoodTabState>();
   final GlobalKey<HomeTabState> _homeTabKey = GlobalKey<HomeTabState>();
   final GlobalKey<HallsTabState> _hallsTabKey = GlobalKey<HallsTabState>();
   final GlobalKey<GroomManagementScreenState> _groomsTabKey = GlobalKey<GroomManagementScreenState>();
-  final GlobalKey<ReservationsTabState> _reservationsTabKey = GlobalKey<ReservationsTabState>();
-  final GlobalKey<FoodTabState> _foodTabKey = GlobalKey<FoodTabState>();
   final GlobalKey<SettingsTabState> _settingsTabKey = GlobalKey<SettingsTabState>();
   final GlobalKey<NotificationsTabState> _notifTabKey = GlobalKey<NotificationsTabState>();
   final GlobalKey<ClanRulesPageState> _rulesTabKey = GlobalKey<ClanRulesPageState>();
   final GlobalKey<SpecialReservationsTabState> _reserv_special = GlobalKey<SpecialReservationsTabState>();
   final GlobalKey<NotificationsTabState> _notificationsTabKey = GlobalKey<NotificationsTabState>(); // Added
-
+  final GlobalKey<GroomAccessPasswordPageState> _groomPasswordTabKey = GlobalKey<GroomAccessPasswordPageState>();
+  final GlobalKey<ReservationsTabState> _reservationsTabKey = GlobalKey<ReservationsTabState>();
+  final GlobalKey<ClanAdminStatisticsPageState> _statisticsTabKey = GlobalKey<ClanAdminStatisticsPageState>();
   @override
   void initState() {
     super.initState();
@@ -68,8 +79,24 @@ class _ClanAdminHomeScreenState extends State<ClanAdminHomeScreen>
 
     _animationController.forward();
     _loadClanInfo();
+    _checkAccessPassword(); // ADD THIS LINE
   }
 
+
+// ADD THIS NEW METHOD:
+Future<void> _checkAccessPassword() async {
+  try {
+    final hasPassword = await ApiService.hasAccessPassword();
+    setState(() {
+      _hasAccessPassword = hasPassword;
+    });
+  } catch (e) {
+    print('Error checking access password: $e');
+    setState(() {
+      _hasAccessPassword = false;
+    });
+  }
+}
   Future<void> _loadClanInfo() async {
     try {
       final clanInfo = await ApiService.getClanInfoByCurrentUser();
@@ -99,21 +126,309 @@ class _ClanAdminHomeScreenState extends State<ClanAdminHomeScreen>
     super.didUpdateWidget(oldWidget);
   }
 
-  // Navigation method with tab refresh logic
-  void _navigateToTab(int index) {
-    if (_lastTabIndex != index) {
-      setState(() {
-        _currentIndex = index;
-      });
-      
-      _refreshCurrentTab(index);
-      _lastTabIndex = index;
-    } else {
-      setState(() {
-        _currentIndex = index;
-      });
-    }
+
+
+  // Method to verify access before navigating to protected tabs
+Future<bool> _verifyAccessForTab(int tabIndex) async {
+  
+  // Check if tab requires protection
+  if (!_protectedTabs.contains(tabIndex)) {
+    return true; // Not a protected tab, allow access
   }
+  await _checkAccessPassword();
+  // Check if user has access password set
+  if (!_hasAccessPassword) {
+    _showAccessPasswordNotSetDialog();
+    return false;
+  }
+
+  // Show password verification dialog
+  return await _showAccessPasswordDialog();
+}
+
+// Dialog when user doesn't have access password
+void _showAccessPasswordNotSetDialog() {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Row(
+        children: [
+          Icon(Icons.lock_outline, color: Colors.orange),
+          SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'كلمة مرور الوصول غير متوفرة',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: isDark ? Colors.white : Colors.black87,
+              ),
+            ),
+          ),
+        ],
+      ),
+      // content: Text(
+      //   'لم يتم تعيين كلمة مرور وصول لحسابك.\nيرجى الاتصال بالمدير الأعلى لإنشاء كلمة مرور.',
+      //   style: TextStyle(
+      //     color: isDark ? Colors.white70 : Colors.black87,
+      //   ),
+      // ),
+      actions: [
+        ElevatedButton(
+          onPressed: () => Navigator.pop(context),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+          ),
+          child: const Text('فهمت', style: TextStyle(color: Colors.white)),
+        ),
+      ],
+    ),
+  );
+}
+// Updated _showAccessPasswordDialog method with loading state
+
+Future<bool> _showAccessPasswordDialog() async {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  final passwordController = TextEditingController();
+  bool obscurePassword = true;
+  String? errorMessage;
+  bool isLoading = false; // ADD THIS LINE
+
+  final result = await showDialog<bool>(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) => StatefulBuilder(
+      builder: (context, setDialogState) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.key, color: AppColors.primary),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'أدخل كلمة مرور الوصول',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 18,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Container(
+            //   padding: const EdgeInsets.all(12),
+            //   decoration: BoxDecoration(
+            //     color: Colors.blue.shade50,
+            //     borderRadius: BorderRadius.circular(8),
+            //     border: Border.all(color: Colors.blue.shade200),
+            //   ),
+            //   child: Row(
+            //     children: const [
+            //       Icon(Icons.info_outline, color: Colors.blue, size: 20),
+            //       SizedBox(width: 8),
+            //       Expanded(
+            //         child: Text(
+            //           'هذه الصفحة محمية. يرجى إدخال كلمة المرور.',
+            //           style: TextStyle(color: Colors.blue, fontSize: 12),
+            //         ),
+            //       ),
+            //     ],
+            //   ),
+            // ),
+            // SizedBox(height: 16),
+            TextField(
+              controller: passwordController,
+              obscureText: obscurePassword,
+              autofocus: true,
+              enabled: !isLoading, // DISABLE WHEN LOADING
+              style: TextStyle(
+                color: isDark ? Colors.white : Colors.black87,
+              ),
+              decoration: InputDecoration(
+                labelText: 'كلمة مرور ',
+                hintText: 'أدخل كلمة المرور',
+                prefixIcon: const Icon(Icons.lock_outline),
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    obscurePassword ? Icons.visibility : Icons.visibility_off,
+                  ),
+                  onPressed: isLoading ? null : () { // DISABLE WHEN LOADING
+                    setDialogState(() {
+                      obscurePassword = !obscurePassword;
+                    });
+                  },
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                errorText: errorMessage,
+              ),
+              onSubmitted: isLoading ? null : (_) async { // DISABLE WHEN LOADING
+                if (passwordController.text.isEmpty) {
+                  setDialogState(() {
+                    errorMessage = 'يرجى إدخال كلمة المرور';
+                  });
+                  return;
+                }
+                
+                // Start loading
+                setDialogState(() {
+                  isLoading = true;
+                  errorMessage = null;
+                });
+                
+                try {
+                  final isValid = await ApiService.validateSpecialPageAccess(
+                    passwordController.text,
+                  );
+                  if (isValid) {
+                    Navigator.pop(context, true);
+                  } else {
+                    setDialogState(() {
+                      isLoading = false;
+                      errorMessage = 'كلمة المرور غير صحيحة';
+                    });
+                  }
+                } catch (e) {
+                  setDialogState(() {
+                    isLoading = false;
+                    errorMessage = 'خطأ في التحقق من كلمة المرور';
+                  });
+                }
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: isLoading ? null : () => Navigator.pop(context, false), // DISABLE WHEN LOADING
+            child: Text(
+              'إلغاء',
+              style: TextStyle(
+                color: isLoading 
+                    ? Colors.grey 
+                    : (isDark ? Colors.white60 : Colors.grey[700]),
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: isLoading ? null : () async { // DISABLE WHEN LOADING
+              if (passwordController.text.isEmpty) {
+                setDialogState(() {
+                  errorMessage = 'يرجى إدخال كلمة المرور';
+                });
+                return;
+              }
+
+              // Start loading
+              setDialogState(() {
+                isLoading = true;
+                errorMessage = null;
+              });
+
+              try {
+                final isValid = await ApiService.validateSpecialPageAccess(
+                  passwordController.text,
+                );
+
+                if (isValid) {
+                  Navigator.pop(context, true);
+                } else {
+                  setDialogState(() {
+                    isLoading = false;
+                    errorMessage = 'كلمة المرور غير صحيحة';
+                  });
+                }
+              } catch (e) {
+                setDialogState(() {
+                  isLoading = false;
+                  errorMessage = 'خطأ في التحقق من كلمة المرور';
+                });
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isLoading 
+                  ? Colors.grey 
+                  : AppColors.primary,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+            ),
+            child: isLoading // UPDATED CHILD WITH LOADING INDICATOR
+                ? Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      ),
+                      SizedBox(width: 8),
+                      Text('جاري التحقق...', style: TextStyle(color: Colors.white)),
+                    ],
+                  )
+                : const Text('تحقق', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    ),
+  );
+
+  passwordController.dispose();
+  return result ?? false;
+}
+
+
+
+// Navigation method with tab refresh logic and access verification
+void _navigateToTab(int index) async {
+  // Check if tab requires access verification
+  bool hasAccess = await _verifyAccessForTab(index);
+  
+  if (!hasAccess) {
+    return; // Don't navigate if access is denied
+  }
+  
+  if (_lastTabIndex != index) {
+    setState(() {
+      _currentIndex = index;
+    });
+    
+    _refreshCurrentTab(index);
+    _lastTabIndex = index;
+  } else {
+    setState(() {
+      _currentIndex = index;
+    });
+  }
+}
+  // // Navigation method with tab refresh logic
+  // void _navigateToTab(int index) {
+  //   if (_lastTabIndex != index) {
+  //     setState(() {
+  //       _currentIndex = index;
+  //     });
+      
+  //     _refreshCurrentTab(index);
+  //     _lastTabIndex = index;
+  //   } else {
+  //     setState(() {
+  //       _currentIndex = index;
+  //     });
+  //   }
+  // }
 
   // Method for refreshing specific tabs
   void _refreshCurrentTab(int index) {
@@ -149,6 +464,12 @@ class _ClanAdminHomeScreenState extends State<ClanAdminHomeScreen>
         _notificationsTabKey.currentState?.refreshData(); // Added
         break;
       case 10:
+        _groomPasswordTabKey.currentState?.refreshData();
+        break;
+      case 11:
+        _statisticsTabKey.currentState?.refreshData(); // ← NEW LINE
+        break;
+      case 12: // ← Update from 11 to 12 for profile
         break;
     }
   }
@@ -252,6 +573,9 @@ Widget build(BuildContext context) {
                           Center(child: CircularProgressIndicator(color: AppColors.primary)),
                         SpecialReservationsTab(key: _reserv_special),
                         NotificationsTab(key: _notificationsTabKey), // Added
+                        GroomAccessPasswordPage(key: _groomPasswordTabKey), // ← NEW LINE
+                        ClanAdminStatisticsPage(key: _statisticsTabKey), // ← NEW LINE
+
                         _buildProfileTab(isDark),
                       ],
                     ),
@@ -368,6 +692,8 @@ Widget build(BuildContext context) {
                       _buildRightNavItem(Icons.rule_outlined, 'اللوازم ', 7, isDark),
                       _buildRightNavItem(Icons.star_border_outlined, 'الحجوزات الخاصة', 8, isDark),
                       _buildRightNavItem(Icons.notifications_outlined, 'الإشعارات', 9, isDark), // Added
+                      _buildRightNavItem(Icons.lock_outline, 'كلمة مرور الوصول', 10, isDark),
+                      _buildRightNavItem(Icons.bar_chart_outlined, 'الإحصائيات', 11, isDark), // ← NEW LINE
                       // _buildRightNavItem(Icons.person_outline, 'الملف الشخصي', 10, isDark), // Changed from 9 to 10                  
                     ],
                   ),
@@ -395,76 +721,174 @@ Widget build(BuildContext context) {
     );
   }
 
-  Widget _buildRightNavItem(IconData icon, String label, int index, bool isDark) {
-    final isSelected = _currentIndex == index;
+  // Widget _buildRightNavItem(IconData icon, String label, int index, bool isDark) {
+  //   final isSelected = _currentIndex == index;
     
-    return GestureDetector(
-      onTap: () => _navigateToTab(index),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOutCubic,
-        margin: const EdgeInsets.symmetric(vertical: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          gradient: isSelected
-              ? LinearGradient(
-                  colors: [
-                    AppColors.primary.withOpacity(0.8),
-                    AppColors.primary.withOpacity(0.5),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                )
-              : null,
-          color: !isSelected && isDark ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.2) ,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: AppColors.primary.withOpacity(0.3),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ]
-              : null,
-        ),
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              color: isSelected 
-                  ? Colors.white 
-                  : (isDark ? Colors.white70 : Colors.black.withOpacity(0.5)),
-              size: 24,
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                  color: isSelected 
-                      ? Colors.white 
-                      : (isDark ? Colors.white70 : Colors.black.withOpacity(0.6)),
-                  letterSpacing: 0.2,
+  //   return GestureDetector(
+  //     onTap: () => _navigateToTab(index),
+  //     child: AnimatedContainer(
+  //       duration: const Duration(milliseconds: 300),
+  //       curve: Curves.easeOutCubic,
+  //       margin: const EdgeInsets.symmetric(vertical: 4),
+  //       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+  //       decoration: BoxDecoration(
+  //         gradient: isSelected
+  //             ? LinearGradient(
+  //                 colors: [
+  //                   AppColors.primary.withOpacity(0.8),
+  //                   AppColors.primary.withOpacity(0.5),
+  //                 ],
+  //                 begin: Alignment.topLeft,
+  //                 end: Alignment.bottomRight,
+  //               )
+  //             : null,
+  //         color: !isSelected && isDark ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.2) ,
+  //         borderRadius: BorderRadius.circular(12),
+  //         boxShadow: isSelected
+  //             ? [
+  //                 BoxShadow(
+  //                   color: AppColors.primary.withOpacity(0.3),
+  //                   blurRadius: 12,
+  //                   offset: const Offset(0, 4),
+  //                 ),
+  //               ]
+  //             : null,
+  //       ),
+  //       child: Row(
+  //         children: [
+  //           Icon(
+  //             icon,
+  //             color: isSelected 
+  //                 ? Colors.white 
+  //                 : (isDark ? Colors.white70 : Colors.black.withOpacity(0.5)),
+  //             size: 24,
+  //           ),
+  //           const SizedBox(width: 16),
+  //           Expanded(
+  //             child: Text(
+  //               label,
+  //               style: TextStyle(
+  //                 fontSize: 15,
+  //                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+  //                 color: isSelected 
+  //                     ? Colors.white 
+  //                     : (isDark ? Colors.white70 : Colors.black.withOpacity(0.6)),
+  //                 letterSpacing: 0.2,
+  //               ),
+  //             ),
+  //           ),
+  //           if (isSelected)
+  //             Container(
+  //               width: 4,
+  //               height: 4,
+  //               decoration: const BoxDecoration(
+  //                 color: Colors.white,
+  //                 shape: BoxShape.circle,
+  //               ),
+  //             ),
+  //         ],
+  //       ),
+  //     ),
+  //   );
+  // }
+
+  Widget _buildRightNavItem(IconData icon, String label, int index, bool isDark) {
+  final isSelected = _currentIndex == index;
+  final isProtected = _protectedTabs.contains(index);
+  
+  return GestureDetector(
+    onTap: () => _navigateToTab(index),
+    child: AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOutCubic,
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        gradient: isSelected
+            ? LinearGradient(
+                colors: [
+                  AppColors.primary.withOpacity(0.8),
+                  AppColors.primary.withOpacity(0.5),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              )
+            : null,
+        color: !isSelected && isDark ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: isSelected
+            ? [
+                BoxShadow(
+                  color: AppColors.primary.withOpacity(0.3),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
                 ),
-              ),
-            ),
-            if (isSelected)
-              Container(
-                width: 4,
-                height: 4,
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                ),
-              ),
-          ],
-        ),
+              ]
+            : null,
       ),
-    );
-  }
+      child: Row(
+        children: [
+          Stack(
+            children: [
+              Icon(
+                icon,
+                color: isSelected 
+                    ? Colors.white 
+                    : (isDark ? Colors.white70 : Colors.black.withOpacity(0.5)),
+                size: 24,
+              ),
+              // Show lock badge for protected tabs
+              if (isProtected && !isSelected)
+                Positioned(
+                  right: -2,
+                  top: -2,
+                  child: Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: Colors.amber,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                        width: 1,
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.lock,
+                      size: 8,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                color: isSelected 
+                    ? Colors.white 
+                    : (isDark ? Colors.white70 : Colors.black.withOpacity(0.6)),
+                letterSpacing: 0.2,
+              ),
+            ),
+          ),
+          if (isSelected)
+            Container(
+              width: 4,
+              height: 4,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+              ),
+            ),
+        ],
+      ),
+    ),
+  );
+}
 
   Widget _buildRightNavLogoutButton(bool isDark) {
     return GestureDetector(
@@ -654,6 +1078,7 @@ Widget build(BuildContext context) {
     );
   }
 
+
   Widget _buildNavItem(IconData icon, String label, int index, bool isDark) {
     final isSelected = _currentIndex == index;
     
@@ -743,7 +1168,11 @@ String _getAppBarTitle() {
     case 9:
       return 'الإشعارات'; // Added
     case 10:
-      return 'الملف الشخصي'; // Changed from case 9 to 10
+      return 'كلمة مرور الوصول';
+    case 11:
+      return 'الإحصائيات'; // ← NEW LINE
+    case 12: // ← Changed from 11 to 12
+      return 'الملف الشخصي';
     default:
       return AppConstants.appName;
   }

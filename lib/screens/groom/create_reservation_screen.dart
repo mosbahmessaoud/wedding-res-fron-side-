@@ -1013,18 +1013,36 @@ Future<void> _loadData() async {
     final madaehCommittees = await ApiService.getGroomMadaihCommittee();
     print('Madaeh committees loaded: ${madaehCommittees.runtimeType} - Length: ${madaehCommittees.length}');
     
-    setState(() {
-      if (clans is List) {
-        _clans = clans;
-      } else {
-        print('WARNING: clans is not a List, it is: ${clans.runtimeType}');
-        _clans = [];
-      }
+    // setState(() {
+    //   if (clans is List) {
+    //     _clans = clans;
+    //   } else {
+    //     print('WARNING: clans is not a List, it is: ${clans.runtimeType}');
+    //     _clans = [];
+    //   }
       
-      _haiaCommittees = haiaCommittees;
-      _madaehCommittees = madaehCommittees;
-      _isLoadingClans = false;
-    });
+    //   _haiaCommittees = haiaCommittees;
+    //   _madaehCommittees = madaehCommittees;
+    //   _isLoadingClans = false;
+    // });
+    setState(() {
+  if (clans is List) {
+    // Sort clans by ID
+    _clans = List<dynamic>.from(clans)
+      ..sort((a, b) {
+        final idA = a['id'] ?? 0;
+        final idB = b['id'] ?? 0;
+        return idA.compareTo(idB);
+      });
+  } else {
+    print('WARNING: clans is not a List, it is: ${clans.runtimeType}');
+    _clans = [];
+  }
+  
+  _haiaCommittees = haiaCommittees;
+  _madaehCommittees = madaehCommittees;
+  _isLoadingClans = false;
+});
     
     print('All data loaded successfully');
     
@@ -1555,6 +1573,7 @@ Widget _buildClanAndHallSelectionStep() {
         // (Keep all existing content in this method)
         
         // Clan Selection
+        
 DropdownButtonFormField<Map<String, dynamic>>(
   value: _selectedClan,
   isExpanded: true,
@@ -1564,24 +1583,46 @@ DropdownButtonFormField<Map<String, dynamic>>(
     border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
     helperText: 'العشائر المتاحة في قصرك',
   ),
-  items: _clans.map((clan) {
-    return DropdownMenuItem<Map<String, dynamic>>(
-      value: clan,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          return SizedBox(
-            width: constraints.maxWidth,
-            child: Text(
-              clan['name']?.toString() ?? 'عشيرة غير مسماة',
-              style: const TextStyle(fontWeight: FontWeight.bold),
-              overflow: TextOverflow.ellipsis,
-              maxLines: 1,
-            ),
-          );
-        },
-      ),
-    );
-  }).toList(),
+  // items: _clans.map((clan) {
+  //   return DropdownMenuItem<Map<String, dynamic>>(
+  //     value: clan,
+  //     child: LayoutBuilder(
+  //       builder: (context, constraints) {
+  //         return SizedBox(
+  //           width: constraints.maxWidth,
+  //           child: Text(
+  //             clan['name']?.toString() ?? 'عشيرة غير مسماة',
+  //             style: const TextStyle(fontWeight: FontWeight.bold),
+  //             overflow: TextOverflow.ellipsis,
+  //             maxLines: 1,
+  //           ),
+  //         );
+  //       },
+  //     ),
+  //   );
+  // }).toList(),
+  items: (_clans..sort((a, b) {
+  final idA = a['id'] ?? 0;
+  final idB = b['id'] ?? 0;
+  return idA.compareTo(idB);
+})).map((clan) {
+  return DropdownMenuItem<Map<String, dynamic>>(
+    value: clan,
+    child: LayoutBuilder(
+      builder: (context, constraints) {
+        return SizedBox(
+          width: constraints.maxWidth,
+          child: Text(
+            clan['name']?.toString() ?? 'عشيرة غير مسماة',
+            style: const TextStyle(fontWeight: FontWeight.bold),
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
+          ),
+        );
+      },
+    ),
+  );
+}).toList(),
   onChanged: _onClanSelected,
   validator: (value) => value == null ? 'العشيرة مطلوبة' : null,
   icon: _isLoadingClans 

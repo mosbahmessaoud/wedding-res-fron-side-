@@ -1,6 +1,8 @@
 // lib/screens/home/super_admin_home_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+// Add this import at the top with other imports
+import 'package:wedding_reservation_app/screens/super%20admin/access_password_management_page.dart';
 import 'package:wedding_reservation_app/screens/super%20admin/clan_admins_management_screen.dart';
 import 'package:wedding_reservation_app/screens/super%20admin/clans_tab.dart';
 import 'package:wedding_reservation_app/screens/super%20admin/create_clan_admin_screen.dart';
@@ -14,7 +16,6 @@ import 'package:wedding_reservation_app/widgets/theme_toggle_button.dart';
 import '../../utils/colors.dart';
 import '../../utils/constants.dart';
 import '../super admin/counties_tab.dart';
-
 class SuperAdminHomeScreen extends StatefulWidget {
   const SuperAdminHomeScreen({super.key});
 
@@ -267,6 +268,8 @@ PreferredSizeWidget _buildModernAppBar(BuildContext context, bool isTablet, bool
         _buildAppBarAction(Icons.person_add, () => Navigator.push(context, MaterialPageRoute(builder: (_) => CreateClanAdminScreen())), isTablet, isDesktop),
         _buildAppBarAction(Icons.notifications_outlined, () {}, isTablet, isDesktop),
         _buildAppBarAction(Icons.person_outline, () {}, isTablet, isDesktop),
+        // Add this line in the actions array, before the phone_android button
+        _buildAppBarAction(Icons.lock_outline, () => Navigator.push(context, MaterialPageRoute(builder: (_) => SuperAdminAccessPasswordPage())), isTablet, isDesktop),
         _buildAppBarAction(Icons.phone_android, () => Navigator.push(context, MaterialPageRoute(builder: (_) => OTPVerificationScreenE(isClanadmin: false))), isTablet, isDesktop),
       ] else
         _buildAppBarAction(Icons.refresh, _loadDashboardData, isTablet, isDesktop),
@@ -280,6 +283,7 @@ PreferredSizeWidget _buildModernAppBar(BuildContext context, bool isTablet, bool
           itemBuilder: (_) => [
             PopupMenuItem(value: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ClanAdminsManagementScreen())), child: Row(children: [Icon(Icons.admin_panel_settings, size: 20), SizedBox(width: 12), Text('إدارة المشرفين')])),
             PopupMenuItem(value: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CreateClanAdminScreen())), child: Row(children: [Icon(Icons.person_add, size: 20), SizedBox(width: 12), Text('إضافة مشرف')])),
+            PopupMenuItem(value: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SuperAdminAccessPasswordPage())), child: Row(children: [Icon(Icons.lock_outline, size: 20), SizedBox(width: 12), Text('إدارة كلمة المرور')])),
             PopupMenuItem(value: () {}, child: Row(children: [Icon(Icons.notifications_outlined, size: 20), SizedBox(width: 12), Text('الإشعارات')])),
             PopupMenuItem(value: () {}, child: Row(children: [Icon(Icons.person_outline, size: 20), SizedBox(width: 12), Text('الملف الشخصي')])),
             PopupMenuItem(value: () => Navigator.push(context, MaterialPageRoute(builder: (_) => OTPVerificationScreenE(isClanadmin: false))), child: Row(children: [Icon(Icons.phone_android, size: 20), SizedBox(width: 12), Text('التحقق')])),
@@ -763,6 +767,7 @@ Widget _buildStatsGrid(bool isTablet, bool isDesktop) {
       'color': Colors.purple,
       'subtitle': 'جميع الحجوزات المسجلة',
     },
+
   ];
 
   return LayoutBuilder(

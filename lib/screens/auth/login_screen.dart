@@ -736,7 +736,8 @@ _AnimatedWidget(
   slideMultiplier: 0.5,
   child: _AnimatedUnderlineTextField(
     controller: phoneController,
-    label: 'رقم الهاتف (رقم هاتف العريس) ',
+    label: ' رقم هاتف العريس',
+    // label: 'رقم الهاتف (رقم هاتف العريس) ',
     labelColor: isDark ? Colors.white : Colors.black,
     boxcolor: isDark ? const Color.fromARGB(255, 157, 42, 42) : Colors.black,
     keyboardType: TextInputType.phone,
@@ -968,7 +969,7 @@ class _AnimatedUnderlineTextFieldState extends State<_AnimatedUnderlineTextField
               ),
             ),
             Positioned(
-              bottom: -4,
+              bottom: -8,
               left: 0,
               right: 0,
               child: AnimatedBuilder(
@@ -978,7 +979,7 @@ class _AnimatedUnderlineTextFieldState extends State<_AnimatedUnderlineTextField
                     size: Size(double.infinity, 3),
                     painter: _MovingUnderlinePainter(
                       progress: _underlineAnimation.value,
-                      color: Colors.red,
+                      color: Colors.green,
                     ),
                   );
                 },

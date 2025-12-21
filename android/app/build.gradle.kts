@@ -43,9 +43,7 @@ android {
 
         applicationId = "com.iTriDev.ASULI"
         minSdk = flutter.minSdkVersion
-        targetSdk = 34
-        //versionCode = 1
-        //versionName = "1.0.0"
+        targetSdk = 35
 
         // Optimize APK size by including only necessary ABIs
         ndk {

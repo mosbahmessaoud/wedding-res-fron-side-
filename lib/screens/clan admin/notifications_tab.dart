@@ -16,18 +16,35 @@ class NotificationsTabState extends State<NotificationsTab> with SingleTickerPro
   final _messageController = TextEditingController();
   final _versionController = TextEditingController();
   bool _isLoading = false;
-  String? _selectedRecipient = 'grooms';
+  String? _selectedRecipient = 'grooms_reserved';
   
   late TabController _tabController;
   List<dynamic> _notifications = [];
   bool _isLoadingNotifications = false;
+@override
+void initState() {
+  super.initState();
+  _tabController = TabController(length: 2, vsync: this);
+  _loadNotifications();
+  
+  // Mark all notifications as read when the page opens
+  _markAllAsReadOnOpen();
+}
 
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-    _loadNotifications();
+/// Mark all notifications as read when opening the page
+Future<void> _markAllAsReadOnOpen() async {
+  try {
+    await ApiService.markAllNotificationsAsRead();
+    print('✅ All notifications marked as read');
+    
+    // Refresh notification list after marking as read
+    if (mounted) {
+      _loadNotifications();
+    }
+  } catch (e) {
+    print('⚠️ Failed to mark all as read: $e');
   }
+}
 
   @override
   void dispose() {
@@ -43,44 +60,68 @@ class NotificationsTabState extends State<NotificationsTab> with SingleTickerPro
     _loadSendedNotifications();
   }
 
-  Future<void> _loadSendedNotifications() async {
-    setState(() => _isLoadingNotifications = true);
+// Update _loadSendedNotifications to fetch with user details
+Future<void> _loadSendedNotifications() async {
+  setState(() => _isLoadingNotifications = true);
+  
+  try {
+    final notifications = await ApiService.getSendedNotifications(limit: 100);
     
-    try {
-      final notifications = await ApiService.getSendedNotifications(limit: 100);
-      setState(() {
-        _notifications = notifications;
-      });
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('خطأ في تحميل الإشعارات: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    } finally {
-      setState(() => _isLoadingNotifications = false);
-    }  }
+    // Enrich notifications with user data if not already included
+    for (var notification in notifications) {
+      if (notification['user_id'] != null && 
+          !notification.containsKey('user_first_name')) {
+        try {
+          // If your backend doesn't return user info, you might need to fetch it
+          // For now, we'll assume the backend returns it or you can add a method
+          // to fetch user details by ID
+        } catch (e) {
+          print('Could not fetch user details: $e');
+        }
+      }
+    }
+    
+    setState(() {
+      _notifications = notifications;
+    });
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('خطأ في تحميل الإشعارات: ${e.toString()}'),
+        backgroundColor: Colors.red,
+      ),
+    );
+  } finally {
+    setState(() => _isLoadingNotifications = false);
+  }
+}
 
-  Future<void> _loadNotifications() async {
-    setState(() => _isLoadingNotifications = true);
+Future<void> _loadNotifications() async {
+  setState(() => _isLoadingNotifications = true);
+  
+  try {
+    final notifications = await ApiService.getNotifications(limit: 100);
     
-    try {
-      final notifications = await ApiService.getNotifications(limit: 100);
+    if (mounted) {
       setState(() {
         _notifications = notifications;
       });
-    } catch (e) {
+    }
+  } catch (e) {
+    if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('خطأ في تحميل الإشعارات: ${e.toString()}'),
           backgroundColor: Colors.red,
         ),
       );
-    } finally {
+    }
+  } finally {
+    if (mounted) {
       setState(() => _isLoadingNotifications = false);
     }
   }
+}
 
   Future<void> _sendNotification() async {
     if (_titleController.text.trim().isEmpty || 
@@ -93,20 +134,21 @@ class NotificationsTabState extends State<NotificationsTab> with SingleTickerPro
       );
       return;
     }
-   
+
     setState(() => _isLoading = true);
 
     try {
       Map<String, dynamic> result;
       
-      if (_selectedRecipient == 'grooms') {
-        result = await ApiService.sendNotificationToAllGrooms(
-          title: _titleController.text.trim(),
-          message: _messageController.text.trim(),
-        );
-        _showSuccessMessage(result['message']);
+      // if (_selectedRecipient == 'grooms') {
+      //   result = await ApiService.sendNotificationToAllGrooms(
+      //     title: _titleController.text.trim(),
+      //     message: _messageController.text.trim(),
+      //   );
+      //   _showSuccessMessage(result['message']);
       
-      } else if (_selectedRecipient == 'grooms_reserved') {
+      // } else 
+      if (_selectedRecipient == 'grooms_reserved') {
         result = await ApiService.createNotificationForValidReserv(
           title: _titleController.text.trim(),
           message: _messageController.text.trim(),
@@ -416,6 +458,7 @@ class NotificationsTabState extends State<NotificationsTab> with SingleTickerPro
                 
                 // Notifications List Tab
                 _buildNotificationsListTab(isDark),
+                // const SizedBox(height: 50),
               ],
             ),
           ),
@@ -426,9 +469,10 @@ class NotificationsTabState extends State<NotificationsTab> with SingleTickerPro
 
   Widget _buildSendNotificationTab(bool isDark) {
     return SingleChildScrollView(
-      padding: EdgeInsets.all(16),
+      padding: EdgeInsets.symmetric(horizontal: 5, vertical: 50),
       child: _buildCustomNotificationCard(isDark),
     );
+    
   }
 
   Widget _buildNotificationsListTab(bool isDark) {
@@ -476,34 +520,7 @@ class NotificationsTabState extends State<NotificationsTab> with SingleTickerPro
                   ),
                 ),
               ),
-              // SizedBox(width: 8),
-              // Expanded(
-              //   child: ElevatedButton.icon(
-              //     onPressed: () async {
-              //       final readIds = _notifications
-              //           .where((n) => n['is_read'] == true)
-              //           .map((n) => n['id'] as int)
-              //           .toList();
-                    
-              //       if (readIds.isEmpty) {
-              //         ScaffoldMessenger.of(context).showSnackBar(
-              //           SnackBar(
-              //             content: Text('لا توجد إشعارات مقروءة للحذف'),
-              //             backgroundColor: Colors.orange,
-              //           ),
-              //         );
-              //         return;
-              //       }
-                    
-              //       await _deleteMultipleNotifications(readIds);
-              //     },
-              //     icon: Icon(Icons.delete_sweep),
-              //     label: Text('حذف المقروءة'),
-              //     style: ElevatedButton.styleFrom(
-              //       backgroundColor: Colors.red,
-              //     ),
-              //   ),
-              // ),
+             
             ],
           ),
         ),
@@ -519,106 +536,176 @@ class NotificationsTabState extends State<NotificationsTab> with SingleTickerPro
             },
           ),
         ),
+        const SizedBox(height: 70),
       ],
+      
     );
   }
-
-  Widget _buildNotificationCard(Map<String, dynamic> notification, bool isDark) {
-    final isRead = notification['is_read'] == true;
-    final createdAt = DateTime.parse(notification['created_at']);
-    
-    return Card(
-      margin: EdgeInsets.only(bottom: 12),
-      elevation: isRead ? 1 : 3,
-      color: isRead 
-          ? (isDark ? Colors.grey[850] : Colors.grey[100])
-          : null,
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: isRead ? Colors.grey : AppColors.primary,
-          child: Icon(
-            isRead ? Icons.notifications : Icons.notifications_active,
-            color: Colors.white,
-          ),
+Widget _buildNotificationCard(Map<String, dynamic> notification, bool isDark) {
+  // Show original read status for visual reference, but they're all marked as read in backend
+  final wasUnread = notification['is_read'] == false;
+  final createdAt = DateTime.parse(notification['created_at']);
+  
+  // Extract user information
+  final userPhone = notification['user_phone_number'] ?? 'غير متوفر';
+  final userName = _buildUserName(notification);
+  
+  return Card(
+    margin: EdgeInsets.only(bottom: 12),
+    elevation: wasUnread ? 2 : 1,
+    color: wasUnread 
+        ? null // Keep normal card color for originally unread
+        : (isDark ? Colors.grey[850] : Colors.grey[100]),
+    child: ListTile(
+      leading: CircleAvatar(
+        backgroundColor: wasUnread ? AppColors.primary.withOpacity(0.7) : Colors.grey,
+        child: Icon(
+          wasUnread ? Icons.notifications_active : Icons.notifications,
+          color: Colors.white,
         ),
-        title: Text(
-          notification['title'] ?? 'بدون عنوان',
-          style: TextStyle(
-            fontWeight: isRead ? FontWeight.normal : FontWeight.bold,
-          ),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(height: 4),
-            Text(
-              notification['message'] ?? '',
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            SizedBox(height: 4),
-            Text(
-              _formatDateTime(createdAt),
+      ),
+      title: Row(
+        children: [
+          Expanded(
+            child: Text(
+              notification['title'] ?? 'بدون عنوان',
               style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey,
+                fontWeight: wasUnread ? FontWeight.w600 : FontWeight.normal,
               ),
             ),
-          ],
-        ),
-        trailing: PopupMenuButton<String>(
-          icon: Icon(Icons.more_vert),
-          onSelected: (value) {
-            if (value == 'edit') {
-              _editNotification(notification);
-            } else if (value == 'delete') {
-              _deleteNotification(notification['id']);
-            } else if (value == 'mark_read') {
-              ApiService.markNotificationAsRead(notification['id']).then((_) {
-                _loadNotifications();
-              });
-            }
-          },
-
-
-          itemBuilder: (context) => [
-            PopupMenuItem(
-              value: 'edit',
-              child: Row(
-                children: [
-                  Icon(Icons.edit, size: 20),
-                  SizedBox(width: 8),
-                  Text('تعديل'),
-                ],
+          ),
+          // Optional: Show a small indicator that it was recently unread
+          if (wasUnread)
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(8),
               ),
-            ),
-            if (!isRead)
-              PopupMenuItem(
-                value: 'mark_read',
-                child: Row(
-                  children: [
-                    Icon(Icons.check, size: 20),
-                    SizedBox(width: 8),
-                    Text('تعليم كمقروء'),
-                  ],
+              child: Text(
+                'جديد',
+                style: TextStyle(
+                  fontSize: 10,
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
-            PopupMenuItem(
-              value: 'delete',
-              child: Row(
-                children: [
-                  Icon(Icons.delete, size: 20, color: Colors.red),
-                  SizedBox(width: 8),
-                  Text('حذف', style: TextStyle(color: Colors.red)),
-                ],
-              ),
             ),
-          ],
-        ),
-        isThreeLine: true,
+        ],
       ),
-    );
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(height: 4),
+          Text(
+            notification['message'] ?? '',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          SizedBox(height: 8),
+          // User info section
+          Container(
+            padding: EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.person_outline,
+                  size: 14,
+                  color: AppColors.primary,
+                ),
+                SizedBox(width: 4),
+                Flexible(
+                  child: Text(
+                    userName,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isDark ? Colors.white70 : Colors.black87,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                SizedBox(width: 8),
+                Icon(
+                  Icons.phone_outlined,
+                  size: 14,
+                  color: AppColors.primary,
+                ),
+                SizedBox(width: 4),
+                Text(
+                  userPhone,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark ? Colors.white70 : Colors.black87,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(height: 4),
+          Text(
+            _formatDateTime(createdAt),
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey,
+            ),
+          ),
+        ],
+      ),
+      trailing: PopupMenuButton<String>(
+        icon: Icon(Icons.more_vert),
+        onSelected: (value) {
+          if (value == 'edit') {
+            _editNotification(notification);
+          } else if (value == 'delete') {
+            _deleteNotification(notification['id']);
+          }
+        },
+        itemBuilder: (context) => [
+          PopupMenuItem(
+            value: 'edit',
+            child: Row(
+              children: [
+                Icon(Icons.edit, size: 20),
+                SizedBox(width: 8),
+                Text('تعديل'),
+              ],
+            ),
+          ),
+          PopupMenuItem(
+            value: 'delete',
+            child: Row(
+              children: [
+                Icon(Icons.delete, size: 20, color: Colors.red),
+                SizedBox(width: 8),
+                Text('حذف', style: TextStyle(color: Colors.red)),
+              ],
+            ),
+          ),
+        ],
+      ),
+      isThreeLine: true,
+    ),
+  );
+}
+
+// Helper method to build user name from notification data
+String _buildUserName(Map<String, dynamic> notification) {
+  final firstName = notification['user_first_name'] ?? '';
+  final lastName = notification['user_last_name'] ?? '';
+  
+  if (firstName.isEmpty && lastName.isEmpty) {
+    return 'مستخدم غير معروف';
   }
+  
+  return '$firstName $lastName'.trim();
+}
 
   Widget _buildCustomNotificationCard(bool isDark) {
     return Card(
@@ -655,7 +742,7 @@ class NotificationsTabState extends State<NotificationsTab> with SingleTickerPro
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'المستلمون:',
+                    'المستلمون:  جميع العرسان (بما فيذالك الذين لم يقيمو العرس بعد)',
                     style: TextStyle(
                       fontWeight: FontWeight.w500,
                       fontSize: 14,
@@ -666,8 +753,8 @@ class NotificationsTabState extends State<NotificationsTab> with SingleTickerPro
                     spacing: 8,
                     runSpacing: 8,
                     children: [
-                      _buildRecipientChip('إرسال للجميع', 'grooms', isDark),
-                      _buildRecipientChip('إرسال لمن لديه حجز', 'grooms_reserved', isDark),
+                      // _buildRecipientChip('إرسال للجميع', 'grooms', isDark),
+                      _buildRecipientChip(' ', 'grooms_reserved', isDark),
                     ],
                   ),
                 ],

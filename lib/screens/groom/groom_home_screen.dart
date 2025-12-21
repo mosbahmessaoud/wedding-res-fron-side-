@@ -49,34 +49,67 @@ class _GroomHomeScreenState extends State<GroomHomeScreen> {
   final GlobalKey<FoodMenuTabGState> _foodMenuTabKey = GlobalKey<FoodMenuTabGState>();
   final GlobalKey<CreateReservationScreenState> _creatResTabKey = GlobalKey<CreateReservationScreenState>();
   final GlobalKey<GroomClanRulesPageState> _rulesTabKey = GlobalKey<GroomClanRulesPageState>();
+// Add these after the existing state variables (around line 40)
+  bool _hasValidReservation = false;
+  bool _isCheckingReservation = true;
 
   @override
-  void initState() {
-    super.initState();
-    _currentIndex = widget.initialTabIndex;
-    
-    _tabs = [
-      HomeTab(onTabChanged: _changeTab),
-      CreateReservationScreen(
-        key: _creatResTabKey,
-        onReservationCreated: () {
-          _changeTab(2);
-        },
-      ),
-      ReservationsTab(key: _reservationsTabKey),
-      FoodMenuTabG(key: _foodMenuTabKey),
-      ProfileTab(key: _profileTabKey),
-      GroomClanRulesPage(key: _rulesTabKey),
-    ];
+void initState() {
+  super.initState();
+  _currentIndex = widget.initialTabIndex;
+  
+  _tabs = [
+    HomeTab(onTabChanged: _changeTab),
+    CreateReservationScreen(
+      key: _creatResTabKey,
+      onReservationCreated: () {
+        _changeTab(2);
+      },
+    ),
+    ReservationsTab(key: _reservationsTabKey),
+    FoodMenuTabG(key: _foodMenuTabKey),
+    ProfileTab(key: _profileTabKey),
+    GroomClanRulesPage(key: _rulesTabKey),
+  ];
 
-    // MODIFIED: Load initial tab data in background
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _refreshCurrentTabInBackground(_currentIndex);
-      _loadUnreadNotificationCount(); // Load initial notification count
-      _startNotificationPolling(); // Start polling for new notifications
-      
+  // MODIFIED: Check reservation first, then load data
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    _checkReservationStatus().then((_) {
+      if (_hasValidReservation) {
+        _refreshCurrentTabInBackground(_currentIndex);
+        _loadUnreadNotificationCount();
+        _startNotificationPolling();
+      }
     });
+  });
+}
+
+/// Check if user has a valid reservation
+Future<void> _checkReservationStatus() async {
+  setState(() {
+    _isCheckingReservation = true;
+  });
+
+  try {
+    // Check for validated reservation
+    final validatedReservation = await ApiService.getMyValidatedReservation();
+    
+    if (validatedReservation != null && validatedReservation.isNotEmpty) {
+      setState(() {
+        _hasValidReservation = true;
+        _isCheckingReservation = false;
+      });
+      return;
+    }
+  } catch (e) {
+    print('No validated reservation found: $e');
   }
+
+  setState(() {
+    _hasValidReservation = false;
+    _isCheckingReservation = false;
+  });
+}
 /// Show notification details dialog
 void _showNotificationDetailsDialog(Map<String, dynamic> notification, bool isDark) {
   showDialog(
@@ -274,7 +307,23 @@ String _formatDateTime(String? dateTimeStr) {
     );
   }
 /// Navigate to notifications screen
-void _navigateToNotifications() {
+void _navigateToNotifications() async {
+  // Check if user has valid reservation
+  if (!_hasValidReservation) {
+    _showNoReservationForNotificationsDialog();
+    return;
+  }
+  
+  // Mark all notifications as read when opening the screen
+  try {
+    await ApiService.markAllNotificationsAsRead();
+    // Refresh the notification count after marking as read
+    await _loadUnreadNotificationCount();
+  } catch (e) {
+    print('Error marking notifications as read: $e');
+    // Continue to open notifications screen even if marking as read fails
+  }
+  
   _navigateToExternalScreen(
     NotificationsScreen(
       onNotificationRead: () {
@@ -282,7 +331,106 @@ void _navigateToNotifications() {
         _loadUnreadNotificationCount();
       },
     ),
-    'الإشعارات', // This will be the title in the app bar
+    'الإشعارات',
+  );
+}
+/// Show dialog when trying to access notifications without valid reservation
+void _showNoReservationForNotificationsDialog() {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Row(
+        children: [
+          Icon(
+            Icons.lock_outline,
+            color: Colors.orange,
+            size: 28,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'حجز مؤكد مطلوب',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: isDark ? Colors.white : Colors.black87,
+              ),
+            ),
+          ),
+        ],
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'للوصول إلى الإشعارات، يجب أن يكون لديك حجز مؤكد.',
+            style: TextStyle(
+              color: isDark ? Colors.white70 : Colors.black87,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: isDark ? Colors.orange.shade900.withOpacity(0.3) : Colors.orange.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: isDark ? Colors.orange.shade700 : Colors.orange.shade200,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.info_outline,
+                  color: isDark ? Colors.orange.shade300 : Colors.orange.shade700,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'قم بإنشاء حجز وانتظر التأكيد للوصول إلى الإشعارات',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: isDark ? Colors.orange.shade200 : Colors.orange.shade900,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(
+            'موافق',
+            style: TextStyle(
+              color: isDark ? Colors.grey[400] : Colors.grey[700],
+            ),
+          ),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            Navigator.pop(context);
+            _changeTab(1); // Navigate to Create Reservation tab
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+          ),
+          child: const Text('إنشاء حجز'),
+        ),
+      ],
+    ),
   );
 }
 
@@ -962,6 +1110,7 @@ PreferredSizeWidget _buildSpotifyAppBar(bool isDark) {
       actions: [
         // Notification Button with Badge
         // In _buildSpotifyAppBar method, replace the notification IconButton onPressed:
+// In _buildSpotifyAppBar, replace the notification IconButton with:
 IconButton(
   icon: Stack(
     clipBehavior: Clip.none,
@@ -978,7 +1127,8 @@ IconButton(
           color: isDark ? Colors.white : Colors.black87,
         ),
       ),
-      if (_unreadNotificationCount > 0)
+      // Only show badge if user has valid reservation and unread notifications
+      if (_hasValidReservation && _unreadNotificationCount > 0)
         Positioned(
           right: 2,
           top: 2,
@@ -1015,7 +1165,7 @@ IconButton(
         ),
     ],
   ),
-  onPressed: () => _navigateToNotifications(), // CHANGED: Navigate to page instead of dialog
+  onPressed: () => _navigateToNotifications(),
 ),
         const SizedBox(width: 4),
         IconButton(
@@ -1714,14 +1864,41 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   List<dynamic> _filteredNotifications = [];
   bool _isLoading = true;
   String? _error;
-  String _selectedFilter = 'all'; // all, today, week, month
+  String _selectedFilter = 'today'; // all, today, week, month
 
   @override
-  void initState() {
-    super.initState();
-    _loadNotifications();
-  }
+void initState() {
+  super.initState();
+  _loadNotifications();
+  
+  // Mark all as read after a short delay to let the UI load
+  Future.delayed(const Duration(milliseconds: 500), () {
+    _markAllAsReadOnOpen();
+  });
+}
 
+/// Mark all notifications as read with loading indicator
+Future<void> _markAllAsReadOnOpen() async {
+  try {
+    await ApiService.markAllNotificationsAsRead();
+    
+    if (mounted) {
+      // Refresh the list to update UI
+      await _loadNotifications();
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('تم تعليم جميع الإشعارات كمقروءة'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+    
+    print('✅ All notifications marked as read');
+  } catch (e) {
+    print('⚠️ Failed to mark all as read: $e');
+  }
+}
 
   
   Future<void> _loadNotifications() async {
@@ -1774,6 +1951,7 @@ Widget _buildFilterChips(bool isDark) {
 
 Widget _buildFilterChip(String label, String value, bool isDark) {
   final isSelected = _selectedFilter == value;
+  _applyFilter();
   
   return GestureDetector(
     onTap: () {
@@ -1993,33 +2171,7 @@ Widget build(BuildContext context) {
 
   return Scaffold(
     backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF6F6F6),
-    // appBar: AppBar(
-    //   // title: const Text('الإشعارات'),
-    //   backgroundColor: isDark 
-    //       ? const Color(0xFF1E1E1E) 
-    //       : const Color.fromARGB(201, 255, 255, 255),
-    //   actions: [
-    //     if (_notifications.isNotEmpty)
-    //       IconButton(
-    //         icon: const Icon(Icons.done_all),
-    //         onPressed: () async {
-    //           try {
-    //             await ApiService.markAllNotificationsAsRead();
-    //             widget.onNotificationRead();
-    //             _loadNotifications();
-    //           } catch (e) {
-    //             ScaffoldMessenger.of(context).showSnackBar(
-    //               SnackBar(
-    //                 content: Text('فشل في تعليم الكل كمقروء: $e'),
-    //                 backgroundColor: AppColors.error,
-    //               ),
-    //             );
-    //           }
-    //         },
-    //         tooltip: 'تعليم الكل كمقروء',
-    //       ),
-    //   ],
-    // ),
+    
     body: _isLoading
         ? const Center(child: CircularProgressIndicator())
         : _error != null
@@ -2119,96 +2271,72 @@ Widget build(BuildContext context) {
               ),
   );
 }
+
 Widget _buildNotificationCard({
   required Map<String, dynamic> notification,
   required bool isDark,
 }) {
-  final isUnread = notification['is_read'] == false;
+  // Remove isUnread check since all are marked as read on open
+  final isUnread = false; // Always false now
   
   return GestureDetector(
-    onTap: () async {
-      // Show full notification details in popup
+    onTap: () {
+      // Just show details, no need to mark as read
       _showNotificationDetailsDialog(notification, isDark);
-      
-      // Mark as read if unread
-      if (isUnread) {
-        try {
-          await ApiService.markNotificationAsRead(notification['id']);
-          widget.onNotificationRead();
-          _loadNotifications();
-        } catch (e) {
-          print('Error marking as read: $e');
-        }
-      }
     },
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isUnread
-              ? (isDark 
-                  ? AppColors.primary.withOpacity(0.1) 
-                  : AppColors.primary.withOpacity(0.05))
-              : (isDark ? const Color(0xFF1E1E1E) : Colors.white),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isUnread
-                ? AppColors.primary.withOpacity(0.3)
-                : (isDark ? Colors.grey[800]! : Colors.grey[200]!),
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    notification['title'] ?? 'إشعار',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 16,
-                      color: isDark ? Colors.white : Colors.black87,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                if (isUnread)
-                  Container(
-                    width: 10,
-                    height: 10,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-                notification['message'] ?? '',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: isDark ? Colors.grey[400] : Colors.grey[600],
-                  height: 1.4,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            const SizedBox(height: 8),
-            Text(
-              _formatDateTime(notification['created_at']),
-              style: TextStyle(
-                fontSize: 12,
-                color: isDark ? Colors.grey[500] : Colors.grey[500],
-              ),
-            ),
-          ],
+    child: Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark ? Colors.grey[800]! : Colors.grey[200]!,
         ),
       ),
-    );
-  }
-
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  notification['title'] ?? 'إشعار',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 16,
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              // Removed unread indicator since all are read
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            notification['message'] ?? '',
+            style: TextStyle(
+              fontSize: 14,
+              color: isDark ? Colors.grey[400] : Colors.grey[600],
+              height: 1.4,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _formatDateTime(notification['created_at']),
+            style: TextStyle(
+              fontSize: 12,
+              color: isDark ? Colors.grey[500] : Colors.grey[500],
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
   String _formatDateTime(String? dateTimeStr) {
     if (dateTimeStr == null) return '';
     

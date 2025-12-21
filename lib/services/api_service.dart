@@ -1016,23 +1016,23 @@ static Future<Map<String, dynamic>> changeClanAdminStatus(int adminId) async {
 
   // ==================== CLAN ADMIN ENDPOINTS ====================
   
-  // List Grooms
-  static Future<List<dynamic>> listGrooms() async {
-    try {
-      final response = await http.get(
-        Uri.parse('$baseUrl/clan-admin/grooms'),
-        headers: await _headers,
-      );
+  // // List Grooms
+  // static Future<List<dynamic>> listGrooms() async {
+  //   try {
+  //     final response = await http.get(
+  //       Uri.parse('$baseUrl/clan-admin/grooms'),
+  //       headers: await _headers,
+  //     );
 
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
-      } else {
-        throw Exception('فشل في تحميل العرسان');
-      }
-    } catch (e) {
-      throw Exception('خطأ في الاتصال: $e');
-    }
-  }
+  //     if (response.statusCode == 200) {
+  //       return json.decode(response.body);
+  //     } else {
+  //       throw Exception('فشل في تحميل العرسان');
+  //     }
+  //   } catch (e) {
+  //     throw Exception('خطأ في الاتصال: $e');
+  //   }
+  // }
 
   // Hall Management
   static Future<List<dynamic>> listHalls() async {
@@ -6075,6 +6075,304 @@ static String formatFileSize(int bytes) {
     return '${(bytes / 1024).toStringAsFixed(1)} كيلوبايت';
   } else {
     return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} ميجابايت';
+  }
+}
+
+
+
+
+
+
+
+
+/////////////// new part // so this part is for password access pages apis 
+///
+// ==================== ACCESS PASSWORD MANAGEMENT (SUPER ADMIN) ====================
+
+// Generate access password for clan admin
+static Future<Map<String, dynamic>> generateClanAdminAccessPassword(int adminId) async {
+  try {
+    final response = await http.post(
+      Uri.parse('$baseUrl/super-admin/clan-admin/$adminId/generate-access-password'),
+      headers: await _headers,
+    );
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل في إنشاء كلمة مرور الوصول');
+    }
+  } catch (e) {
+    throw Exception('خطأ في إنشاء كلمة مرور الوصول: $e');
+  }
+}
+
+// Manually set access password for clan admin
+static Future<Map<String, dynamic>> setClanAdminAccessPassword(
+  int adminId, 
+  String accessPassword
+) async {
+  try {
+    final response = await http.put(
+      Uri.parse('$baseUrl/super-admin/clan-admin/$adminId/set-access-password'),
+      headers: await _headers,
+      body: json.encode({
+        'access_password': accessPassword,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل في تعيين كلمة مرور الوصول');
+    }
+  } catch (e) {
+    throw Exception('خطأ في تعيين كلمة مرور الوصول: $e');
+  }
+}
+
+
+
+// ==================== CLAN ADMIN ENDPOINTS ====================
+
+// Generate access password for groom (Clan Admin)
+static Future<Map<String, dynamic>> generateGroomAccessPassword(int groomId) async {
+  try {
+    final response = await http.post(
+      Uri.parse('$baseUrl/clan-admin/groom/$groomId/generate-access-password'),
+      headers: await _headers,
+    );
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل في إنشاء كلمة مرور الوصول للعريس');
+    }
+  } catch (e) {
+    throw Exception('خطأ في إنشاء كلمة مرور الوصول: $e');
+  }
+}
+
+// Manually set access password for groom (Clan Admin)
+static Future<Map<String, dynamic>> setGroomAccessPassword(
+  int groomId, 
+  String accessPassword
+) async {
+  try {
+    final response = await http.put(
+      Uri.parse('$baseUrl/clan-admin/groom/$groomId/set-access-password'),
+      headers: await _headers,
+      body: json.encode({
+        'access_password': accessPassword,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل في تعيين كلمة مرور الوصول للعريس');
+    }
+  } catch (e) {
+    throw Exception('خطأ في تعيين كلمة مرور الوصول: $e');
+  }
+}
+
+// Get list of grooms (if not already present)
+static Future<List<dynamic>> listGrooms() async {
+  try {
+    final response = await http.get(
+      Uri.parse('$baseUrl/clan-admin/grooms'),
+      headers: await _headers,
+    );
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل في تحميل العرسان');
+    }
+  } catch (e) {
+    throw Exception('خطأ في تحميل العرسان: $e');
+  }
+}
+
+// ==================== ACCESS PASSWORD VERIFICATION ====================
+
+// Verify access password for special pages
+static Future<Map<String, dynamic>> verifyAccessPassword(
+  int userId, 
+  String accessPassword
+) async {
+  try {
+    final response = await http.post(
+      Uri.parse('$baseUrl/auth/verify-access-password'),
+      headers: await _headers,
+      body: json.encode({
+        'user_id': userId,
+        'access_password': accessPassword,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'كلمة مرور الوصول غير صحيحة');
+    }
+  } catch (e) {
+    throw Exception('خطأ في التحقق من كلمة مرور الوصول: $e');
+  }
+}
+
+// Check if user has access password set
+static Future<bool> hasAccessPassword() async {
+  try {
+    final userInfo = await getCurrentUserInfo();
+    // Assuming the API returns access_pages_password_hash or a flag
+    return userInfo['access_pages_password_hash'] != null;
+  } catch (e) {
+    return false;
+  }
+}
+
+
+// ==================== ACCESS PASSWORD UTILITIES ====================
+
+/// Validates access to special pages
+/// Returns true if user has access (Super Admin always has access)
+/// Throws exception if access is denied
+static Future<bool> validateSpecialPageAccess(String accessPassword) async {
+  try {
+    // Get current user info
+    final userInfo = await getCurrentUserInfo();
+    final role = userInfo['role'];
+    
+    // Super admins don't need access password
+    if (role == 'super_admin') {
+      return true;
+    }
+    
+    // Check if user has access password set
+    if (userInfo['access_pages_password_hash'] == null) {
+      throw Exception('لم يتم تعيين كلمة مرور الوصول. يرجى الاتصال بالمسؤول.');
+    }
+    
+    // Verify the access password
+    final userId = userInfo['id'];
+    final result = await verifyAccessPassword(userId, accessPassword);
+    
+    return result['valid'] == true;
+  } catch (e) {
+    throw Exception('فشل التحقق من الوصول: $e');
+  }
+}
+
+/// Check user's role without requiring access password
+static Future<String> getUserRole() async {
+  try {
+    final userInfo = await getCurrentUserInfo();
+    return userInfo['role'];
+  } catch (e) {
+    throw Exception('فشل في الحصول على دور المستخدم: $e');
+  }
+}
+
+
+
+// ==================== ACCESS PASSWORD STATUS CHECK ====================
+
+/// Get clan admins with their access password status
+static Future<List<Map<String, dynamic>>> getClanAdminsWithAccessStatus(int countyId) async {
+  try {
+    final admins = await listClanAdmins(countyId);
+    
+    // Add access password status to each admin
+    return admins.map<Map<String, dynamic>>((admin) {
+      // Create a mutable map from the admin data
+      final Map<String, dynamic> adminMap = Map<String, dynamic>.from(admin);
+      
+      // Add the has_access_password flag
+      adminMap['has_access_password'] = adminMap['access_pages_password_hash'] != null;
+      
+      return adminMap;
+    }).toList();
+  } catch (e) {
+    throw Exception('خطأ في تحميل حالة كلمات مرور الوصول: $e');
+  }
+}
+
+
+/// Get grooms with their access password status
+static Future<List<Map<String, dynamic>>> getGroomsWithAccessStatus() async {
+  try {
+    final grooms = await listGrooms();
+    
+
+
+        // Add access password status to each admin
+    return grooms.map<Map<String, dynamic>>((groom) {
+      // Create a mutable map from the admin data
+      final Map<String, dynamic> groomMap = Map<String, dynamic>.from(groom);
+      
+      // Add the has_access_password flag
+      groomMap['has_access_password'] = groomMap['access_pages_password_hash'] != null;
+
+      return groomMap;
+    }).toList();
+  } catch (e) {
+    throw Exception('خطأ في تحميل حالة كلمات مرور الوصول: $e');
+  }
+}
+
+
+
+
+///// to dfownload statistics 
+///
+// Add these methods to your ApiService class (lib/services/api_service.dart)
+// Add them in the CLAN ADMIN section
+
+// ==================== CLAN ADMIN STATISTICS ENDPOINTS ====================
+
+// List all grooms for clan admin
+static Future<List<dynamic>> listGroomsForClanAdmin() async {
+  try {
+    final response = await http.get(
+      Uri.parse('$baseUrl/clan-admin/grooms'),
+      headers: await _headers,
+    );
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body) as List<dynamic>;
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل في تحميل العرسان');
+    }
+  } catch (e) {
+    throw Exception('خطأ في تحميل العرسان: $e');
+  }
+}
+
+// List all reservations for clan admin
+static Future<List<dynamic>> listReservationsForClanAdmin() async {
+  try {
+    final response = await http.get(
+      Uri.parse('$baseUrl/clan-admin/reservations'),
+      headers: await _headers,
+    );
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body) as List<dynamic>;
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل في تحميل الحجوزات');
+    }
+  } catch (e) {
+    throw Exception('خطأ في تحميل الحجوزات: $e');
   }
 }
 

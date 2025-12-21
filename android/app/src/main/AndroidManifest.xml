@@ -21,9 +21,9 @@
 
     
     <!-- Storage permissions for Android 13+ (API 33+) -->
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <!-- <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
-    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" /> -->
     
     <!-- For accessing all files (Android 11+, requires special approval from Google Play) -->
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"

@@ -461,9 +461,11 @@ PreferredSizeWidget _buildSliverAppBar(bool isMobile) {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
+            isDark ? AppColors.primary.withOpacity(0.4):AppColors.primary.withOpacity(0.8) ,
+            AppColors.primary,
             AppColors.primary,
             isDark ? AppColors.primary.withOpacity(0.4):AppColors.primary.withOpacity(0.8) ,
-            isDark ? AppColors.primary.withOpacity(0.4):const Color.fromARGB(255, 130, 161, 112).withOpacity(0.9),
+            // isDark ? AppColors.primary.withOpacity(0.4):const Color.fromARGB(255, 130, 161, 112).withOpacity(0.9),
             
           ],
         ),
@@ -585,7 +587,7 @@ PreferredSizeWidget _buildSliverAppBar(bool isMobile) {
         icon: CircleAvatar(
           radius: isMobile ? 16 : 18,
           backgroundColor: Colors.white.withOpacity(0.2),
-          child: Icon(Icons.person, 
+          child: Icon(Icons.logout, 
             color: Colors.white, 
             size: isMobile ? 18 : 20),
         ),
@@ -637,17 +639,19 @@ PreferredSizeWidget _buildSliverAppBar(bool isMobile) {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
+            AppColors.primary.withOpacity(0.5),
             AppColors.primary,
-            AppColors.primary.withOpacity(0.7),
-            isDark ? const Color.fromARGB(102, 118, 84, 25).withOpacity(0.8) : const Color.fromARGB(255, 176, 126, 39).withOpacity(0.8) ,
-            isDark ? const Color.fromARGB(103, 107, 76, 22).withOpacity(0.8) : const Color.fromARGB(255, 183, 143, 58).withOpacity(0.9) ,
+            AppColors.primary,
+            AppColors.primary.withOpacity(0.5),
+            // isDark ? const Color.fromARGB(102, 118, 84, 25).withOpacity(0.8) : const Color.fromARGB(255, 176, 126, 39).withOpacity(0.8) ,
+            // isDark ? const Color.fromARGB(103, 107, 76, 22).withOpacity(0.8) : const Color.fromARGB(255, 183, 143, 58).withOpacity(0.9) ,
             
           ],
         ),
         borderRadius: BorderRadius.circular(isMobile ? 16 : 20),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withOpacity(0.3),
+            color: AppColors.primary.withOpacity(0.5),
             spreadRadius: 10,
             blurRadius: 20,
             offset: Offset(0, 8),
@@ -745,8 +749,7 @@ PreferredSizeWidget _buildSliverAppBar(bool isMobile) {
       ),
     );
   }
-
- Widget _buildStatsCards(bool isMobile, bool isTablet) {
+Widget _buildStatsCards(bool isMobile, bool isTablet) {
   final stats = [
     {
       'title': 'القاعات',
@@ -780,16 +783,45 @@ PreferredSizeWidget _buildSliverAppBar(bool isMobile) {
 
   return LayoutBuilder(
     builder: (context, constraints) {
-      final crossAxisCount = isMobile ? 2 : (isTablet ? 4 : 3);
-      final childAspectRatio = isMobile ? 1.1 : (isTablet ? 1.3 : 1.2);
+      final width = constraints.maxWidth;
+      
+      // More granular breakpoints for better responsiveness
+      int crossAxisCount;
+      double childAspectRatio;
+      
+      if (width < 480) {
+        // Small mobile
+        crossAxisCount = 2;
+        childAspectRatio = 1.15;
+      } else if (width < 600) {
+        // Large mobile
+        crossAxisCount = 2;
+        childAspectRatio = 1.2;
+      } else if (width < 900) {
+        // Tablet portrait
+        crossAxisCount = 3;
+        childAspectRatio = 1.25;
+      } else if (width < 1200) {
+        // Tablet landscape / Small desktop
+        crossAxisCount = 4;
+        childAspectRatio = 1.3;
+      } else if (width < 1600) {
+        // Desktop
+        crossAxisCount = 4;
+        childAspectRatio = 1.35;
+      } else {
+        // Large desktop / Ultra-wide
+        crossAxisCount = 4;
+        childAspectRatio = 1.4;
+      }
       
       return GridView.builder(
         shrinkWrap: true,
-        physics: NeverScrollableScrollPhysics(),
+        physics: const NeverScrollableScrollPhysics(),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: crossAxisCount,
-          mainAxisSpacing: isMobile ? 10 : 16,
-          crossAxisSpacing: isMobile ? 10 : 16,
+          mainAxisSpacing: width < 600 ? 10 : 16,
+          crossAxisSpacing: width < 600 ? 10 : 16,
           childAspectRatio: childAspectRatio,
         ),
         itemCount: stats.length,
@@ -801,7 +833,7 @@ PreferredSizeWidget _buildSliverAppBar(bool isMobile) {
             stat['icon'],
             stat['color'],
             stat['trend'],
-            isMobile,
+            width < 600, // Pass isMobile based on width
           );
         },
       );
@@ -847,7 +879,7 @@ Widget _buildStatCard(String title, String value, IconData icon, Color color,
                 color: color.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(isMobile ? 8 : 10),
               ),
-              child: Icon(icon, color: color, size: isMobile ? 16 : 20),
+              child: Icon(icon, color: color, size: isMobile ? 30 : 37),
             ),
             if (!isMobile)
               Container(
@@ -1213,7 +1245,7 @@ Widget _buildStatisticsSection(bool isMobile, bool isTablet) {
           children: [
             // Clan Statistics Card with expandable chart
             _buildChartCard(
-              title: 'أعراس عشيرتك',
+              title: 'أعراس العشيرة',
               icon: Icons.groups_rounded,
               selectedPeriod: _clanSelectedPeriod,
               data: _clanStats,
@@ -1228,7 +1260,7 @@ Widget _buildStatisticsSection(bool isMobile, bool isTablet) {
             
             // County Statistics Card with expandable chart
             _buildChartCard(
-              title: 'أعراس المحافظة',
+              title: 'أعراس القصر',
               icon: Icons.location_city_rounded,
               selectedPeriod: _countySelectedPeriod,
               data: _countyStats,
@@ -1918,9 +1950,9 @@ Widget _buildComparisonChart(bool isMobile, bool isDark) {
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            _buildLegendItem('عشيرتك', AppColors.primary, isMobile),
+            _buildLegendItem('العشيرة', AppColors.primary, isMobile),
             SizedBox(width: 24),
-            _buildLegendItem('المحافظة', Colors.blue, isMobile),
+            _buildLegendItem('القصر', Colors.blue, isMobile),
           ],
         ),
       ],
@@ -2079,11 +2111,11 @@ Widget _buildActivityItem({
           ],
         ),
       ),
-      Icon(
-        Icons.chevron_right,
-        color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.5), // Changed
-        size: isMobile ? 16 : 18,
-      ),
+      // Icon(
+      //   Icons.chevron_right,
+      //   color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.5), // Changed
+      //   size: isMobile ? 16 : 18,
+      // ),
     ],
   );
 }

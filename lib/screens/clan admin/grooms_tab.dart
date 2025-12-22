@@ -1,10 +1,8 @@
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:wedding_reservation_app/providers/theme_provider.dart';
-import 'package:wedding_reservation_app/screens/auth/signup_screen%20copy%20.dart';
 import 'package:wedding_reservation_app/screens/auth/sing_up_screen.dart';
 import 'package:wedding_reservation_app/screens/super%20admin/otp_verification_screen.dart';
 import 'package:wedding_reservation_app/services/api_service.dart';
@@ -19,26 +17,457 @@ class GroomManagementScreen extends StatefulWidget {
   State<GroomManagementScreen> createState() => GroomManagementScreenState();
 }
 
+
+
+
 class GroomManagementScreenState extends State<GroomManagementScreen> {
   List<Map<String, dynamic>> grooms = [];
   bool isLoading = true;
   String? errorMessage;
+  // ADD THESE NEW VARIABLES:
+  bool _hasAccessPassword = false;
+  bool _isVerifyingAccess = false;
+
+
+  List<Map<String, dynamic>> filteredGrooms = []; // NEW
+
+  // NEW: Search and filter variables
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  String _statusFilter = 'all'; // all, active, inactive
+  String _reservationFilter = 'all'; // all, validated, pending, cancelled, none
+  bool _showFilters = false;
+
 
   @override
   void initState() {
     super.initState();
     _checkConnectivityAndLoad();
-  }
+    _checkAccessPassword();
+    _searchController.addListener(_onSearchChanged); // NEW
 
+  }
+@override
+  void dispose() {
+    _searchController.dispose(); // NEW
+    super.dispose();
+  }
  void refreshData() {
     // Add your refresh logic here
     _checkConnectivityAndLoad();
+    _checkAccessPassword();
     setState(() {
       // Trigger rebuild
+
     });
   }
 
+ // NEW: Search handler
+  void _onSearchChanged() {
+    setState(() {
+      _searchQuery = _searchController.text.toLowerCase();
+      _applyFilters();
+    });
+  }
 
+void _applyFilters() {
+  filteredGrooms = grooms.where((groom) {
+    // Search filter
+    if (_searchQuery.isNotEmpty) {
+      final fullName = '${groom['first_name'] ?? ''} ${groom['last_name'] ?? ''}'.toLowerCase();
+      final phone = groom['phone_number']?.toString().toLowerCase() ?? '';
+      
+      if (!fullName.contains(_searchQuery) && !phone.contains(_searchQuery)) {
+        return false;
+      }
+    }
+
+    // Status filter
+    if (_statusFilter != 'all') {
+      final status = groom['status']?.toString() ?? 'inactive';
+      if (status != _statusFilter) {
+        return false;
+      }
+    }
+
+    return true;
+  }).toList();
+  
+  // Apply reservation filter if active
+  if (_reservationFilter != 'all') {
+    _applyReservationFilterSync();
+  }
+}
+
+void _applyReservationFilterSync() {
+  if (_reservationFilter == 'all') {
+    return;
+  }
+
+  // This will trigger async fetch when filter chips are tapped
+  // We'll update filteredGrooms after fetching
+}
+
+
+// ==================== UPDATED ASYNC RESERVATION FILTER ====================
+Future<void> _applyReservationFilter() async {
+  print('🔧 Applying reservation filter: $_reservationFilter');
+  
+  if (_reservationFilter == 'all') {
+    _applyFilters();
+    return;
+  }
+
+  setState(() {
+    isLoading = true;
+  });
+
+  try {
+    // Get all reservations once based on filter type
+    List<dynamic> allReservations = [];
+    
+    if (_reservationFilter == 'validated') {
+      allReservations = await ApiService.getValidatedReservations();
+    } else if (_reservationFilter == 'pending_validation') {
+      allReservations = await ApiService.getPendingReservations();
+    } else if (_reservationFilter == 'cancelled') {
+      allReservations = await ApiService.getCancelledReservations();
+    }
+    
+    print('📊 Total ${_reservationFilter} reservations: ${allReservations.length}');
+    
+    // Create a set of groom IDs that have this type of reservation
+    final Set<int> groomIdsWithReservations = {};
+    for (var reservation in allReservations) {
+      final groomId = int.tryParse(reservation['groom_id'].toString());
+      if (groomId != null) {
+        groomIdsWithReservations.add(groomId);
+      }
+    }
+    
+    print('👥 Groom IDs with $_reservationFilter reservations: $groomIdsWithReservations');
+    
+    // Start with already filtered grooms (by search and status)
+    List<Map<String, dynamic>> temp = [];
+    
+    // Apply reservation filter
+    for (var groom in filteredGrooms) {
+      final groomId = groom['id'] as int?;
+      if (groomId == null) continue;
+      
+      final hasReservation = groomIdsWithReservations.contains(groomId);
+      
+      if (_reservationFilter == 'none') {
+        // Include only grooms WITHOUT any active reservation
+        if (!hasReservation) {
+          print('✅ Adding groom $groomId (no reservation)');
+          temp.add(groom);
+        }
+      } else {
+        // Include grooms WITH matching reservation status
+        if (hasReservation) {
+          print('✅ Adding groom $groomId (has $_reservationFilter reservation)');
+          temp.add(groom);
+        }
+      }
+    }
+    
+    print('📊 Filtered result: ${temp.length} grooms');
+    
+    setState(() {
+      filteredGrooms = temp;
+      isLoading = false;
+    });
+  } catch (e) {
+    print('❌ Error in _applyReservationFilter: $e');
+    setState(() {
+      isLoading = false;
+    });
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('خطأ في تطبيق الفلتر: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+}
+
+// ADD THIS NEW METHOD:
+Future<void> _checkAccessPassword() async {
+  try {
+    final hasPassword = await ApiService.hasAccessPassword();
+    setState(() {
+      _hasAccessPassword = hasPassword;
+    });
+  } catch (e) {
+    print('Error checking access password: $e');
+    setState(() {
+      _hasAccessPassword = false;
+    });
+  }
+}
+  // Method to verify access before navigating to protected tabs
+Future<bool> _verifyAccessForTab() async {
+  
+
+  await _checkAccessPassword();
+  // Check if user has access password set
+  if (!_hasAccessPassword) {
+    _showAccessPasswordNotSetDialog();
+    return false;
+  }
+
+  // Show password verification dialog
+  return await _showAccessPasswordDialog();
+}
+
+
+// Dialog when user doesn't have access password
+void _showAccessPasswordNotSetDialog() {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Row(
+        children: [
+          Icon(Icons.lock_outline, color: Colors.orange),
+          SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'كلمة مرور الوصول غير متوفرة',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: isDark ? Colors.white : Colors.black87,
+              ),
+            ),
+          ),
+        ],
+      ),
+      // content: Text(
+      //   'لم يتم تعيين كلمة مرور وصول لحسابك.\nيرجى الاتصال بالمدير الأعلى لإنشاء كلمة مرور.',
+      //   style: TextStyle(
+      //     color: isDark ? Colors.white70 : Colors.black87,
+      //   ),
+      // ),
+      actions: [
+        ElevatedButton(
+          onPressed: () => Navigator.pop(context),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+          ),
+          child: const Text('فهمت', style: TextStyle(color: Colors.white)),
+        ),
+      ],
+    ),
+  );
+}
+// Updated _showAccessPasswordDialog method with loading state
+
+Future<bool> _showAccessPasswordDialog() async {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  final passwordController = TextEditingController();
+  bool obscurePassword = true;
+  String? errorMessage;
+  bool isLoading = false; // ADD THIS LINE
+
+  final result = await showDialog<bool>(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) => StatefulBuilder(
+      builder: (context, setDialogState) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.key, color: AppColors.primary),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'أدخل كلمة مرور الوصول',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 18,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Container(
+            //   padding: const EdgeInsets.all(12),
+            //   decoration: BoxDecoration(
+            //     color: Colors.blue.shade50,
+            //     borderRadius: BorderRadius.circular(8),
+            //     border: Border.all(color: Colors.blue.shade200),
+            //   ),
+            //   child: Row(
+            //     children: const [
+            //       Icon(Icons.info_outline, color: Colors.blue, size: 20),
+            //       SizedBox(width: 8),
+            //       Expanded(
+            //         child: Text(
+            //           'هذه الصفحة محمية. يرجى إدخال كلمة المرور.',
+            //           style: TextStyle(color: Colors.blue, fontSize: 12),
+            //         ),
+            //       ),
+            //     ],
+            //   ),
+            // ),
+            // SizedBox(height: 16),
+            TextField(
+              controller: passwordController,
+              obscureText: obscurePassword,
+              autofocus: true,
+              enabled: !isLoading, // DISABLE WHEN LOADING
+              style: TextStyle(
+                color: isDark ? Colors.white : Colors.black87,
+              ),
+              decoration: InputDecoration(
+                labelText: 'كلمة مرور ',
+                hintText: 'أدخل كلمة المرور',
+                prefixIcon: const Icon(Icons.lock_outline),
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    obscurePassword ? Icons.visibility : Icons.visibility_off,
+                  ),
+                  onPressed: isLoading ? null : () { // DISABLE WHEN LOADING
+                    setDialogState(() {
+                      obscurePassword = !obscurePassword;
+                    });
+                  },
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                errorText: errorMessage,
+              ),
+              onSubmitted: isLoading ? null : (_) async { // DISABLE WHEN LOADING
+                if (passwordController.text.isEmpty) {
+                  setDialogState(() {
+                    errorMessage = 'يرجى إدخال كلمة المرور';
+                  });
+                  return;
+                }
+                
+                // Start loading
+                setDialogState(() {
+                  isLoading = true;
+                  errorMessage = null;
+                }); 
+                
+                try {
+                  final isValid = await ApiService.validateSpecialPageAccess(
+                    passwordController.text,
+                  );
+                  if (isValid) {
+                    Navigator.pop(context, true);
+                  } else {
+                    setDialogState(() {
+                      isLoading = false;
+                      errorMessage = 'كلمة المرور غير صحيحة';
+                    });
+                  }
+                } catch (e) {
+                  setDialogState(() {
+                    isLoading = false;
+                    errorMessage = 'خطأ في التحقق من كلمة المرور';
+                  });
+                }
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: isLoading ? null : () => Navigator.pop(context, false), // DISABLE WHEN LOADING
+            child: Text(
+              'إلغاء',
+              style: TextStyle(
+                color: isLoading 
+                    ? Colors.grey 
+                    : (isDark ? Colors.white60 : Colors.grey[700]),
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: isLoading ? null : () async { // DISABLE WHEN LOADING
+              if (passwordController.text.isEmpty) {
+                setDialogState(() {
+                  errorMessage = 'يرجى إدخال كلمة المرور';
+                });
+                return;
+              }
+
+              // Start loading
+              setDialogState(() {
+                isLoading = true;
+                errorMessage = null;
+              });
+
+              try {
+                final isValid = await ApiService.validateSpecialPageAccess(
+                  passwordController.text,
+                );
+
+                if (isValid) {
+                  Navigator.pop(context, true);
+                } else {
+                  setDialogState(() {
+                    isLoading = false;
+                    errorMessage = 'كلمة المرور غير صحيحة';
+                  });
+                }
+              } catch (e) {
+                setDialogState(() {
+                  isLoading = false;
+                  errorMessage = 'خطأ في التحقق من كلمة المرور';
+                });
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isLoading 
+                  ? Colors.grey 
+                  : AppColors.primary,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+            ),
+            child: isLoading // UPDATED CHILD WITH LOADING INDICATOR
+                ? Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      ),
+                      SizedBox(width: 8),
+                      Text('جاري التحقق...', style: TextStyle(color: Colors.white)),
+                    ],
+                  )
+                : const Text('تحقق', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    ),
+  );
+
+  passwordController.dispose();
+  return result ?? false;  
+}
 
   Future<void> _checkConnectivityAndLoad() async {
   setState(() {
@@ -163,83 +592,109 @@ void _showNoInternetDialog() {
 //     return null;
 //   }
 // }
-Future<Map<String, dynamic>?> _getGroomReservationStatus(int groomId) async {
-  print('🔍 Starting reservation status check for groomId: $groomId');
-  
+static Future<Map<String, dynamic>?> _getGroomReservationStatus(int groomId) async {
   try {
+    print('🔍 ViewDialog: Checking reservation for groomId: $groomId');
+    
     // Priority 1: Validated reservation
-    print('📋 Checking for validated reservations...');
     try {
       final validatedList = await ApiService.getValidatedReservations();
-      print('✅ Validated count: ${validatedList.length}');
-      final validatedForGroom = validatedList.where((r) => int.tryParse(r['groom_id'].toString()) == groomId).toList();
-      if (validatedForGroom.isNotEmpty) {
-        print('✨ MATCH FOUND - Returning validated reservation');
-        return {'status': 'validated', 'reservation': validatedForGroom.first, 'priority': 1};
+      for (var res in validatedList) {
+        final resGroomId = int.tryParse(res['groom_id'].toString());
+        if (resGroomId == groomId) {
+          print('✅ ViewDialog: Found validated reservation');
+          return {'status': 'validated', 'reservation': res, 'priority': 1};
+        }
       }
-      print('❌ No validated reservations for this groom');
     } catch (e) {
-      print('⚠️ Error fetching validated: $e');
+      print('⚠️ ViewDialog: Error checking validated: $e');
     }
 
     // Priority 2: Pending reservation
-    print('📋 Checking for pending reservations...');
     try {
       final pendingList = await ApiService.getPendingReservations();
-      print('⏳ Pending count: ${pendingList.length}');
-      final pendingForGroom = pendingList.where((r) => int.tryParse(r['groom_id'].toString()) == groomId).toList();
-      if (pendingForGroom.isNotEmpty) {
-        print('✨ MATCH FOUND - Returning pending reservation');
-        return {'status': 'pending_validation', 'reservation': pendingForGroom.first, 'priority': 2};
+      for (var res in pendingList) {
+        final resGroomId = int.tryParse(res['groom_id'].toString());
+        if (resGroomId == groomId) {
+          print('✅ ViewDialog: Found pending reservation');
+          return {'status': 'pending_validation', 'reservation': res, 'priority': 2};
+        }
       }
-      print('❌ No pending reservations for this groom');
     } catch (e) {
-      print('⚠️ Error fetching pending: $e');
+      print('⚠️ ViewDialog: Error checking pending: $e');
     }
 
     // Priority 3: Most recent cancelled reservation
-    print('📋 Checking for cancelled reservations...');
     try {
       final cancelledList = await ApiService.getCancelledReservations();
-      print('❌ Cancelled count: ${cancelledList.length}');
-      final groomCancelled = cancelledList.where((r) => int.tryParse(r['groom_id'].toString()) == groomId).toList();
+      final groomCancelled = <Map<String, dynamic>>[];
+      
+      for (var res in cancelledList) {
+        final resGroomId = int.tryParse(res['groom_id'].toString());
+        if (resGroomId == groomId) {
+          groomCancelled.add(res);
+        }
+      }
+      
       if (groomCancelled.isNotEmpty) {
-        groomCancelled.sort((a, b) => (DateTime.tryParse(b['created_at'] ?? '') ?? DateTime(0))
-            .compareTo(DateTime.tryParse(a['created_at'] ?? '') ?? DateTime(0)));
-        print('✨ MATCH FOUND - Returning cancelled reservation');
+        groomCancelled.sort((a, b) => 
+          (DateTime.tryParse(b['created_at'] ?? '') ?? DateTime(0))
+            .compareTo(DateTime.tryParse(a['created_at'] ?? '') ?? DateTime(0))
+        );
+        print('✅ ViewDialog: Found cancelled reservation');
         return {'status': 'cancelled', 'reservation': groomCancelled.first, 'priority': 3};
       }
-      print('❌ No cancelled reservations for this groom');
     } catch (e) {
-      print('⚠️ Error fetching cancelled: $e');
+      print('⚠️ ViewDialog: Error checking cancelled: $e');
     }
 
-    print('🚫 No reservation found for groomId: $groomId');
+    print('🚫 ViewDialog: No reservation found');
     return null;
   } catch (e) {
-    print('💥 Error getting reservation status: $e');
+    print('💥 ViewDialog: Error getting reservation status: $e');
     return null;
   }
 }
-  Future<void> _loadGrooms() async {
-    setState(() {
-      isLoading = true;
-      errorMessage = null;
-    });
 
-    try {
-      final response = await ApiService.listGrooms();
-      setState(() {
-        grooms = List<Map<String, dynamic>>.from(response);
-        isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        errorMessage = e.toString();
-        isLoading = false;
-      });
+// ==================== UPDATED LOAD GROOMS ====================
+Future<void> _loadGrooms() async {
+  setState(() {
+    isLoading = true;
+    errorMessage = null;
+  });
+
+  try {
+    final response = await ApiService.listGrooms();
+    setState(() {
+      grooms = List<Map<String, dynamic>>.from(response);
+      filteredGrooms = grooms; // Initialize filtered list
+      isLoading = false;
+    });
+    
+    // Apply filters if any are active
+    if (_searchQuery.isNotEmpty || _statusFilter != 'all' || _reservationFilter != 'all') {
+      _applyFilters();
+      if (_reservationFilter != 'all') {
+        await _applyReservationFilter();
+      }
     }
+  } catch (e) {
+    setState(() {
+      errorMessage = e.toString();
+      isLoading = false;
+    });
   }
+}
+// ==================== UPDATED CLEAR FILTERS ====================
+void _clearFilters() {
+  setState(() {
+    _searchController.clear();
+    _searchQuery = '';
+    _statusFilter = 'all';
+    _reservationFilter = 'all';
+    filteredGrooms = grooms; // Reset to all grooms
+  });
+}
 
   Future<void> _updateGroomStatus(String phoneNumber, String currentStatus) async {
     try {
@@ -750,7 +1205,15 @@ Widget _buildMobileActionButtons(Map<String, dynamic> groom, String status, bool
             icon: Icons.edit,
             label: 'تعديل',
             colors: [Colors.green, AppColors.primary],
-            onPressed: () => _showEditGroomDialog(groom),
+            onPressed: () async  {
+                        // Check if tab requires access verification
+                bool hasAccess = await _verifyAccessForTab();
+                
+                if (!hasAccess) {
+                  return; // Don't navigate if access is denied
+                }
+                _showEditGroomDialog(groom);
+              },          
           ),
         ],
       ),
@@ -767,16 +1230,24 @@ Widget _buildMobileActionButtons(Map<String, dynamic> groom, String status, bool
               ? [Colors.orange, Colors.orange.shade700]
               : [Colors.green, Colors.green.shade700],
             onPressed: () => _updateGroomStatus(
-              groom['phone_number']?.toString() ?? '', 
-              status
-            ),
+                groom['phone_number']?.toString() ?? '', 
+                status
+              ),
           ),
           SizedBox(width: 6),
           _buildModernButton(
             icon: Icons.delete,
             label: 'حذف',
             colors: [Colors.red, Colors.red.shade700],
-            onPressed: () => _deleteGroom(groom['phone_number']?.toString() ?? ''),
+            onPressed: () async  {
+                              // Check if tab requires access verification
+                      bool hasAccess = await _verifyAccessForTab();
+                      print('Access verification result+++++++++++++: $hasAccess');
+                      if (!hasAccess) {
+                        return; // Don't navigate if access is denied
+                      }
+                    _deleteGroom(groom['phone_number']?.toString() ?? '');      
+            },          
           ),
         ],
       ),
@@ -805,7 +1276,15 @@ Widget _buildDesktopActionButtons(
         icon: Icons.edit,
         label: 'تعديل',
         colors: [Colors.green, AppColors.primary],
-        onPressed: () => _showEditGroomDialog(groom),
+        onPressed: () async  {
+                  // Check if tab requires access verification
+          bool hasAccess = await _verifyAccessForTab();
+          
+          if (!hasAccess) {
+            return; // Don't navigate if access is denied
+          }
+          _showEditGroomDialog(groom);
+        },
         isCompact: isTablet,
       ),
       _buildModernButton(
@@ -814,17 +1293,38 @@ Widget _buildDesktopActionButtons(
         colors: isActive 
           ? [Colors.orange, Colors.orange.shade700]
           : [Colors.green, Colors.green.shade700],
-        onPressed: () => _updateGroomStatus(
-          groom['phone_number']?.toString() ?? '', 
-          status
-        ),
+          onPressed: () => _updateGroomStatus(
+            groom['phone_number']?.toString() ?? '', 
+            status
+          ),
+        // onPressed: () async  {
+        //           // Check if tab requires access verification
+        //   bool hasAccess = await _verifyAccessForTab();
+        //   print('Access verification result+++++++++++++: $hasAccess');
+        //   if (!hasAccess) {
+        //     return; // Don't navigate if access is denied
+        //   }
+        //   _updateGroomStatus(
+        //     groom['phone_number']?.toString() ?? '', 
+        //     status
+        //   );      
+        //   },
+        
         isCompact: isTablet,
       ),
       _buildModernButton(
         icon: Icons.delete,
         label: 'حذف',
         colors: [Colors.red, Colors.red.shade700],
-        onPressed: () => _deleteGroom(groom['phone_number']?.toString() ?? ''),
+        onPressed: () async  {
+                  // Check if tab requires access verification
+          bool hasAccess = await _verifyAccessForTab();
+          print('Access verification result+++++++++++++: $hasAccess');
+          if (!hasAccess) {
+            return; // Don't navigate if access is denied
+          }
+         _deleteGroom(groom['phone_number']?.toString() ?? '');      
+          },
         isCompact: isTablet,
       ),
     ],
@@ -943,18 +1443,26 @@ Widget build(BuildContext context) {
 }
 
 PreferredSizeWidget _buildModernAppBar() {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
   return AppBar(
     elevation: 0,
     backgroundColor: Colors.transparent,
     flexibleSpace: Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [AppColors.primary, Colors.green.shade900],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-    ),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    isDark ? AppColors.primary.withOpacity(0.4):AppColors.primary.withOpacity(0.8) ,
+                    AppColors.primary,
+                    AppColors.primary,
+                    isDark ? AppColors.primary.withOpacity(0.4):AppColors.primary.withOpacity(0.8) ,
+                    // isDark ? AppColors.primary.withOpacity(0.4):const Color.fromARGB(255, 130, 161, 112).withOpacity(0.9),
+                    
+                  ],
+                ),
+              ),
+            ),
     title: LayoutBuilder(
       builder: (context, constraints) {
         final isSmallScreen = MediaQuery.of(context).size.width < 600;
@@ -1028,36 +1536,457 @@ PreferredSizeWidget _buildModernAppBar() {
     ],
   );
 }
-Widget _buildBody() {
-  if (isLoading) {
-    return _buildLoadingState();
+
+
+
+  // NEW: Build search bar
+  Widget _buildSearchBar() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isSmallScreen = MediaQuery.of(context).size.width < 600;
+    
+    return Container(
+      margin: EdgeInsets.symmetric(
+        horizontal: isSmallScreen ? 12 : 16,
+        vertical: 8,
+      ),
+      child: Column(
+        children: [
+          // Search TextField
+          Container(
+            decoration: BoxDecoration(
+              color:  Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: Offset(0, 2),
+                ),
+              ],
+            ),
+            child: TextField(
+              controller: _searchController,
+              style: TextStyle(
+                color:  Colors.black87,
+              ),
+              decoration: InputDecoration(
+                hintText: 'ابحث بالاسم أو رقم الهاتف...',
+                hintStyle: TextStyle(
+                  color:  Colors.grey[500],
+                ),
+                prefixIcon: Icon(
+                  Icons.search,
+                  color: AppColors.primary,
+                ),
+                suffixIcon: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_searchQuery.isNotEmpty)
+                      IconButton(
+                        icon: Icon(Icons.clear, size: 20),
+                        onPressed: () => _searchController.clear(),
+                        color: Colors.grey,
+                      ),
+                    IconButton(
+                      icon: Icon(
+                        _showFilters ? Icons.filter_alt : Icons.filter_alt_outlined,
+                        color: (_statusFilter != 'all' || _reservationFilter != 'all')
+                            ? AppColors.primary
+                            : Colors.grey,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _showFilters = !_showFilters;
+                        });
+                      },
+                    ),
+                  ],
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                filled: true,
+                fillColor:  Colors.white,
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+              ),
+            ),
+          ),
+          
+          // Filter Options (collapsible)
+          if (_showFilters) ...[
+            SizedBox(height: 12),
+            _buildFilterChips(isDark, isSmallScreen),
+          ],
+          
+          // Active filters indicator
+          if (_searchQuery.isNotEmpty || 
+              _statusFilter != 'all' || 
+              _reservationFilter != 'all') ...[
+            SizedBox(height: 8),
+            _buildActiveFiltersRow(isSmallScreen),
+          ],
+        ],
+      ),
+    );
   }
-  
-  if (errorMessage != null) {
-    return _buildErrorState();
-  }
-  
-  if (grooms.isEmpty) {
-    return _buildEmptyState();
-  }
-  
-  return LayoutBuilder(
-    builder: (context, constraints) {
-      final isSmallScreen = constraints.maxWidth < 600;
-      
-      return ListView.builder(
-        padding: EdgeInsets.only(
-          top: isSmallScreen ? 12 : 16,
-          left: 2,
-          right: 2,
-          bottom: isSmallScreen ? 150 : 120,
+
+  Widget _buildFilterChips(bool isDark, bool isSmallScreen) {
+  return Container(
+    padding: EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: Colors.grey[50],
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(
+        color: Colors.grey[200]!,
+      ),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Status Filter
+        Text(
+          'الحالة:',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 12,
+            color: Colors.grey[700],
+          ),
         ),
-        itemCount: grooms.length,
-        itemBuilder: (context, index) => _buildGroomCard(grooms[index]),
-      );
-    },
+        SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _buildFilterChip('الكل', 'all', _statusFilter, (value) async {
+              // Clear all filters first
+              _clearFilters();
+              // Then set the new status filter
+              setState(() {
+                _statusFilter = value;
+              });
+              await _loadGrooms();
+            }),
+            _buildFilterChip('نشط', 'active', _statusFilter, (value) async {
+              // Clear all filters first
+              _clearFilters();
+              // Then set the new status filter
+              setState(() {
+                _statusFilter = value;
+              });
+              await _loadGrooms();
+            }),
+            _buildFilterChip('غير نشط', 'inactive', _statusFilter, (value) async {
+              // Clear all filters first
+              _clearFilters();
+              // Then set the new status filter
+              setState(() {
+                _statusFilter = value;
+              });
+              await _loadGrooms();
+            }),
+          ],
+        ),
+        
+        SizedBox(height: 12),
+        
+        // Reservation Filter
+        Text(
+          'حالة الحجز:',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 12,
+            color: Colors.grey[700],
+          ),
+        ),
+        SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _buildFilterChip('الكل', 'all', _reservationFilter, (value) async {
+              // Clear all filters first
+              _clearFilters();
+              // Then set the new reservation filter
+              setState(() {
+                _reservationFilter = value;
+              });
+              await _loadGrooms();
+            }),
+            _buildFilterChip('مؤكد', 'validated', _reservationFilter, (value) async {
+              // Clear all filters first
+              _clearFilters();
+              // Then set the new reservation filter
+              setState(() {
+                _reservationFilter = value;
+              });
+              await _loadGrooms();
+            }),
+            _buildFilterChip('معلق', 'pending_validation', _reservationFilter, (value) async {
+              // Clear all filters first
+              _clearFilters();
+              // Then set the new reservation filter
+              setState(() {
+                _reservationFilter = value;
+              });
+              await _loadGrooms();
+            }),
+          ],
+        ),
+        
+        SizedBox(height: 12),
+        
+        // Clear filters button
+        TextButton.icon(
+          onPressed: () async {
+            _clearFilters();
+            await _loadGrooms();
+          },
+          icon: Icon(Icons.clear_all, size: 16),
+          label: Text('مسح الفلاتر'),
+          style: TextButton.styleFrom(
+            foregroundColor: AppColors.primary,
+            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          ),
+        ),
+      ],
+    ),
   );
 }
+// ==================== UPDATED BUILD FILTER CHIP ====================
+Widget _buildFilterChip(
+  String label,
+  String value,
+  String currentValue,
+  Future<void> Function(String) onSelected, // Changed to async function
+) {
+  final isSelected = currentValue == value;
+  
+  return InkWell(
+    onTap: () => onSelected(value),
+    borderRadius: BorderRadius.circular(20),
+    child: Container(
+      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        gradient: isSelected
+            ? LinearGradient(
+                colors: [AppColors.primary, AppColors.primary.withOpacity(0.8)],
+              )
+            : null,
+        color: isSelected ? null : Colors.grey[200],
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isSelected ? AppColors.primary : Colors.grey[300]!,
+          width: isSelected ? 2 : 1,
+        ),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: isSelected ? Colors.white : Colors.grey[700],
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          fontSize: 12,
+        ),
+      ),
+    ),
+  );
+}
+  // NEW: Build active filters row
+  Widget _buildActiveFiltersRow(bool isSmallScreen) {
+    final activeFilters = <String>[];
+    
+    if (_searchQuery.isNotEmpty) {
+      activeFilters.add('بحث: "$_searchQuery"');
+    }
+    if (_statusFilter != 'all') {
+      activeFilters.add(_statusFilter == 'active' ? 'نشط' : 'غير نشط');
+    }
+    if (_reservationFilter != 'all') {
+      final reservationLabels = {
+        'validated': 'حجز مؤكد',
+        'pending_validation': 'حجز معلق',
+        'cancelled': 'حجز ملغى',
+        'none': 'بدون حجز',
+      };
+      activeFilters.add(reservationLabels[_reservationFilter] ?? '');
+    }
+    
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.filter_alt, size: 16, color: AppColors.primary),
+          SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              activeFilters.join(' • '),
+              style: TextStyle(
+                fontSize: 11,
+                color: AppColors.primary,
+                fontWeight: FontWeight.w500,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          Text(
+            '(${filteredGrooms.length})',
+            style: TextStyle(
+              fontSize: 11,
+              color: AppColors.primary,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+   // UPDATE: Build body to use filteredGrooms instead of grooms
+  Widget _buildBody() {
+    if (isLoading) {
+      return _buildLoadingState();
+    }
+    
+    if (errorMessage != null) {
+      return _buildErrorState();
+    }
+    
+    return Column(
+      children: [
+        _buildSearchBar(), // NEW: Add search bar
+        
+        if (grooms.isEmpty)
+          Expanded(child: _buildEmptyState())
+        else if (filteredGrooms.isEmpty)
+          Expanded(child: _buildNoResultsState()) // NEW
+        else
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final isSmallScreen = constraints.maxWidth < 600;
+                
+                return ListView.builder(
+                  padding: EdgeInsets.only(
+                    top: isSmallScreen ? 8 : 12,
+                    left: 2,
+                    right: 2,
+                    bottom: isSmallScreen ? 150 : 120,
+                  ),
+                  itemCount: filteredGrooms.length, // CHANGED from grooms
+                  itemBuilder: (context, index) => _buildGroomCard(filteredGrooms[index]), // CHANGED
+                );
+              },
+            ),
+          ),
+      ],
+    );
+  }
+
+  // NEW: Build no results state
+  Widget _buildNoResultsState() {
+    return Center(
+      child: Container(
+        margin: EdgeInsets.all(32),
+        padding: EdgeInsets.all(32),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.1),
+              blurRadius: 20,
+              offset: Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.search_off,
+                size: 64,
+                color: Colors.orange,
+              ),
+            ),
+            SizedBox(height: 20),
+            Text(
+              'لا توجد نتائج',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[800],
+              ),
+            ),
+            SizedBox(height: 8),
+            Text(
+              'حاول تغيير معايير البحث أو الفلاتر',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[600],
+              ),
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: 16),
+            TextButton.icon(
+              onPressed: _clearFilters,
+              icon: Icon(Icons.clear_all),
+              label: Text('مسح الفلاتر'),
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.primary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+
+// Widget _buildBody() {
+//   if (isLoading) {
+//     return _buildLoadingState();
+//   }
+  
+//   if (errorMessage != null) {
+//     return _buildErrorState();
+//   }
+  
+//   if (grooms.isEmpty) {
+//     return _buildEmptyState();
+//   }
+  
+//   return LayoutBuilder(
+//     builder: (context, constraints) {
+//       final isSmallScreen = constraints.maxWidth < 600;
+      
+//       return ListView.builder(
+//         padding: EdgeInsets.only(
+//           top: isSmallScreen ? 12 : 16,
+//           left: 2,
+//           right: 2,
+//           bottom: isSmallScreen ? 150 : 120,
+//         ),
+//         itemCount: grooms.length,
+//         itemBuilder: (context, index) => _buildGroomCard(grooms[index]),
+//       );
+//     },
+//   );
+// }
+
+
 Widget _buildLoadingState() {
   return Center(
     child: Column(

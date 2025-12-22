@@ -1,8 +1,10 @@
 // lib/screens/home/clan_admin_home_screen.dart
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:wedding_reservation_app/screens/clan%20admin/HallsTab.dart';
+import 'package:wedding_reservation_app/screens/clan%20admin/clan_admin_statistics_page.dart';
 import 'package:wedding_reservation_app/screens/clan%20admin/clan_rules_management_page.dart';
 import 'package:wedding_reservation_app/screens/clan%20admin/clan_settings_tab.dart';
 import 'package:wedding_reservation_app/screens/clan%20admin/food_menu_tab.dart';
@@ -18,7 +20,6 @@ import '../../services/api_service.dart';
 import '../../utils/colors.dart';
 import '../../utils/constants.dart';
 
-import 'package:wedding_reservation_app/screens/clan%20admin/clan_admin_statistics_page.dart';
 class ClanAdminHomeScreen extends StatefulWidget {
   const ClanAdminHomeScreen({super.key});
 
@@ -42,8 +43,14 @@ class _ClanAdminHomeScreenState extends State<ClanAdminHomeScreen>
   bool _hasAccessPassword = false;
   bool _isVerifyingAccess = false;
   
+  // ADD THESE NEW VARIABLES FOR BOTTOM NAV VISIBILITY:
+  bool _isBottomNavVisible = true;
+  Timer? _hideNavTimer;
+  late AnimationController _navAnimationController;
+  late Animation<Offset> _navSlideAnimation;
+
   // List of protected tab indices
-  final List<int> _protectedTabs = [1, 2, 5, 6, 7, 8, 10,11]; // Halls, Grooms, Settings, Notif, Rules, Special Reserv, Password Management
+  final List<int> _protectedTabs = [1, 5, 6, 7, 8, 10,11]; // Halls, Grooms, Settings, Notif, Rules, Special Reserv, Password Management
   
   // Tab keys for refreshing specific tabs
   final GlobalKey<FoodTabState> _foodTabKey = GlobalKey<FoodTabState>();
@@ -80,6 +87,28 @@ class _ClanAdminHomeScreenState extends State<ClanAdminHomeScreen>
     _animationController.forward();
     _loadClanInfo();
     _checkAccessPassword(); // ADD THIS LINE
+
+
+
+    // ADD THIS INITIALIZATION FOR NAV ANIMATION:
+    _navAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 400),
+      vsync: this,
+    );
+    
+    _navSlideAnimation = Tween<Offset>(
+      begin: const Offset(0, 1), // Hidden below screen
+      end: Offset.zero, // Visible
+    ).animate(CurvedAnimation(
+      parent: _navAnimationController,
+      curve: Curves.easeInOut,
+    ));
+    
+    // Show nav initially
+    _navAnimationController.forward();
+    _startHideTimer();
+  
+
   }
 
 
@@ -118,19 +147,46 @@ Future<void> _checkAccessPassword() async {
   void dispose() {
     _animationController.dispose();
     _refreshAnimationController.dispose();
+    _hideNavTimer?.cancel();
+    _navAnimationController.dispose();
     super.dispose();
-  }
+    
+      }
 
   @override
   void didUpdateWidget(ClanAdminHomeScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
   }
 
+// ADD THESE NEW METHODS:
+  void _startHideTimer() {
+    _hideNavTimer?.cancel();
+    _hideNavTimer = Timer(const Duration(seconds: 5), () {
+      if (mounted) {
+        _hideBottomNav();
+      }
+    });
+  }
 
+  void _hideBottomNav() {
+    setState(() {
+      _isBottomNavVisible = false;
+    });
+    _navAnimationController.reverse();
+  }
+
+  void _showBottomNav() {
+    setState(() {
+      _isBottomNavVisible = true;
+    });
+    _navAnimationController.forward();
+    _startHideTimer();
+  }
 
   // Method to verify access before navigating to protected tabs
 Future<bool> _verifyAccessForTab(int tabIndex) async {
   
+  print('Verifying access for tab index--------: $tabIndex');
   // Check if tab requires protection
   if (!_protectedTabs.contains(tabIndex)) {
     return true; // Not a protected tab, allow access
@@ -285,7 +341,7 @@ Future<bool> _showAccessPasswordDialog() async {
                 setDialogState(() {
                   isLoading = true;
                   errorMessage = null;
-                });
+                }); 
                 
                 try {
                   final isValid = await ApiService.validateSpecialPageAccess(
@@ -390,30 +446,35 @@ Future<bool> _showAccessPasswordDialog() async {
   return result ?? false;
 }
 
+// UPDATE THE _navigateToTab METHOD TO RESET TIMER:
+  void _navigateToTab(int index) async {
+    bool hasAccess = await _verifyAccessForTab(index);
+    final screenSize = MediaQuery.of(context).size;
+    final isLargeScreen = screenSize.width > 1024;
 
-
-// Navigation method with tab refresh logic and access verification
-void _navigateToTab(int index) async {
-  // Check if tab requires access verification
-  bool hasAccess = await _verifyAccessForTab(index);
-  
-  if (!hasAccess) {
-    return; // Don't navigate if access is denied
-  }
-  
-  if (_lastTabIndex != index) {
-    setState(() {
-      _currentIndex = index;
-    });
     
-    _refreshCurrentTab(index);
-    _lastTabIndex = index;
-  } else {
-    setState(() {
-      _currentIndex = index;
-    });
+    if (!hasAccess) {
+      return;
+    }
+    
+    if (_lastTabIndex != index) {
+      setState(() {
+        _currentIndex = index;
+      });
+      
+      _refreshCurrentTab(index);
+      _lastTabIndex = index;
+    } else {
+      setState(() {
+        _currentIndex = index;
+      });
+    }
+    
+    // Reset hide timer when navigating
+    if (!isLargeScreen) {
+      _startHideTimer();
+    }
   }
-}
   // // Navigation method with tab refresh logic
   // void _navigateToTab(int index) {
   //   if (_lastTabIndex != index) {
@@ -529,36 +590,38 @@ void _navigateToTab(int index) async {
     );
   }
 
-@override
-Widget build(BuildContext context) {
-  final isDark = Theme.of(context).brightness == Brightness.dark;
-  final screenSize = MediaQuery.of(context).size;
-  final isLargeScreen = screenSize.width > 1024;
-  final isMobile = screenSize.width <= 480;
 
-  return PopScope(
-    canPop: false,
-    onPopInvokedWithResult: (bool didPop, dynamic result) {
-      return;
-    },
-    child: Scaffold(
-      backgroundColor: isDark ? const Color(0xFF1E1E1E) : Color(0xFFF8FAFC),
-      body: Row(
-        children: [
-          // Right Side Navigation for Large Screens
-          if (isLargeScreen) _buildRightNavigation(isDark),
-          
-          // Main Content
-          Expanded(
-            child: Stack(
-              children: [
-                // Main content
-                Positioned.fill(
-                  child: HeroMode(
-                    enabled: false,
-                    child: IndexedStack(
-                      index: _currentIndex,
-                      children: [
+
+  // REPLACE THE build METHOD'S bottom navigation section with this:
+  // build widget of clan admin 
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final screenSize = MediaQuery.of(context).size;
+    final isLargeScreen = screenSize.width > 1024;
+    final isMobile = screenSize.width <= 480;
+
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (bool didPop, dynamic result) {
+        return;
+      },
+      child: Scaffold(
+        backgroundColor: isDark ? const Color(0xFF1E1E1E) : Color(0xFFF8FAFC),
+        body: Row(
+          children: [
+            if (isLargeScreen) _buildRightNavigation(isDark),
+            
+            Expanded(
+              child: Stack(
+                children: [
+                  // Main content
+                  Positioned.fill(
+                    child: HeroMode(
+                      enabled: false,
+                      child: IndexedStack(
+                        index: _currentIndex,
+                        children: [
                         HomeTab(key: _homeTabKey, onNavigateToTab: _navigateToTab),
                         HallsTab(key: _hallsTabKey),
                         GroomManagementScreen(key: _groomsTabKey),
@@ -566,7 +629,9 @@ Widget build(BuildContext context) {
                         FoodTab(key: _foodTabKey),
                         SettingsTab(key: _settingsTabKey),
                         NotificationsTab(key: _notifTabKey),    
-                        
+                         
+
+                         
                         if (_clanId != null && _clanName != null)
                           ClanRulesPage(key: _rulesTabKey)
                         else
@@ -582,22 +647,84 @@ Widget build(BuildContext context) {
                   ),
                 ),
                 
-                // Bottom Navigation Bar
-                if (!isLargeScreen)
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    child: _buildModernBottomNav(isMobile, isDark),
-                  ),
-              ],
+                // UPDATED BOTTOM NAVIGATION SECTION:
+                  if (!isLargeScreen) ...[
+                    // Animated Bottom Navigation Bar
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      child: SlideTransition(
+                        position: _navSlideAnimation,
+                        child: _buildModernBottomNav(isMobile, isDark),
+                      ),
+                    ),
+                    
+                    // Floating Show Button (appears when nav is hidden)
+                    if (!_isBottomNavVisible)
+                      Positioned(
+                        bottom: 30,
+                        right: 16,
+                        child: _buildShowNavButton(isDark),
+                      ),
+                  ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
+
+   // ADD THIS NEW METHOD FOR THE SHOW BUTTON:
+  Widget _buildShowNavButton(bool isDark) {
+    return GestureDetector(
+      onTap: _showBottomNav,
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          // border: Border.all(color: AppColors.primary.withOpacity(0.9)),
+          gradient: LinearGradient(
+            colors: [
+              isDark ? Color.fromARGB(204, 46, 125, 50) : const Color.fromARGB(188, 34, 123, 38),
+              isDark ? Color.fromARGB(196, 46, 125, 50) : const Color.fromARGB(166, 25, 120, 30),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(35),
+          // boxShadow: [
+          //   BoxShadow(
+          //     color: AppColors.primary.withOpacity(0.4),
+          //     blurRadius: 12,
+          //     offset: const Offset(0, 3),
+          //   ),
+          // ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.menu,
+              color: isDark ? Colors.white : Colors.white,
+              size: 20,
+            ),
+            // const SizedBox(width: 8),
+            // Text(
+            //   'القائمة',
+            //   style: TextStyle(
+            //     color: Colors.white,
+            //     fontSize: 14,
+            //     fontWeight: FontWeight.w600,
+            //   ),
+            // ),
+          ],
+        ),
+      ),
+    );
+  }
+
 
   Widget _buildRightNavigation(bool isDark) {
     return Container(
@@ -1020,56 +1147,59 @@ Widget build(BuildContext context) {
   //     ],
   //   );
   // }
-
+// UPDATE _buildModernBottomNav to handle tap events that reset timer:
   Widget _buildModernBottomNav(bool isMobile, bool isDark) {
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 0, horizontal: 0),
-      padding: EdgeInsets.zero,
-      decoration: BoxDecoration(
-        color: isDark 
-            ? const Color.fromARGB(57, 248, 249, 250).withOpacity(0.2)
-            : const Color.fromARGB(105, 79, 79, 79),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.3 : 0.08),
-            blurRadius: 25,
-            offset: const Offset(0, -4),
-            spreadRadius: 2,
+    return GestureDetector(
+      onTap: _startHideTimer, // Reset timer on any tap
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 0, horizontal: 0),
+        padding: EdgeInsets.zero,
+        decoration: BoxDecoration(
+          color: isDark 
+              ? const Color.fromARGB(57, 248, 249, 250).withOpacity(0.2)
+              : const Color.fromARGB(105, 79, 79, 79),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(isDark ? 0.3 : 0.08),
+              blurRadius: 25,
+              offset: const Offset(0, -4),
+              spreadRadius: 2,
+            ),
+            BoxShadow(
+              color: AppColors.primary.withOpacity(0.3),
+              blurRadius: 25,
+              offset: const Offset(0, -4),
+              spreadRadius: 0,
+            ),
+          ],
+          border: Border.all(
+            color: AppColors.primary.withOpacity(isDark ? 0.2 : 0.3),
+            width: 0,
           ),
-          BoxShadow(
-            color: AppColors.primary.withOpacity(0.3),
-            blurRadius: 25,
-            offset: const Offset(0, -4),
-            spreadRadius: 0,
-          ),
-        ],
-        border: Border.all(
-          color: AppColors.primary.withOpacity(isDark ? 0.2 : 0.3),
-          width: 0,
         ),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(25),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2),
-          child: SafeArea(
-            bottom: true,
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  _buildNavItem(Icons.castle_outlined, 'القاعات', 1, isDark),
-                  _buildNavItem(Icons.group_outlined, 'العرسان', 2, isDark),
-                  _buildNavItem(Icons.book_outlined, 'الحجوزات', 3, isDark),
-                  _buildNavItem(Icons.home_rounded, 'الرئيسية', 0, isDark),
-                  _buildNavItem(Icons.restaurant_menu_outlined, 'الطعام', 4, isDark),
-                  _buildNavItem(Icons.settings_outlined, 'الإعدادات', 5, isDark),
-                  _buildNavItem(Icons.notifications_outlined, 'الإشعارات', 9, isDark), // Added
-                ],
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(25),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2),
+            child: SafeArea(
+              bottom: true,
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    _buildNavItem(Icons.castle_outlined, 'القاعات', 1, isDark),
+                    _buildNavItem(Icons.group_outlined, 'العرسان', 2, isDark),
+                    _buildNavItem(Icons.book_outlined, 'الحجوزات', 3, isDark),
+                    _buildNavItem(Icons.home_rounded, 'الرئيسية', 0, isDark),
+                    _buildNavItem(Icons.restaurant_menu_outlined, 'الطعام', 4, isDark),
+                    _buildNavItem(Icons.settings_outlined, 'الإعدادات', 5, isDark),
+                    _buildNavItem(Icons.notifications_outlined, 'الإشعارات', 9, isDark),
+                  ],
+                ),
               ),
             ),
           ),
@@ -1077,6 +1207,7 @@ Widget build(BuildContext context) {
       ),
     );
   }
+    
 
 
   Widget _buildNavItem(IconData icon, String label, int index, bool isDark) {

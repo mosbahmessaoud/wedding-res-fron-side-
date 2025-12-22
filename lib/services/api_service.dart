@@ -1738,6 +1738,26 @@ static Future<Uint8List> downloadPdfFromServer(int reservationId) async {
     }
   }
 
+  // List All Reservations for Clan Admin (for export)
+static Future<List<dynamic>> getAllReservationsClanAdmin() async {
+  try {
+    final response = await http.get(
+      Uri.parse('$baseUrl/reservations/clan_admin/all_reservations'),
+      headers: await _headers,
+    );
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else if (response.statusCode == 403) {
+      throw Exception('غير مصرح لك بالوصول إلى هذه البيانات');
+    } else {
+      throw Exception('فشل في تحميل الحجوزات: ${response.statusCode}');
+    }
+  } catch (e) {
+    throw Exception('خطأ في الاتصال: $e');
+  }
+}
+
   static Future<List<dynamic>> getPendingReservations() async {
     try {
       final response = await http.get(
@@ -4434,139 +4454,6 @@ static Future<int> getValidatedReservationsYearCountyCount() async {
   final data = await getValidatedReservationsYearCounty();
   return data['count'] as int;
 }
-
-// ==================== RESERVATION COUNT BY TIME ENDPOINTS ====================
-
-// ========== CLAN-SPECIFIC COUNTS ==========
-
-// /// Get count of validated reservations for today for specific clan
-// /// GET /reservations/valid_reservations_today/{clan_id}
-// static Future<int> getValidatedReservationsTodayCount() async {
-//   try {
-//     final response = await http.get(
-//       Uri.parse('$baseUrl/reservations/valid_reservations_today'),
-//       headers: await _headers,
-//     );
-
-//     if (response.statusCode == 200) {
-//       final data = json.decode(response.body);
-//       return data['validated_reservations_today'] as int;
-//     } else {
-//       final error = json.decode(response.body);
-//       throw Exception(error['detail'] ?? 'فشل في جلب العدد');
-//     }
-//   } catch (e) {
-//     throw Exception('خطأ في جلب العدد: $e');
-//   }
-// }
-
-// /// Get count of validated reservations for current month for specific clan
-// /// GET /reservations/valid_reservations_month/{clan_id}
-// static Future<int> getValidatedReservationsMonthCount() async {
-//   try {
-//     final response = await http.get(
-//       Uri.parse('$baseUrl/reservations/valid_reservations_month'),
-//       headers: await _headers,
-//     );
-
-//     if (response.statusCode == 200) {
-//       final data = json.decode(response.body);
-//       return data['validated_reservations_month'] as int;
-//     } else {
-//       final error = json.decode(response.body);
-//       throw Exception(error['detail'] ?? 'فشل في جلب العدد');
-//     }
-//   } catch (e) {
-//     throw Exception('خطأ في جلب العدد: $e');
-//   }
-// }
-
-// /// Get count of validated reservations for current year for specific clan
-// /// GET /reservations/valid_reservations_year/{clan_id}
-// static Future<int> getValidatedReservationsYearCount() async {
-//   try {
-//     final response = await http.get(
-//       Uri.parse('$baseUrl/reservations/valid_reservations_year'),
-//       headers: await _headers,
-//     );
-
-//     if (response.statusCode == 200) {
-//       final data = json.decode(response.body);
-//       return data['validated_reservations_year'] as int;
-//     } else {
-//       final error = json.decode(response.body);
-//       throw Exception(error['detail'] ?? 'فشل في جلب العدد');
-//     }
-//   } catch (e) {
-//     throw Exception('خطأ في جلب العدد: $e');
-//   }
-// }
-
-// // ========== COUNTY-WIDE COUNTS ==========
-
-// /// Get count of validated reservations for today for entire county
-// /// GET /reservations/valid_reservations_today_county
-// static Future<int> getValidatedReservationsTodayCountyCount() async {
-//   try {
-//     final response = await http.get(
-//       Uri.parse('$baseUrl/reservations/valid_reservations_today_county'),
-//       headers: await _headers,
-//     );
-
-//     if (response.statusCode == 200) {
-//       final data = json.decode(response.body);
-//       return data['validated_reservations_today_county'] as int;
-//     } else {
-//       final error = json.decode(response.body);
-//       throw Exception(error['detail'] ?? 'فشل في جلب العدد');
-//     }
-//   } catch (e) {
-//     throw Exception('خطأ في جلب العدد: $e');
-//   }
-// }
-
-// /// Get count of validated reservations for current month for entire county
-// /// GET /reservations/valid_reservations_month_county
-// static Future<int> getValidatedReservationsMonthCountyCount() async {
-//   try {
-//     final response = await http.get(
-//       Uri.parse('$baseUrl/reservations/valid_reservations_month_county'),
-//       headers: await _headers,
-//     );
-
-//     if (response.statusCode == 200) {
-//       final data = json.decode(response.body);
-//       return data['validated_reservations_month_county'] as int;
-//     } else {
-//       final error = json.decode(response.body);
-//       throw Exception(error['detail'] ?? 'فشل في جلب العدد');
-//     }
-//   } catch (e) {
-//     throw Exception('خطأ في جلب العدد: $e');
-//   }
-// }
-
-// /// Get count of validated reservations for current year for entire county
-// /// GET /reservations/valid_reservations_year_county
-// static Future<int> getValidatedReservationsYearCountyCount() async {
-//   try {
-//     final response = await http.get(
-//       Uri.parse('$baseUrl/reservations/valid_reservations_year_county'),
-//       headers: await _headers,
-//     );
-
-//     if (response.statusCode == 200) {
-//       final data = json.decode(response.body);
-//       return data['validated_reservations_year_county'] as int;
-//     } else {
-//       final error = json.decode(response.body);
-//       throw Exception(error['detail'] ?? 'فشل في جلب العدد');
-//     }
-//   } catch (e) {
-//     throw Exception('خطأ في جلب العدد: $e');
-//   }
-// }
-
 
 
 

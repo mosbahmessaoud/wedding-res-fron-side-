@@ -338,6 +338,7 @@ Future<void> _saveSettings() async {
   }
 }
 void _showSuccessDialog() {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
   showDialog(
     context: context,
     barrierDismissible: false,
@@ -364,7 +365,7 @@ void _showSuccessDialog() {
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
+              color: isDark ? AppColors.border : AppColors.textPrimary,
             ),
           ),
           SizedBox(height: 8),
@@ -409,12 +410,27 @@ void _showSuccessDialog() {
     final screenSize = MediaQuery.of(context).size;
     final isTablet = screenSize.width > 768;
     final isMobile = screenSize.width <= 480;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       appBar: AppBar(  
         title: Text('إعدادات العشيرة'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
+        flexibleSpace: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    isDark ? AppColors.primary.withOpacity(0.4):AppColors.primary.withOpacity(0.8) ,
+                    AppColors.primary,
+                    AppColors.primary,
+                    isDark ? AppColors.primary.withOpacity(0.4):AppColors.primary.withOpacity(0.8) ,
+                    // isDark ? AppColors.primary.withOpacity(0.4):const Color.fromARGB(255, 130, 161, 112).withOpacity(0.9),
+                    
+                  ],
+                ),
+              ),
+            ),        foregroundColor: Colors.white,
         systemOverlayStyle: SystemUiOverlayStyle.light,
         leading: IconButton(
             icon: Icon(Icons.arrow_back),

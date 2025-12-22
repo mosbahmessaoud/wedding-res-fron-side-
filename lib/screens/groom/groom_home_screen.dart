@@ -26,7 +26,9 @@ class GroomHomeScreen extends StatefulWidget {
   @override
   _GroomHomeScreenState createState() => _GroomHomeScreenState();
 }
-class _GroomHomeScreenState extends State<GroomHomeScreen> {
+class _GroomHomeScreenState extends State<GroomHomeScreen> 
+    with TickerProviderStateMixin {
+      
   int _currentIndex = 0;
   late List<Widget> _tabs;
   Widget? _externalScreen;
@@ -53,36 +55,416 @@ class _GroomHomeScreenState extends State<GroomHomeScreen> {
   bool _hasValidReservation = false;
   bool _isCheckingReservation = true;
 
-  @override
-void initState() {
-  super.initState();
-  _currentIndex = widget.initialTabIndex;
-  
-  _tabs = [
-    HomeTab(onTabChanged: _changeTab),
-    CreateReservationScreen(
-      key: _creatResTabKey,
-      onReservationCreated: () {
-        _changeTab(2);
-      },
-    ),
-    ReservationsTab(key: _reservationsTabKey),
-    FoodMenuTabG(key: _foodMenuTabKey),
-    ProfileTab(key: _profileTabKey),
-    GroomClanRulesPage(key: _rulesTabKey),
-  ];
 
-  // MODIFIED: Check reservation first, then load data
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    _checkReservationStatus().then((_) {
-      if (_hasValidReservation) {
-        _refreshCurrentTabInBackground(_currentIndex);
-        _loadUnreadNotificationCount();
-        _startNotificationPolling();
+  // ADD THESE NEW VARIABLES:
+  bool _hasAccessPassword = false;
+  bool _isVerifyingAccess = false;
+
+// ADD THESE NEW VARIABLES FOR BOTTOM NAV VISIBILITY:
+  bool _isBottomNavVisible = true;
+  Timer? _hideNavTimer;
+  late AnimationController _navAnimationController;
+  late Animation<Offset> _navSlideAnimation;
+
+//   @override
+// void initState() {
+//   super.initState();
+//   _currentIndex = widget.initialTabIndex;
+  
+//   _tabs = [
+//     HomeTab(onTabChanged: _changeTab),
+//     CreateReservationScreen(
+//       key: _creatResTabKey,
+//       onReservationCreated: () {
+//         _changeTab(2);
+//       },
+//     ),
+//     ReservationsTab(key: _reservationsTabKey),
+//     FoodMenuTabG(key: _foodMenuTabKey),
+//     ProfileTab(key: _profileTabKey),
+//     GroomClanRulesPage(key: _rulesTabKey),
+//   ];
+
+//   // MODIFIED: Check reservation first, then load data
+//   WidgetsBinding.instance.addPostFrameCallback((_) {
+//     _checkReservationStatus().then((_) {
+//       if (_hasValidReservation) {
+//         _refreshCurrentTabInBackground(_currentIndex);
+//         _loadUnreadNotificationCount();
+//         _startNotificationPolling();
+//       }
+//     });
+//   });
+
+
+
+  
+// }
+
+
+
+@override
+  void initState() {
+    super.initState();
+      _currentIndex = widget.initialTabIndex;
+        
+        _tabs = [
+          HomeTab(onTabChanged: _changeTab),
+          CreateReservationScreen(
+            key: _creatResTabKey,
+            onReservationCreated: () {
+              _changeTab(2);
+            },
+          ),
+          ReservationsTab(key: _reservationsTabKey),
+          FoodMenuTabG(key: _foodMenuTabKey),
+          ProfileTab(key: _profileTabKey),
+          GroomClanRulesPage(key: _rulesTabKey),
+        ];
+        
+            
+    // ADD THIS INITIALIZATION FOR NAV ANIMATION:
+    _navAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 400),
+      vsync: this,
+    );
+    
+    _navSlideAnimation = Tween<Offset>(
+      begin: const Offset(0, 1), // Hidden below screen
+      end: Offset.zero, // Visible
+    ).animate(CurvedAnimation(
+      parent: _navAnimationController,
+      curve: Curves.easeInOut,
+    ));
+    
+    // Show nav initially and start hide timer
+    _navAnimationController.forward();
+    
+    // Modified: Check reservation first, then load data and start timer
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkReservationStatus().then((_) {
+        if (_hasValidReservation) {
+          _refreshCurrentTabInBackground(_currentIndex);
+          _loadUnreadNotificationCount();
+          _startNotificationPolling();
+          _startHideTimer(); // Start timer after loading
+        } else {
+          _startHideTimer(); // Start timer even without reservation
+        }
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    // ... existing dispose code ...
+    _hideNavTimer?.cancel();
+    _navAnimationController.dispose();
+    _notificationPollTimer?.cancel(); // Don't forget existing timer
+    super.dispose();
+  }
+
+// ADD THESE NEW METHODS:
+  void _startHideTimer() {
+    _hideNavTimer?.cancel();
+    _hideNavTimer = Timer(const Duration(seconds: 5), () {
+      if (mounted) {
+        _hideBottomNav();
       }
     });
-  });
+  }
+
+  void _hideBottomNav() {
+    setState(() {
+      _isBottomNavVisible = false;
+    });
+    _navAnimationController.reverse();
+  }
+
+  void _showBottomNav() {
+    setState(() {
+      _isBottomNavVisible = true;
+    });
+    _navAnimationController.forward();
+    _startHideTimer();
+  }
+
+
+// ADD THIS NEW METHOD:
+Future<void> _checkAccessPassword() async {
+  try {
+    final hasPassword = await ApiService.hasAccessPassword();
+    setState(() {
+      _hasAccessPassword = hasPassword;
+    });
+  } catch (e) {
+    print('Error checking access password: $e');
+    setState(() {
+      _hasAccessPassword = false;
+    });
+  }
 }
+  // Method to verify access before navigating to protected tabs
+Future<bool> _verifyAccessForTab() async {
+  
+
+  await _checkAccessPassword();
+  // Check if user has access password set
+  if (!_hasAccessPassword) {
+    _showAccessPasswordNotSetDialog();
+    return false;
+  }
+
+  // Show password verification dialog
+  return await _showAccessPasswordDialog();
+}
+
+
+// Dialog when user doesn't have access password
+void _showAccessPasswordNotSetDialog() {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Row(
+        children: [
+          Icon(Icons.lock_outline, color: Colors.orange),
+          SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'كلمة مرور الوصول غير متوفرة',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: isDark ? Colors.white : Colors.black87,
+              ),
+            ),
+          ),
+        ],
+      ),
+      // content: Text(
+      //   'لم يتم تعيين كلمة مرور وصول لحسابك.\nيرجى الاتصال بالمدير الأعلى لإنشاء كلمة مرور.',
+      //   style: TextStyle(
+      //     color: isDark ? Colors.white70 : Colors.black87,
+      //   ),
+      // ),
+      actions: [
+        ElevatedButton(
+          onPressed: () => Navigator.pop(context),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+          ),
+          child: const Text('فهمت', style: TextStyle(color: Colors.white)),
+        ),
+      ],
+    ),
+  );
+}
+// Updated _showAccessPasswordDialog method with loading state
+
+Future<bool> _showAccessPasswordDialog() async {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  final passwordController = TextEditingController();
+  bool obscurePassword = true;
+  String? errorMessage;
+  bool isLoading = false; // ADD THIS LINE
+
+  final result = await showDialog<bool>(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) => StatefulBuilder(
+      builder: (context, setDialogState) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.key, color: AppColors.primary),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'أدخل كلمة مرور الوصول',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 18,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Container(
+            //   padding: const EdgeInsets.all(12),
+            //   decoration: BoxDecoration(
+            //     color: Colors.blue.shade50,
+            //     borderRadius: BorderRadius.circular(8),
+            //     border: Border.all(color: Colors.blue.shade200),
+            //   ),
+            //   child: Row(
+            //     children: const [
+            //       Icon(Icons.info_outline, color: Colors.blue, size: 20),
+            //       SizedBox(width: 8),
+            //       Expanded(
+            //         child: Text(
+            //           'هذه الصفحة محمية. يرجى إدخال كلمة المرور.',
+            //           style: TextStyle(color: Colors.blue, fontSize: 12),
+            //         ),
+            //       ),
+            //     ],
+            //   ),
+            // ),
+            // SizedBox(height: 16),
+            TextField(
+              controller: passwordController,
+              obscureText: obscurePassword,
+              autofocus: true,
+              enabled: !isLoading, // DISABLE WHEN LOADING
+              style: TextStyle(
+                color: isDark ? Colors.white : Colors.black87,
+              ),
+              decoration: InputDecoration(
+                labelText: 'كلمة مرور ',
+                hintText: 'أدخل كلمة المرور',
+                prefixIcon: const Icon(Icons.lock_outline),
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    obscurePassword ? Icons.visibility : Icons.visibility_off,
+                  ),
+                  onPressed: isLoading ? null : () { // DISABLE WHEN LOADING
+                    setDialogState(() {
+                      obscurePassword = !obscurePassword;
+                    });
+                  },
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                errorText: errorMessage,
+              ),
+              onSubmitted: isLoading ? null : (_) async { // DISABLE WHEN LOADING
+                if (passwordController.text.isEmpty) {
+                  setDialogState(() {
+                    errorMessage = 'يرجى إدخال كلمة المرور';
+                  });
+                  return;
+                }
+                
+                // Start loading
+                setDialogState(() {
+                  isLoading = true;
+                  errorMessage = null;
+                }); 
+                
+                try {
+                  final isValid = await ApiService.validateSpecialPageAccess(
+                    passwordController.text,
+                  );
+                  if (isValid) {
+                    Navigator.pop(context, true);
+                  } else {
+                    setDialogState(() {
+                      isLoading = false;
+                      errorMessage = 'كلمة المرور غير صحيحة';
+                    });
+                  }
+                } catch (e) {
+                  setDialogState(() {
+                    isLoading = false;
+                    errorMessage = 'خطأ في التحقق من كلمة المرور';
+                  });
+                }
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: isLoading ? null : () => Navigator.pop(context, false), // DISABLE WHEN LOADING
+            child: Text(
+              'إلغاء',
+              style: TextStyle(
+                color: isLoading 
+                    ? Colors.grey 
+                    : (isDark ? Colors.white60 : Colors.grey[700]),
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: isLoading ? null : () async { // DISABLE WHEN LOADING
+              if (passwordController.text.isEmpty) {
+                setDialogState(() {
+                  errorMessage = 'يرجى إدخال كلمة المرور';
+                });
+                return;
+              }
+
+              // Start loading
+              setDialogState(() {
+                isLoading = true;
+                errorMessage = null;
+              });
+
+              try {
+                final isValid = await ApiService.validateSpecialPageAccess(
+                  passwordController.text,
+                );
+
+                if (isValid) {
+                  Navigator.pop(context, true);
+                } else {
+                  setDialogState(() {
+                    isLoading = false;
+                    errorMessage = 'كلمة المرور غير صحيحة';
+                  });
+                }
+              } catch (e) {
+                setDialogState(() {
+                  isLoading = false;
+                  errorMessage = 'خطأ في التحقق من كلمة المرور';
+                });
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isLoading 
+                  ? Colors.grey 
+                  : AppColors.primary,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+            ),
+            child: isLoading // UPDATED CHILD WITH LOADING INDICATOR
+                ? Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      ),
+                      SizedBox(width: 8),
+                      Text('جاري التحقق...', style: TextStyle(color: Colors.white)),
+                    ],
+                  )
+                : const Text('تحقق', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    ),
+  );
+
+  passwordController.dispose();
+  return result ?? false;
+}
+
+
 
 /// Check if user has a valid reservation
 Future<void> _checkReservationStatus() async {
@@ -613,21 +995,32 @@ void _showNoInternetDialog() {
   );
 }
 
-
-void _changeTab(int index) async {
-  setState(() {
-    _currentIndex = index;
-    _externalScreen = null;
-    _externalScreenTitle = null;
-  });
-  
-  // Check if data needs refresh (e.g., older than 5 minutes)
-  final needsRefresh = _shouldRefreshTab(index);
-  
-  if (needsRefresh) {
-    _refreshCurrentTabInBackground(index);
+// UPDATE THE _changeTab METHOD TO RESET TIMER:
+  void _changeTab(int index) async {
+    // Check if trying to access Create Reservation tab (index 1)
+    if (index == 1 && !_hasValidReservation ) {
+      final hasAccess = await _verifyAccessForTab();
+      if (!hasAccess) {
+        return;
+      }
+    }
+    
+    setState(() {
+      _currentIndex = index;
+      _externalScreen = null;
+      _externalScreenTitle = null;
+    });
+    
+    // Check if data needs refresh
+    final needsRefresh = _shouldRefreshTab(index);
+    
+    if (needsRefresh) {
+      _refreshCurrentTabInBackground(index);
+    }
+    
+    // Reset hide timer when navigating
+    _startHideTimer();
   }
-}
 
 
 // ============================================
@@ -663,7 +1056,7 @@ void _refreshCurrentTabInBackground(int index) {
   
   // Mark as loading
   _tabLoadingStatus[index] = true;
-  
+   
   // Perform refresh in background without blocking UI
   Future.microtask(() async {
     try {
@@ -766,120 +1159,134 @@ void _navigateToExternalScreen(Widget screen, String title) async {
       ),
     );
   }
+@override
+Widget build(BuildContext context) {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
 
-  @override
-  Widget build(BuildContext context) {
-    // final themeProvider = Provider.of<ThemeProvider>(context);
-    // final isDark = themeProvider.isDarkMode;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-
-    return WillPopScope(
-      onWillPop: () async {
-        if (_externalScreen != null) {
-          _closeExternalScreen();
-          return false;
-        }
-        return true;
-      },
-      child: Scaffold(
-        backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF6F6F6),
-        appBar: _buildSpotifyAppBar(isDark),
-        drawer: _buildSpotifyDrawer(isDark),
-        body: Stack(
-  children: [
-    // Main content with bottom padding for nav bar
-    Positioned.fill(
-      child: Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).size.width < 360 ? 65.0 : 70.0,
-        ),
-        child: _externalScreen != null
-            ? Column(
-                children: [
-                  // Custom app bar for external screen
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Row(
+  return WillPopScope(
+    onWillPop: () async {
+      if (_externalScreen != null) {
+        _closeExternalScreen();
+        return false;
+      }
+      return true;
+    },
+    child: Scaffold(
+      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF6F6F6),
+      appBar: _buildSpotifyAppBar(isDark),
+      drawer: _buildSpotifyDrawer(isDark),
+      body: Stack(
+        children: [
+          // Main content with bottom padding to avoid overlap with nav bar
+          Positioned.fill(
+            child: Padding(
+              padding: EdgeInsets.only(
+                bottom: _isBottomNavVisible ? 70 : 0, // Add padding when nav is visible
+              ),
+              child: _externalScreen != null
+                  ? Column(
                       children: [
-                        IconButton(
-                          icon: Icon(
-                            Icons.arrow_back,
-                            size: 22,
-                            color: isDark ? Colors.white : Colors.black87,
+                        // Custom app bar for external screen
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 8,
                           ),
-                          onPressed: _closeExternalScreen,
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
+                                blurRadius: 10,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            children: [
+                              IconButton(
+                                icon: Icon(
+                                  Icons.arrow_back,
+                                  size: 22,
+                                  color: isDark ? Colors.white : Colors.black87,
+                                ),
+                                onPressed: _closeExternalScreen,
+                              ),
+                              Expanded(
+                                child: Text(
+                                  _externalScreenTitle ?? '',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w600,
+                                    color: isDark ? Colors.white : Colors.black87,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                              const SizedBox(width: 48),
+                            ],
+                          ),
                         ),
+                        // External screen content
                         Expanded(
-                          child: Text(
-                            _externalScreenTitle ?? '',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              color: isDark ? Colors.white : Colors.black87,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
+                          child: _externalScreen!,
                         ),
-                        const SizedBox(width: 48),
                       ],
-                    ),
-                  ),
-                  // External screen content
-                  Expanded(
-                    child: _externalScreen!,
+                    )
+                  : _tabs[_currentIndex],
+            ),
+          ),
+          
+          // Animated Bottom Navigation Bar - ALWAYS above system navigation
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: SlideTransition(
+              position: _navSlideAnimation,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  navigationBar(isDark),
+                  // This ensures it sits above the system nav bar
+                  Container(
+                    height: MediaQuery.of(context).padding.bottom,
+                    color: isDark 
+                        ? const Color.fromARGB(173, 52, 52, 52) 
+                        : const Color.fromARGB(180, 212, 212, 212),
                   ),
                 ],
-              )
-            : _tabs[_currentIndex],
+              ),
+            ),
+          ), 
+          
+          // Floating Show Button (appears when nav is hidden)
+          if (!_isBottomNavVisible)
+            Positioned(
+              bottom: 30 + MediaQuery.of(context).padding.bottom,
+              right: 16,
+              child: _buildShowNavButton(isDark),
+            ),
+        ],
       ),
     ),
-    
-    // Bottom Navigation Bar - FLOATING ON TOP
-    Positioned(
-      left: 0,
-      right: 0,
-      bottom: 0,
-      child: SafeArea(
-        top: false,
-        child: navigationBar(isDark),
-      ),
-    ),
-  ],
-),
-      ),
-    );
-  }
+  );
+}
 
-  // Responsive Navigation Bar with smooth transitions
+// Updated navigationBar to handle tap events that reset timer
 AnimatedContainer navigationBar(bool isDark) {
-  // Get screen width for responsive sizing
   final screenWidth = MediaQuery.of(context).size.width;
   final isSmallScreen = screenWidth < 360;
   final isMediumScreen = screenWidth >= 360 && screenWidth < 600;
   
-  // Responsive dimensions
   final navHeight = isSmallScreen ? 65.0 : 70.0;
   final borderRadius = isSmallScreen ? 15.0 : 20.0;
   
   return AnimatedContainer(
-
     height: navHeight,
     duration: const Duration(milliseconds: 400),
     curve: Curves.easeInOutCubic,
+    
     decoration: BoxDecoration(
       color: isDark 
           ? const Color.fromARGB(173, 52, 52, 52) 
@@ -898,15 +1305,13 @@ AnimatedContainer navigationBar(bool isDark) {
         topLeft: Radius.circular(_currentIndex == 5 ? 0.0 : borderRadius),
         topRight: Radius.circular(_currentIndex == 5 ? 0.0 : borderRadius),
       ),
-      child: SafeArea(
-        bottom: false,
-        top: false,
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 1.5, sigmaY: 1.5),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 1.5, sigmaY: 1.5),
+        child: GestureDetector(
+          onTap: _startHideTimer, // Reset timer on any tap
           child: LayoutBuilder(
             builder: (context, constraints) {
-              // Calculate item width based on available space
-              final itemWidth = constraints.maxWidth / 5; // Changed from 6 to 5 items
+              final itemWidth = constraints.maxWidth / 5;
               
               return Stack(
                 children: [
@@ -958,6 +1363,53 @@ AnimatedContainer navigationBar(bool isDark) {
   );
 }
 
+   // ADD THIS NEW METHOD FOR THE SHOW BUTTON:
+  Widget _buildShowNavButton(bool isDark) {
+    return GestureDetector(
+      onTap: _showBottomNav,
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          // border: Border.all(color: AppColors.primary.withOpacity(0.9)),
+          gradient: LinearGradient(
+            colors: [
+              isDark ? Color.fromARGB(204, 46, 125, 50) : const Color.fromARGB(188, 34, 123, 38),
+              isDark ? Color.fromARGB(196, 46, 125, 50) : const Color.fromARGB(166, 25, 120, 30),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(35),
+          // boxShadow: [
+          //   BoxShadow(
+          //     color: AppColors.primary.withOpacity(0.4),
+          //     blurRadius: 12,
+          //     offset: const Offset(0, 3),
+          //   ),
+          // ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.menu,
+              color: isDark ? Colors.white : Colors.white,
+              size: 20,
+            ),
+            // const SizedBox(width: 8),
+            // Text(
+            //   'القائمة',
+            //   style: TextStyle(
+            //     color: Colors.white,
+            //     fontSize: 14,
+            //     fontWeight: FontWeight.w600,
+            //   ),
+            // ),
+          ],
+        ),
+      ),
+    );
+  }
 
 
 // Helper method to calculate indicator position
@@ -973,97 +1425,110 @@ double _getIndicatorPosition(double itemWidth) {
   
   return (indexToPosition[_currentIndex] ?? 2) * itemWidth;
 }
-// Responsive _buildNavItem with dynamic sizing
-Widget _buildNavItem(IconData icon, String label, int index, bool isDark, double itemWidth) {
-  final isSelected = _currentIndex == index && _externalScreen == null;
-  final screenWidth = MediaQuery.of(context).size.width;
-  final isSmallScreen = screenWidth < 360;
-  final isMediumScreen = screenWidth >= 360 && screenWidth < 600;
-  
-  // Responsive notch dimensions
-  var notchHeight = isSelected ? (isSmallScreen ? 50.0 : 60.0) : 0.0;
-  var notchWidth = isSelected ? (isSmallScreen ? 45.0 : 50.0) : 0.0;
-  
-  // Responsive icon sizes
-  final selectedIconSize = isSmallScreen ? 24.0 : 28.0;
-  final unselectedIconSize = isSmallScreen ? 20.0 : 24.0;
-  
-  // Responsive font size
-  final fontSize = isSmallScreen ? 9.0 : (isMediumScreen ? 10.0 : 11.0);
-  
-  // Constrain item width
-  final constrainedWidth = itemWidth.clamp(50.0, 80.0);
-  
-  return GestureDetector(
-    onTap: () => _changeTab(index),
-    behavior: HitTestBehavior.opaque,
-    child: SizedBox(
-      width: constrainedWidth,
-      child: Stack(
-        children: [
-          // CustomPaint Notch at top
-          Align(
-            alignment: Alignment.topCenter,
-            child: AnimatedContainer(
-              height: notchHeight,
-              width: notchWidth,
-              duration: const Duration(milliseconds: 600),
-              curve: Curves.easeOutCubic,
-              child: isSelected
-                  ? CustomPaint(
-                      painter: ButtonNotch(
-                        isDark: isDark,
-                      ),
-                    )
-                  : const SizedBox(),
-            ),
-          ),
-          // Icon in center
-          Align(
-            alignment: Alignment.center,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              padding: EdgeInsets.all(isSmallScreen ? 6 : 8),
-              child: Icon(
-                icon,
-                color: isSelected 
-                    ? isDark ? AppColors.primary : AppColors.primaryLight
-                    : (isDark 
-                        ? Colors.white.withOpacity(0.6) 
-                        : Colors.black.withOpacity(0.5)),
-                size: isSelected ? selectedIconSize : unselectedIconSize,
+
+
+
+  // UPDATE _buildNavItem to reset timer on tap:
+  Widget _buildNavItem(IconData icon, String label, int index, bool isDark, double itemWidth) {
+    final isSelected = _currentIndex == index && _externalScreen == null;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 360;
+    final isMediumScreen = screenWidth >= 360 && screenWidth < 600;
+    
+    var notchHeight = isSelected ? (isSmallScreen ? 50.0 : 60.0) : 0.0;
+    var notchWidth = isSelected ? (isSmallScreen ? 45.0 : 50.0) : 0.0;
+    
+    final selectedIconSize = isSmallScreen ? 24.0 : 28.0;
+    final unselectedIconSize = isSmallScreen ? 20.0 : 24.0;
+    
+    final fontSize = isSmallScreen ? 9.0 : (isMediumScreen ? 10.0 : 11.0);
+    
+    final constrainedWidth = itemWidth.clamp(50.0, 80.0);
+    
+    return GestureDetector(
+      onTap: () async {
+        // Reset timer immediately on tap
+        _startHideTimer();
+        
+        // Check if trying to access Create Reservation tab (index 1)
+        if (index == 1 && !_hasValidReservation ) {
+          final hasAccess = await _verifyAccessForTab();
+          if (!hasAccess) {
+            return;
+          }
+        }
+        
+        _changeTab(index);
+      },
+      behavior: HitTestBehavior.opaque,
+      child: SizedBox(
+        width: constrainedWidth,
+        child: Stack(
+          children: [
+            // CustomPaint Notch at top
+            Align(
+              alignment: Alignment.topCenter,
+              child: AnimatedContainer(
+                height: notchHeight,
+                width: notchWidth,
+                duration: const Duration(milliseconds: 600),
+                curve: Curves.easeOutCubic,
+                child: isSelected
+                    ? CustomPaint(
+                        painter: ButtonNotch(
+                          isDark: isDark,
+                        ),
+                      )
+                    : const SizedBox(),
               ),
             ),
-          ),
-          // Label at bottom
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: Padding(
-              padding: EdgeInsets.only(bottom: isSmallScreen ? 2 : 4),
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontSize: fontSize,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+            // Icon in center
+            Align(
+              alignment: Alignment.center,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                padding: EdgeInsets.all(isSmallScreen ? 6 : 8),
+                child: Icon(
+                  icon,
                   color: isSelected 
                       ? isDark ? AppColors.primary : AppColors.primaryLight
                       : (isDark 
                           ? Colors.white.withOpacity(0.6) 
-                          : Colors.black.withOpacity(0.7)),
-                  letterSpacing: 0.2,
-                  height: 1.2,
+                          : Colors.black.withOpacity(0.5)),
+                  size: isSelected ? selectedIconSize : unselectedIconSize,
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
               ),
             ),
-          ),
-        ],
+            // Label at bottom
+            Align(
+              alignment: Alignment.bottomCenter,
+              child: Padding(
+                padding: EdgeInsets.only(bottom: isSmallScreen ? 2 : 4),
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: fontSize,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                    color: isSelected 
+                        ? isDark ? AppColors.primary : AppColors.primaryLight
+                        : (isDark 
+                            ? Colors.white.withOpacity(0.6) 
+                            : Colors.black.withOpacity(0.7)),
+                    letterSpacing: 0.2,
+                    height: 1.2,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
+
 
 // Optional: Add SafeArea wrapper for better compatibility
 Widget buildNavigationWithSafeArea(bool isDark) {
@@ -1628,8 +2093,6 @@ IconButton(
       ),
     );
   }
-
-// Update _buildDrawerItem method - only the onTap part
 Widget _buildDrawerItem(IconData icon, String title, int index, bool isDark) {
   final isSelected = _currentIndex == index && _externalScreen == null;
   return Container(
@@ -1661,12 +2124,17 @@ Widget _buildDrawerItem(IconData icon, String title, int index, bool isDark) {
         ),
       ),
       onTap: () async {
-        Navigator.pop(context);
-        // final hasInternet = await _checkConnectivity();
-        // if (!hasInternet) {
-        //   _showNoInternetDialog();
-        //   return;
-        // }
+        Navigator.pop(context); // Close drawer first
+        
+        // Check if trying to access Create Reservation tab (index 1)
+        if (index == 1 && !_hasValidReservation) {
+          final hasAccess = await _verifyAccessForTab();
+          if (!hasAccess) {
+            // User cancelled or failed verification, don't change tab
+            return;
+          }
+        }
+        
         _changeTab(index);
       },
     ),
@@ -1674,44 +2142,6 @@ Widget _buildDrawerItem(IconData icon, String title, int index, bool isDark) {
 }
 
 
-// Update _buildExternalDrawerItem method - only the onTap part
-Widget _buildExternalDrawerItem(IconData icon, String title, Widget screen, bool isDark) {
-  return Container(
-    margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-    child: ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      leading: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: isDark ? Colors.grey[800] : Colors.grey[100],
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Icon(
-          icon,
-          color: isDark ? Colors.grey[400] : Colors.grey[700],
-          size: 20,
-        ),
-      ),
-      title: Text(
-        title,
-        style: TextStyle(
-          color: isDark ? Colors.grey[300] : Colors.grey[800],
-          fontWeight: FontWeight.w500,
-          fontSize: 15,
-        ),
-      ),
-      onTap: () async {
-        Navigator.pop(context);
-        // final hasInternet = await _checkConnectivity();
-        // if (!hasInternet) {
-        //   _showNoInternetDialog();
-        //   return;
-        // }
-        _navigateToExternalScreen(screen, title);
-      },
-    ),
-  );
-}
 
   String _getAppBarTitle() {
     if (_externalScreen != null) {

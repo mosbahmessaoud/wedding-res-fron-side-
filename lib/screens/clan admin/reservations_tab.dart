@@ -7,17 +7,10 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:open_file/open_file.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
-
-import 'dart:io';
-import 'dart:typed_data';
-import 'package:path_provider/path_provider.dart';
-import 'package:open_file/open_file.dart';
-import 'package:http/http.dart' as http;
 import 'package:wedding_reservation_app/utils/colors.dart';
-import '../../providers/theme_provider.dart';
 
+import '../../providers/theme_provider.dart';
 import '../../services/api_service.dart';
 
 class ReservationsTab extends StatefulWidget {
@@ -36,6 +29,12 @@ class ReservationsTabState extends State<ReservationsTab> with SingleTickerProvi
   List<dynamic> _archivedReservations = [];
   bool _isLoading = false;
   String _searchQuery = '';
+
+
+  // ADD THESE NEW VARIABLES:
+  bool _hasAccessPassword = false;
+  bool _isVerifyingAccess = false;
+
 
   // @override
   // void initState() {
@@ -69,6 +68,281 @@ Future<void> _loadInitialData() async {
     _tabController.dispose();
     super.dispose();
   }
+
+
+// ADD THIS NEW METHOD:
+Future<void> _checkAccessPassword() async {
+  try {
+    final hasPassword = await ApiService.hasAccessPassword();
+    setState(() {
+      _hasAccessPassword = hasPassword;
+    });
+  } catch (e) {
+    print('Error checking access password: $e');
+    setState(() {
+      _hasAccessPassword = false;
+    });
+  }
+}
+  // Method to verify access before navigating to protected tabs
+Future<bool> _verifyAccessForTab() async {
+  
+
+  await _checkAccessPassword();
+  // Check if user has access password set
+  if (!_hasAccessPassword) {
+    _showAccessPasswordNotSetDialog();
+    return false;
+  }
+
+  // Show password verification dialog
+  return await _showAccessPasswordDialog();
+}
+
+
+// Dialog when user doesn't have access password
+void _showAccessPasswordNotSetDialog() {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Row(
+        children: [
+          Icon(Icons.lock_outline, color: Colors.orange),
+          SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'كلمة مرور الوصول غير متوفرة',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: isDark ? Colors.white : Colors.black87,
+              ),
+            ),
+          ),
+        ],
+      ),
+      // content: Text(
+      //   'لم يتم تعيين كلمة مرور وصول لحسابك.\nيرجى الاتصال بالمدير الأعلى لإنشاء كلمة مرور.',
+      //   style: TextStyle(
+      //     color: isDark ? Colors.white70 : Colors.black87,
+      //   ),
+      // ),
+      actions: [
+        ElevatedButton(
+          onPressed: () => Navigator.pop(context),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+          ),
+          child: const Text('فهمت', style: TextStyle(color: Colors.white)),
+        ),
+      ],
+    ),
+  );
+}
+// Updated _showAccessPasswordDialog method with loading state
+
+Future<bool> _showAccessPasswordDialog() async {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  final passwordController = TextEditingController();
+  bool obscurePassword = true;
+  String? errorMessage;
+  bool isLoading = false; // ADD THIS LINE
+
+  final result = await showDialog<bool>(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) => StatefulBuilder(
+      builder: (context, setDialogState) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.key, color: AppColors.primary),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'أدخل كلمة مرور الوصول',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 18,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Container(
+            //   padding: const EdgeInsets.all(12),
+            //   decoration: BoxDecoration(
+            //     color: Colors.blue.shade50,
+            //     borderRadius: BorderRadius.circular(8),
+            //     border: Border.all(color: Colors.blue.shade200),
+            //   ),
+            //   child: Row(
+            //     children: const [
+            //       Icon(Icons.info_outline, color: Colors.blue, size: 20),
+            //       SizedBox(width: 8),
+            //       Expanded(
+            //         child: Text(
+            //           'هذه الصفحة محمية. يرجى إدخال كلمة المرور.',
+            //           style: TextStyle(color: Colors.blue, fontSize: 12),
+            //         ),
+            //       ),
+            //     ],
+            //   ),
+            // ),
+            // SizedBox(height: 16),
+            TextField(
+              controller: passwordController,
+              obscureText: obscurePassword,
+              autofocus: true,
+              enabled: !isLoading, // DISABLE WHEN LOADING
+              style: TextStyle(
+                color: isDark ? Colors.white : Colors.black87,
+              ),
+              decoration: InputDecoration(
+                labelText: 'كلمة مرور ',
+                hintText: 'أدخل كلمة المرور',
+                prefixIcon: const Icon(Icons.lock_outline),
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    obscurePassword ? Icons.visibility : Icons.visibility_off,
+                  ),
+                  onPressed: isLoading ? null : () { // DISABLE WHEN LOADING
+                    setDialogState(() {
+                      obscurePassword = !obscurePassword;
+                    });
+                  },
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                errorText: errorMessage,
+              ),
+              onSubmitted: isLoading ? null : (_) async { // DISABLE WHEN LOADING
+                if (passwordController.text.isEmpty) {
+                  setDialogState(() {
+                    errorMessage = 'يرجى إدخال كلمة المرور';
+                  });
+                  return;
+                }
+                
+                // Start loading
+                setDialogState(() {
+                  isLoading = true;
+                  errorMessage = null;
+                }); 
+                
+                try {
+                  final isValid = await ApiService.validateSpecialPageAccess(
+                    passwordController.text,
+                  );
+                  if (isValid) {
+                    Navigator.pop(context, true);
+                  } else {
+                    setDialogState(() {
+                      isLoading = false;
+                      errorMessage = 'كلمة المرور غير صحيحة';
+                    });
+                  }
+                } catch (e) {
+                  setDialogState(() {
+                    isLoading = false;
+                    errorMessage = 'خطأ في التحقق من كلمة المرور';
+                  });
+                }
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: isLoading ? null : () => Navigator.pop(context, false), // DISABLE WHEN LOADING
+            child: Text(
+              'إلغاء',
+              style: TextStyle(
+                color: isLoading 
+                    ? Colors.grey 
+                    : (isDark ? Colors.white60 : Colors.grey[700]),
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: isLoading ? null : () async { // DISABLE WHEN LOADING
+              if (passwordController.text.isEmpty) {
+                setDialogState(() {
+                  errorMessage = 'يرجى إدخال كلمة المرور';
+                });
+                return;
+              }
+
+              // Start loading
+              setDialogState(() {
+                isLoading = true;
+                errorMessage = null;
+              });
+
+              try {
+                final isValid = await ApiService.validateSpecialPageAccess(
+                  passwordController.text,
+                );
+
+                if (isValid) {
+                  Navigator.pop(context, true);
+                } else {
+                  setDialogState(() {
+                    isLoading = false;
+                    errorMessage = 'كلمة المرور غير صحيحة';
+                  });
+                }
+              } catch (e) {
+                setDialogState(() {
+                  isLoading = false;
+                  errorMessage = 'خطأ في التحقق من كلمة المرور';
+                });
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isLoading 
+                  ? Colors.grey 
+                  : AppColors.primary,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+            ),
+            child: isLoading // UPDATED CHILD WITH LOADING INDICATOR
+                ? Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      ),
+                      SizedBox(width: 8),
+                      Text('جاري التحقق...', style: TextStyle(color: Colors.white)),
+                    ],
+                  )
+                : const Text('تحقق', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    ),
+  );
+
+  passwordController.dispose();
+  return result ?? false;
+}
 
 
 Future<void> _checkConnectivityAndLoad() async {
@@ -565,7 +839,22 @@ void _showNoInternetDialog() {
             fontSize: 18,
           ),
         ),
-        backgroundColor: AppColors.primary,
+        flexibleSpace: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    isDark ? AppColors.primary.withOpacity(0.4):AppColors.primary.withOpacity(0.8) ,
+                    AppColors.primary,
+                    AppColors.primary,
+                    isDark ? AppColors.primary.withOpacity(0.4):AppColors.primary.withOpacity(0.8) ,
+                    // isDark ? AppColors.primary.withOpacity(0.4):const Color.fromARGB(255, 130, 161, 112).withOpacity(0.9),
+                    
+                  ],
+                ),
+              ),
+            ),
         foregroundColor: Colors.white,
         systemOverlayStyle: SystemUiOverlayStyle.light,
         leading: IconButton(
@@ -1108,6 +1397,15 @@ Widget _buildModernActionButtons(Map<String, dynamic> reservation, String status
     buttons.add(
       _buildActionButton(
         onPressed: () => _cancelReservation(groomId, groomName),
+        // onPressed:() async {
+        //            // Check if tab requires access verification
+        //   bool hasAccess = await _verifyAccessForTab();
+          
+        //   if (!hasAccess) {
+        //     return; // Don't navigate if access is denied
+        //   }
+        //   _cancelReservation(groomId, groomName);
+        // },
         icon: Icons.close_rounded,
         label: 'إلغاء',
         color: Colors.red.shade400,
@@ -1127,7 +1425,16 @@ Widget _buildModernActionButtons(Map<String, dynamic> reservation, String status
     
     buttons.add(
       _buildActionButton(
-        onPressed: () => _cancelReservation(groomId, groomName),
+        // onPressed: () => _cancelReservation(groomId, groomName),
+        onPressed:() async {
+                   // Check if tab requires access verification
+          bool hasAccess = await _verifyAccessForTab();
+          
+          if (!hasAccess) {
+            return; // Don't navigate if access is denied
+          }
+          _cancelReservation(groomId, groomName);
+        },
         icon: Icons.close_rounded,
         label: 'إلغاء',
         color: Colors.red.shade400,

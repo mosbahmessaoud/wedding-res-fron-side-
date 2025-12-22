@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
 import '../../../services/api_service.dart';
 import '../../../utils/colors.dart';
 import 'hall_form_dialog.dart';
@@ -243,6 +244,8 @@ Future<void> _loadInitialData() async {
   }
 @override
 Widget build(BuildContext context) {
+
+  final isDark = Theme.of(context).brightness == Brightness.dark;
   return Scaffold(
     appBar: AppBar(
       title: Text('إدارة القاعات',
@@ -251,7 +254,22 @@ Widget build(BuildContext context) {
           fontSize: 18,
         ),
       ),
-      backgroundColor: AppColors.primary,
+      flexibleSpace: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    isDark ? AppColors.primary.withOpacity(0.4):AppColors.primary.withOpacity(0.8) ,
+                    AppColors.primary,
+                    AppColors.primary,
+                    isDark ? AppColors.primary.withOpacity(0.4):AppColors.primary.withOpacity(0.8) ,
+                    // isDark ? AppColors.primary.withOpacity(0.4):const Color.fromARGB(255, 130, 161, 112).withOpacity(0.9),
+                    
+                  ],
+                ),
+              ),
+            ),
       foregroundColor: Colors.white,
       systemOverlayStyle: SystemUiOverlayStyle.light,
       leading: IconButton(

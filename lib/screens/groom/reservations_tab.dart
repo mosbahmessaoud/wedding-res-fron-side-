@@ -831,6 +831,7 @@ Widget build(BuildContext context) {
                   icon: const Icon(Icons.cancel),
                   label: const Text('إلغاء الحجز'),
                   style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     backgroundColor: Colors.red,
                     foregroundColor: Colors.white,
                   ),
@@ -1223,66 +1224,66 @@ Widget build(BuildContext context) {
                 },
               ),
             ],
-            
             // Enhanced PDF Download Section (only show if not cancelled)
             if (!isCancelled) ...[
               const SizedBox(height: 16),
-              _buildDetailSection('تحميل ومشاركة الملفات', [
+              _buildDetailSection('تحميل ومشاركة', [
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: Theme.of(context).brightness == Brightness.dark
-                        ? Colors.green.withOpacity(0.15)
-                        : Colors.green.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
+                        ? Colors.green.withOpacity(0.1)
+                        : Colors.green.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(10),
                     border: Border.all(
-                      color: Theme.of(context).brightness == Brightness.dark
-                          ? Colors.green.withOpacity(0.4)
-                          : Colors.green.withOpacity(0.3),
+                      color: Colors.green.withOpacity(0.3),
+                      width: 1,
                     ),
                   ),
                   child: Column(
                     children: [
                       Icon(
                         Icons.picture_as_pdf,
-                        size: 48,
+                        size: 32,
                         color: Colors.green,
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'ملف الحجز جاهز للتحميل والمشاركة',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.green,
-                        ),
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'يمكنك تحميل ملف PDF أو مشاركته مباشرة',
+                        'ملف PDF جاهز',
                         style: TextStyle(
                           fontSize: 14,
-                          color: _getTextColor(context),
+                          fontWeight: FontWeight.w600,
+                          color: Colors.green,
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 4),
+                      Text(
+                        'حمّل أو شارك الملف',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
                       Row(
                         children: [
                           Expanded(
                             child: ElevatedButton.icon(
                               onPressed: () => _downloadPdf(reservation['id']),
-                              icon: const Icon(Icons.download),
-                              label: const Text('تحميل ملف PDF'),
+                              icon: const Icon(Icons.download, size: 16),
+                              label: const Text('تحميل', style: TextStyle(fontSize: 13)),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.green,
                                 foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
                               ),
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          
+                          const SizedBox(width: 8),
                           Expanded(
                             child: ElevatedButton.icon(
                               onPressed: () async {
@@ -1290,15 +1291,18 @@ Widget build(BuildContext context) {
                                   final pdfBytes = await _ensurePdfAndDownload(reservation['id']);
                                   await _sharePdf(reservation['id'], pdfBytes);
                                 } catch (e) {
-                                  _showSnackBar('خطأ في مشاركة الملف: $e', Colors.red);
+                                  _showSnackBar('خطأ في المشاركة', Colors.red);
                                 }
                               },
-                              icon: const Icon(Icons.share),
-                              label: const Text('مشاركة الملف'),
+                              icon: const Icon(Icons.share, size: 16),
+                              label: const Text('مشاركة', style: TextStyle(fontSize: 13)),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.blue,
                                 foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
                               ),
                             ),
                           ),
@@ -1309,6 +1313,91 @@ Widget build(BuildContext context) {
                 ),
               ]),
             ],
+            // // Enhanced PDF Download Section (only show if not cancelled)
+            // if (!isCancelled) ...[
+            //   const SizedBox(height: 16),
+            //   _buildDetailSection('تحميل ومشاركة الملفات', [
+            //     Container(
+            //       width: double.infinity,
+            //       padding: const EdgeInsets.all(16),
+            //       decoration: BoxDecoration(
+            //         color: Theme.of(context).brightness == Brightness.dark
+            //             ? Colors.green.withOpacity(0.15)
+            //             : Colors.green.withOpacity(0.1),
+            //         borderRadius: BorderRadius.circular(12),
+            //         border: Border.all(
+            //           color: Theme.of(context).brightness == Brightness.dark
+            //               ? Colors.green.withOpacity(0.4)
+            //               : Colors.green.withOpacity(0.3),
+            //         ),
+            //       ),
+            //       child: Column(
+            //         children: [
+            //           Icon(
+            //             Icons.picture_as_pdf,
+            //             size: 48,
+            //             color: Colors.green,
+            //           ),
+            //           const SizedBox(height: 12),
+            //           Text(
+            //             'ملف الحجز جاهز للتحميل والمشاركة',
+            //             style: TextStyle(
+            //               fontSize: 16,
+            //               fontWeight: FontWeight.bold,
+            //               color: Colors.green,
+            //             ),
+            //           ),
+            //           const SizedBox(height: 8),
+            //           Text(
+            //             'يمكنك تحميل ملف PDF أو مشاركته مباشرة',
+            //             style: TextStyle(
+            //               fontSize: 14,
+            //               color: _getTextColor(context),
+            //             ),
+            //           ),
+            //           const SizedBox(height: 16),
+            //           Row(
+            //             children: [
+            //               Expanded(
+            //                 child: ElevatedButton.icon(
+            //                   onPressed: () => _downloadPdf(reservation['id']),
+            //                   icon: const Icon(Icons.download),
+            //                   label: const Text('تحميل ملف PDF'),
+            //                   style: ElevatedButton.styleFrom(
+            //                     backgroundColor: Colors.green,
+            //                     foregroundColor: Colors.white,
+            //                     padding: const EdgeInsets.symmetric(vertical: 12),
+            //                   ),
+            //                 ),
+            //               ),
+            //               const SizedBox(width: 12),
+                          
+            //               Expanded(
+            //                 child: ElevatedButton.icon(
+            //                   onPressed: () async {
+            //                     try {
+            //                       final pdfBytes = await _ensurePdfAndDownload(reservation['id']);
+            //                       await _sharePdf(reservation['id'], pdfBytes);
+            //                     } catch (e) {
+            //                       _showSnackBar('خطأ في مشاركة الملف: $e', Colors.red);
+            //                     }
+            //                   },
+            //                   icon: const Icon(Icons.share),
+            //                   label: const Text('مشاركة الملف'),
+            //                   style: ElevatedButton.styleFrom(
+            //                     backgroundColor: Colors.blue,
+            //                     foregroundColor: Colors.white,
+            //                     padding: const EdgeInsets.symmetric(vertical: 12),
+            //                   ),
+            //                 ),
+            //               ),
+            //             ],
+            //           ),
+            //         ],
+            //       ),
+            //     ),
+            //   ]),
+            // ],
             
             if (showActions && actions.isNotEmpty) ...[
               const SizedBox(height: 20),
@@ -1843,6 +1932,108 @@ Future<void> _sharePdf(int reservationId, Uint8List pdfBytes) async {
 //   );
 // }
 // Replace the _showPdfActionsDialog method with this updated version:
+
+
+ 
+
+// void _showPdfActionsDialog(String filePath, int reservationId, Uint8List pdfBytes) {
+//   if (!mounted) return;
+  
+//   final isDesktop = Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+//   final isDark = Theme.of(context).brightness == Brightness.dark;
+  
+//   showDialog(
+//     context: context,
+//     builder: (context) => AlertDialog(
+//       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+//       title: Row(
+//         children: [
+//           Icon(Icons.check_circle, color: Colors.green, size: 28),
+//           SizedBox(width: 8),
+//           Text('تم التحميل بنجاح'),
+//         ],
+//       ),
+//       content: Column(
+//         mainAxisSize: MainAxisSize.min,
+//         crossAxisAlignment: CrossAxisAlignment.start,
+//         children: [
+//           Text('تم حفظ الملف في:', style: TextStyle(color: _getTextColor(context))),
+//           SizedBox(height: 8),
+//           Container(
+//             padding: EdgeInsets.all(12),
+//             decoration: BoxDecoration(
+//               color: isDark ? Colors.grey[800] : Colors.grey[200],
+//               borderRadius: BorderRadius.circular(8),
+//               border: Border.all(
+//                 color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+//               ),
+//             ),
+//             child: SelectableText(
+//               filePath,
+//               style: TextStyle(
+//                 fontSize: 12,
+//                 fontFamily: 'monospace',
+//                 color: _getTextColor(context),
+//               ),
+//             ),
+//           ),
+//           SizedBox(height: 16),
+//           Row(
+//             children: [
+//               Icon(Icons.folder, color: Colors.blue, size: 18),
+//               SizedBox(width: 8),
+//               Expanded(
+//                 child: Text(
+//                   isDesktop 
+//                       ? 'الملف محفوظ في مجلد التحميلات'
+//                       : 'الملف محفوظ في مجلد التحميلات',
+//                   style: TextStyle(fontSize: 12, color: Colors.blue[700]),
+//                 ),
+//               ),
+//             ],
+//           ),
+//         ],
+//       ),
+//       actions: [
+//         TextButton(
+//           onPressed: () => Navigator.pop(context),
+//           child: const Text('إغلاق'),
+//         ),
+//         if (!isDesktop)
+//           ElevatedButton.icon(
+//             onPressed: () async {
+//               Navigator.pop(context);
+//               await _sharePdf(reservationId, pdfBytes);
+//             },
+//             icon: const Icon(Icons.share, size: 18),
+//             label: const Text('مشاركة'),
+//             style: ElevatedButton.styleFrom(
+//               backgroundColor: Colors.blue,
+//               foregroundColor: Colors.white,
+//               shape: RoundedRectangleBorder(
+//                 borderRadius: BorderRadius.circular(8),
+//               ),
+//             ),
+//           ),
+//         ElevatedButton.icon(
+//           onPressed: () async {
+//             Navigator.pop(context);
+//             await _openPdfFile(filePath);
+//           },
+//           icon: const Icon(Icons.open_in_new, size: 18),
+//           label: const Text('فتح الملف'),
+//           style: ElevatedButton.styleFrom(
+//             backgroundColor: Colors.green,
+//             foregroundColor: Colors.white,
+//             shape: RoundedRectangleBorder(
+//               borderRadius: BorderRadius.circular(8),
+//             ),
+//           ),
+//         ),
+//       ],
+//     ),
+//   );
+// }
 void _showPdfActionsDialog(String filePath, int reservationId, Uint8List pdfBytes) {
   if (!mounted) return;
   
@@ -1852,49 +2043,46 @@ void _showPdfActionsDialog(String filePath, int reservationId, Uint8List pdfByte
   showDialog(
     context: context,
     builder: (context) => AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       title: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.check_circle, color: Colors.green, size: 28),
-          SizedBox(width: 8),
-          Text('تم التحميل بنجاح'),
+          Icon(Icons.check_circle, color: Colors.green, size: 22),
+          SizedBox(width: 6),
+          Text('تم التحميل', style: TextStyle(fontSize: 16)),
         ],
       ),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('تم حفظ الملف في:', style: TextStyle(color: _getTextColor(context))),
-          SizedBox(height: 8),
+          Text(
+            'الملف:',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+          ),
+          SizedBox(height: 6),
           Container(
-            padding: EdgeInsets.all(12),
+            padding: EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: isDark ? Colors.grey[800] : Colors.grey[200],
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
-              ),
+              color: isDark ? Colors.grey[800] : Colors.grey[100],
+              borderRadius: BorderRadius.circular(6),
             ),
-            child: SelectableText(
-              filePath,
-              style: TextStyle(
-                fontSize: 12,
-                fontFamily: 'monospace',
-                color: _getTextColor(context),
-              ),
+            child: Text(
+              filePath.split('/').last,
+              style: TextStyle(fontSize: 11),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
-          SizedBox(height: 16),
+          SizedBox(height: 8),
           Row(
             children: [
-              Icon(Icons.folder, color: Colors.blue, size: 18),
-              SizedBox(width: 8),
+              Icon(Icons.folder, color: Colors.blue, size: 14),
+              SizedBox(width: 4),
               Expanded(
                 child: Text(
-                  isDesktop 
-                      ? 'الملف محفوظ في مجلد التحميلات'
-                      : 'الملف محفوظ في مجلد التحميلات',
-                  style: TextStyle(fontSize: 12, color: Colors.blue[700]),
+                  'مجلد التحميلات',
+                  style: TextStyle(fontSize: 11, color: Colors.grey[600]),
                 ),
               ),
             ],
@@ -1904,36 +2092,30 @@ void _showPdfActionsDialog(String filePath, int reservationId, Uint8List pdfByte
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('إغلاق'),
+          child: Text('إغلاق', style: TextStyle(fontSize: 13)),
         ),
         if (!isDesktop)
-          ElevatedButton.icon(
+          TextButton.icon(
             onPressed: () async {
               Navigator.pop(context);
               await _sharePdf(reservationId, pdfBytes);
             },
-            icon: const Icon(Icons.share, size: 18),
-            label: const Text('مشاركة'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
+            icon: Icon(Icons.share, size: 16),
+            label: Text('مشاركة', style: TextStyle(fontSize: 13)),
           ),
         ElevatedButton.icon(
           onPressed: () async {
             Navigator.pop(context);
             await _openPdfFile(filePath);
           },
-          icon: const Icon(Icons.open_in_new, size: 18),
-          label: const Text('فتح الملف'),
+          icon: Icon(Icons.open_in_new, size: 16),
+          label: Text('فتح', style: TextStyle(fontSize: 13)),
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.green,
             foregroundColor: Colors.white,
+            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(6),
             ),
           ),
         ),

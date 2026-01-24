@@ -669,7 +669,7 @@ PreferredSizeWidget _buildSliverAppBar(bool isMobile) {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'مرحباً $_adminName  \n$_ClanName',
+                      '$_ClanName',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: isMobile ? 22 : (isTablet ? 32 : 28),

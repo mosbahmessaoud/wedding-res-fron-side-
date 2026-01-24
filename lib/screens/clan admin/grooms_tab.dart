@@ -1,4 +1,3 @@
-
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -7,9 +6,7 @@ import 'package:wedding_reservation_app/screens/auth/sing_up_screen.dart';
 import 'package:wedding_reservation_app/screens/super%20admin/otp_verification_screen.dart';
 import 'package:wedding_reservation_app/services/api_service.dart';
 import 'package:wedding_reservation_app/utils/colors.dart';
-// Add your AdminOTPScreen import here
-// import 'admin_otp_screen.dart';
- 
+
 class GroomManagementScreen extends StatefulWidget {
   const GroomManagementScreen({Key? key}) : super(key: key);
 
@@ -17,26 +14,29 @@ class GroomManagementScreen extends StatefulWidget {
   State<GroomManagementScreen> createState() => GroomManagementScreenState();
 }
 
-
-
-
 class GroomManagementScreenState extends State<GroomManagementScreen> {
   List<Map<String, dynamic>> grooms = [];
+  List<Map<String, dynamic>> filteredGrooms = [];
   bool isLoading = true;
   String? errorMessage;
-  // ADD THESE NEW VARIABLES:
   bool _hasAccessPassword = false;
-  bool _isVerifyingAccess = false;
-
-
-  List<Map<String, dynamic>> filteredGrooms = []; // NEW
-
-  // NEW: Search and filter variables
+  bool _isGridView = true; 
+  
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
-  String _statusFilter = 'all'; // all, active, inactive
-  String _reservationFilter = 'all'; // all, validated, pending, cancelled, none
+  String _statusFilter = 'all';
+  String _reservationFilter = 'all';
   bool _showFilters = false;
+
+int _getCrossAxisCount(BuildContext context) {
+  final width = MediaQuery.of(context).size.width;
+  
+  if (width < 600) return 2;
+  if (width < 1100) return 3;
+  if (width < 1400) return 4;
+  if (width < 1700) return 5;
+  return 6;
+}
 
 
   @override
@@ -44,25 +44,20 @@ class GroomManagementScreenState extends State<GroomManagementScreen> {
     super.initState();
     _checkConnectivityAndLoad();
     _checkAccessPassword();
-    _searchController.addListener(_onSearchChanged); // NEW
-
+    _searchController.addListener(_onSearchChanged);
   }
-@override
+
+  @override
   void dispose() {
-    _searchController.dispose(); // NEW
+    _searchController.dispose();
     super.dispose();
   }
- void refreshData() {
-    // Add your refresh logic here
+
+  void refreshData() {
     _checkConnectivityAndLoad();
     _checkAccessPassword();
-    setState(() {
-      // Trigger rebuild
-
-    });
   }
 
- // NEW: Search handler
   void _onSearchChanged() {
     setState(() {
       _searchQuery = _searchController.text.toLowerCase();
@@ -70,356 +65,185 @@ class GroomManagementScreenState extends State<GroomManagementScreen> {
     });
   }
 
-void _applyFilters() {
-  filteredGrooms = grooms.where((groom) {
-    // Search filter
-    if (_searchQuery.isNotEmpty) {
-      final fullName = '${groom['first_name'] ?? ''} ${groom['last_name'] ?? ''}'.toLowerCase();
-      final phone = groom['phone_number']?.toString().toLowerCase() ?? '';
-      
-      if (!fullName.contains(_searchQuery) && !phone.contains(_searchQuery)) {
-        return false;
+  void _applyFilters() {
+    filteredGrooms = grooms.where((groom) {
+      if (_searchQuery.isNotEmpty) {
+        final fullName = '${groom['first_name'] ?? ''} ${groom['last_name'] ?? ''}'.toLowerCase();
+        final phone = groom['phone_number']?.toString().toLowerCase() ?? '';
+        if (!fullName.contains(_searchQuery) && !phone.contains(_searchQuery)) return false;
       }
-    }
-
-    // Status filter
-    if (_statusFilter != 'all') {
-      final status = groom['status']?.toString() ?? 'inactive';
-      if (status != _statusFilter) {
-        return false;
+      if (_statusFilter != 'all') {
+        final status = groom['status']?.toString() ?? 'inactive';
+        if (status != _statusFilter) return false;
       }
-    }
-
-    return true;
-  }).toList();
-  
-  // Apply reservation filter if active
-  if (_reservationFilter != 'all') {
-    _applyReservationFilterSync();
-  }
-}
-
-void _applyReservationFilterSync() {
-  if (_reservationFilter == 'all') {
-    return;
+      return true;
+    }).toList();
+    
+    if (_reservationFilter != 'all') _applyReservationFilterSync();
   }
 
-  // This will trigger async fetch when filter chips are tapped
-  // We'll update filteredGrooms after fetching
-}
-
-
-// ==================== UPDATED ASYNC RESERVATION FILTER ====================
-Future<void> _applyReservationFilter() async {
-  print('🔧 Applying reservation filter: $_reservationFilter');
-  
-  if (_reservationFilter == 'all') {
-    _applyFilters();
-    return;
+  void _applyReservationFilterSync() {
+    if (_reservationFilter == 'all') return;
   }
 
-  setState(() {
-    isLoading = true;
-  });
+  Future<void> _applyReservationFilter() async {
+    if (_reservationFilter == 'all') {
+      _applyFilters();
+      return;
+    }
 
-  try {
-    // Get all reservations once based on filter type
-    List<dynamic> allReservations = [];
-    
-    if (_reservationFilter == 'validated') {
-      allReservations = await ApiService.getValidatedReservations();
-    } else if (_reservationFilter == 'pending_validation') {
-      allReservations = await ApiService.getPendingReservations();
-    } else if (_reservationFilter == 'cancelled') {
-      allReservations = await ApiService.getCancelledReservations();
-    }
-    
-    print('📊 Total ${_reservationFilter} reservations: ${allReservations.length}');
-    
-    // Create a set of groom IDs that have this type of reservation
-    final Set<int> groomIdsWithReservations = {};
-    for (var reservation in allReservations) {
-      final groomId = int.tryParse(reservation['groom_id'].toString());
-      if (groomId != null) {
-        groomIdsWithReservations.add(groomId);
+    setState(() => isLoading = true);
+
+    try {
+      List<dynamic> allReservations = [];
+      
+      if (_reservationFilter == 'validated') {
+        allReservations = await ApiService.getValidatedReservations();
+      } else if (_reservationFilter == 'pending_validation') {
+        allReservations = await ApiService.getPendingReservations();
+      } else if (_reservationFilter == 'cancelled') {
+        allReservations = await ApiService.getCancelledReservations();
       }
-    }
-    
-    print('👥 Groom IDs with $_reservationFilter reservations: $groomIdsWithReservations');
-    
-    // Start with already filtered grooms (by search and status)
-    List<Map<String, dynamic>> temp = [];
-    
-    // Apply reservation filter
-    for (var groom in filteredGrooms) {
-      final groomId = groom['id'] as int?;
-      if (groomId == null) continue;
       
-      final hasReservation = groomIdsWithReservations.contains(groomId);
+      final Set<int> groomIdsWithReservations = {};
+      for (var reservation in allReservations) {
+        final groomId = int.tryParse(reservation['groom_id'].toString());
+        if (groomId != null) groomIdsWithReservations.add(groomId);
+      }
       
-      if (_reservationFilter == 'none') {
-        // Include only grooms WITHOUT any active reservation
-        if (!hasReservation) {
-          print('✅ Adding groom $groomId (no reservation)');
-          temp.add(groom);
-        }
-      } else {
-        // Include grooms WITH matching reservation status
-        if (hasReservation) {
-          print('✅ Adding groom $groomId (has $_reservationFilter reservation)');
-          temp.add(groom);
+      List<Map<String, dynamic>> temp = [];
+      
+      for (var groom in filteredGrooms) {
+        final groomId = groom['id'] as int?;
+        if (groomId == null) continue;
+        
+        final hasReservation = groomIdsWithReservations.contains(groomId);
+        
+        if (_reservationFilter == 'none') {
+          if (!hasReservation) temp.add(groom);
+        } else {
+          if (hasReservation) temp.add(groom);
         }
       }
-    }
-    
-    print('📊 Filtered result: ${temp.length} grooms');
-    
-    setState(() {
-      filteredGrooms = temp;
-      isLoading = false;
-    });
-  } catch (e) {
-    print('❌ Error in _applyReservationFilter: $e');
-    setState(() {
-      isLoading = false;
-    });
-    
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('خطأ في تطبيق الفلتر: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      
+      setState(() {
+        filteredGrooms = temp;
+        isLoading = false;
+      });
+    } catch (e) {
+      setState(() => isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('خطأ في تطبيق الفلتر: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
-}
 
-// ADD THIS NEW METHOD:
-Future<void> _checkAccessPassword() async {
-  try {
-    final hasPassword = await ApiService.hasAccessPassword();
-    setState(() {
-      _hasAccessPassword = hasPassword;
-    });
-  } catch (e) {
-    print('Error checking access password: $e');
-    setState(() {
-      _hasAccessPassword = false;
-    });
-  }
-}
-  // Method to verify access before navigating to protected tabs
-Future<bool> _verifyAccessForTab() async {
-  
-
-  await _checkAccessPassword();
-  // Check if user has access password set
-  if (!_hasAccessPassword) {
-    _showAccessPasswordNotSetDialog();
-    return false;
+  Future<void> _checkAccessPassword() async {
+    try {
+      final hasPassword = await ApiService.hasAccessPassword();
+      setState(() => _hasAccessPassword = hasPassword);
+    } catch (e) {
+      setState(() => _hasAccessPassword = false);
+    }
   }
 
-  // Show password verification dialog
-  return await _showAccessPasswordDialog();
-}
+  Future<bool> _verifyAccessForTab() async {
+    await _checkAccessPassword();
+    if (!_hasAccessPassword) {
+      _showAccessPasswordNotSetDialog();
+      return false;
+    }
+    return await _showAccessPasswordDialog();
+  }
 
-
-// Dialog when user doesn't have access password
-void _showAccessPasswordNotSetDialog() {
-  final isDark = Theme.of(context).brightness == Brightness.dark;
-  
-  showDialog(
-    context: context,
-    builder: (context) => AlertDialog(
-      backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      title: Row(
-        children: [
-          Icon(Icons.lock_outline, color: Colors.orange),
-          SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              'كلمة مرور الوصول غير متوفرة',
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                color: isDark ? Colors.white : Colors.black87,
-              ),
-            ),
-          ),
-        ],
-      ),
-      // content: Text(
-      //   'لم يتم تعيين كلمة مرور وصول لحسابك.\nيرجى الاتصال بالمدير الأعلى لإنشاء كلمة مرور.',
-      //   style: TextStyle(
-      //     color: isDark ? Colors.white70 : Colors.black87,
-      //   ),
-      // ),
-      actions: [
-        ElevatedButton(
-          onPressed: () => Navigator.pop(context),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-          ),
-          child: const Text('فهمت', style: TextStyle(color: Colors.white)),
-        ),
-      ],
-    ),
-  );
-}
-// Updated _showAccessPasswordDialog method with loading state
-
-Future<bool> _showAccessPasswordDialog() async {
-  final isDark = Theme.of(context).brightness == Brightness.dark;
-  final passwordController = TextEditingController();
-  bool obscurePassword = true;
-  String? errorMessage;
-  bool isLoading = false; // ADD THIS LINE
-
-  final result = await showDialog<bool>(
-    context: context,
-    barrierDismissible: false,
-    builder: (context) => StatefulBuilder(
-      builder: (context, setDialogState) => AlertDialog(
+  void _showAccessPasswordNotSetDialog() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
         backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
-            Icon(Icons.key, color: AppColors.primary),
+            Icon(Icons.lock_outline, color: Colors.orange),
             SizedBox(width: 8),
             Expanded(
-              child: Text(
-                'أدخل كلمة مرور الوصول',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 18,
-                  color: isDark ? Colors.white : Colors.black87,
-                ),
-              ),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Container(
-            //   padding: const EdgeInsets.all(12),
-            //   decoration: BoxDecoration(
-            //     color: Colors.blue.shade50,
-            //     borderRadius: BorderRadius.circular(8),
-            //     border: Border.all(color: Colors.blue.shade200),
-            //   ),
-            //   child: Row(
-            //     children: const [
-            //       Icon(Icons.info_outline, color: Colors.blue, size: 20),
-            //       SizedBox(width: 8),
-            //       Expanded(
-            //         child: Text(
-            //           'هذه الصفحة محمية. يرجى إدخال كلمة المرور.',
-            //           style: TextStyle(color: Colors.blue, fontSize: 12),
-            //         ),
-            //       ),
-            //     ],
-            //   ),
-            // ),
-            // SizedBox(height: 16),
-            TextField(
-              controller: passwordController,
-              obscureText: obscurePassword,
-              autofocus: true,
-              enabled: !isLoading, // DISABLE WHEN LOADING
-              style: TextStyle(
-                color: isDark ? Colors.white : Colors.black87,
-              ),
-              decoration: InputDecoration(
-                labelText: 'كلمة مرور ',
-                hintText: 'أدخل كلمة المرور',
-                prefixIcon: const Icon(Icons.lock_outline),
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    obscurePassword ? Icons.visibility : Icons.visibility_off,
-                  ),
-                  onPressed: isLoading ? null : () { // DISABLE WHEN LOADING
-                    setDialogState(() {
-                      obscurePassword = !obscurePassword;
-                    });
-                  },
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                errorText: errorMessage,
-              ),
-              onSubmitted: isLoading ? null : (_) async { // DISABLE WHEN LOADING
-                if (passwordController.text.isEmpty) {
-                  setDialogState(() {
-                    errorMessage = 'يرجى إدخال كلمة المرور';
-                  });
-                  return;
-                }
-                
-                // Start loading
-                setDialogState(() {
-                  isLoading = true;
-                  errorMessage = null;
-                }); 
-                
-                try {
-                  final isValid = await ApiService.validateSpecialPageAccess(
-                    passwordController.text,
-                  );
-                  if (isValid) {
-                    Navigator.pop(context, true);
-                  } else {
-                    setDialogState(() {
-                      isLoading = false;
-                      errorMessage = 'كلمة المرور غير صحيحة';
-                    });
-                  }
-                } catch (e) {
-                  setDialogState(() {
-                    isLoading = false;
-                    errorMessage = 'خطأ في التحقق من كلمة المرور';
-                  });
-                }
-              },
+              child: Text('كلمة مرور الوصول غير متوفرة',
+                style: TextStyle(fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black87)),
             ),
           ],
         ),
         actions: [
-          TextButton(
-            onPressed: isLoading ? null : () => Navigator.pop(context, false), // DISABLE WHEN LOADING
-            child: Text(
-              'إلغاء',
-              style: TextStyle(
-                color: isLoading 
-                    ? Colors.grey 
-                    : (isDark ? Colors.white60 : Colors.grey[700]),
-              ),
-            ),
-          ),
           ElevatedButton(
-            onPressed: isLoading ? null : () async { // DISABLE WHEN LOADING
+            onPressed: () => Navigator.pop(context),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+            ),
+            child: const Text('فهمت', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<bool> _showAccessPasswordDialog() async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final passwordController = TextEditingController();
+    bool obscurePassword = true;
+    String? errorMessage;
+    bool isLoading = false;
+
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              Icon(Icons.key, color: AppColors.primary),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text('أدخل كلمة مرور الوصول',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 18, color: isDark ? Colors.white : Colors.black87)),
+              ),
+            ],
+          ),
+          content: TextField(
+            controller: passwordController,
+            obscureText: obscurePassword,
+            autofocus: true,
+            enabled: !isLoading,
+            style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+            decoration: InputDecoration(
+              labelText: 'كلمة مرور',
+              hintText: 'أدخل كلمة المرور',
+              prefixIcon: const Icon(Icons.lock_outline),
+              suffixIcon: IconButton(
+                icon: Icon(obscurePassword ? Icons.visibility : Icons.visibility_off),
+                onPressed: isLoading ? null : () => setDialogState(() => obscurePassword = !obscurePassword),
+              ),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              errorText: errorMessage,
+            ),
+            onSubmitted: isLoading ? null : (_) async {
               if (passwordController.text.isEmpty) {
-                setDialogState(() {
-                  errorMessage = 'يرجى إدخال كلمة المرور';
-                });
+                setDialogState(() => errorMessage = 'يرجى إدخال كلمة المرور');
                 return;
               }
-
-              // Start loading
+              
               setDialogState(() {
                 isLoading = true;
                 errorMessage = null;
               });
-
+              
               try {
-                final isValid = await ApiService.validateSpecialPageAccess(
-                  passwordController.text,
-                );
-
+                final isValid = await ApiService.validateSpecialPageAccess(passwordController.text);
                 if (isValid) {
                   Navigator.pop(context, true);
                 } else {
@@ -435,292 +259,215 @@ Future<bool> _showAccessPasswordDialog() async {
                 });
               }
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: isLoading 
-                  ? Colors.grey 
-                  : AppColors.primary,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-            ),
-            child: isLoading // UPDATED CHILD WITH LOADING INDICATOR
-                ? Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: const [
-                      SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                        ),
-                      ),
-                      SizedBox(width: 8),
-                      Text('جاري التحقق...', style: TextStyle(color: Colors.white)),
-                    ],
-                  )
-                : const Text('تحقق', style: TextStyle(color: Colors.white)),
           ),
-        ],
-      ),
-    ),
-  );
+          actions: [
+            TextButton(
+              onPressed: isLoading ? null : () => Navigator.pop(context, false),
+              child: Text('إلغاء', style: TextStyle(color: isLoading ? Colors.grey : (isDark ? Colors.white60 : Colors.grey[700]))),
+            ),
+            ElevatedButton(
+              onPressed: isLoading ? null : () async {
+                if (passwordController.text.isEmpty) {
+                  setDialogState(() => errorMessage = 'يرجى إدخال كلمة المرور');
+                  return;
+                }
 
-  passwordController.dispose();
-  return result ?? false;  
-}
+                setDialogState(() {
+                  isLoading = true;
+                  errorMessage = null;
+                });
+
+                try {
+                  final isValid = await ApiService.validateSpecialPageAccess(passwordController.text);
+                  if (isValid) {
+                    Navigator.pop(context, true);
+                  } else {
+                    setDialogState(() {
+                      isLoading = false;
+                      errorMessage = 'كلمة المرور غير صحيحة';
+                    });
+                  }
+                } catch (e) {
+                  setDialogState(() {
+                    isLoading = false;
+                    errorMessage = 'خطأ في التحقق من كلمة المرور';
+                  });
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: isLoading ? Colors.grey : AppColors.primary,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+              ),
+              child: isLoading
+                  ? Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white))),
+                        SizedBox(width: 8),
+                        Text('جاري التحقق...', style: TextStyle(color: Colors.white)),
+                      ],
+                    )
+                  : const Text('تحقق', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    passwordController.dispose();
+    return result ?? false;
+  }
 
   Future<void> _checkConnectivityAndLoad() async {
-  setState(() {
-    isLoading = true;
-  });
-  
-  // Show loading for 2 seconds
-  await Future.delayed(Duration(seconds: 2));
-  final connectivityResult = await Connectivity().checkConnectivity();
-  
-  if (connectivityResult.contains(ConnectivityResult.none)) {
-    _showNoInternetDialog();
-    setState(() {
-      isLoading = false;
-    });
-    return;
+    setState(() => isLoading = true);
+    await Future.delayed(Duration(seconds: 2));
+    final connectivityResult = await Connectivity().checkConnectivity();
+    
+    if (connectivityResult.contains(ConnectivityResult.none)) {
+      _showNoInternetDialog();
+      setState(() => isLoading = false);
+      return;
+    }
+    
+    await _loadGrooms();
   }
-  
-  await _loadGrooms();
-}
 
-void _showNoInternetDialog() {
-  showDialog(
-    context: context,
-    barrierDismissible: false,
-    builder: (context) => AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: Row(
-        children: [
-          Icon(Icons.wifi_off, color: Colors.orange),
-          SizedBox(width: 10),
-          Text('لا يوجد اتصال'),
-        ],
-      ),
-      content: Text('يرجى التحقق من اتصالك بالإنترنت'),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text('إلغاء'),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            Navigator.pop(context);
-            _checkConnectivityAndLoad();
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-          child: Text('إعادة المحاولة', style: TextStyle(color: Colors.white)),
-        ),
-      ],
-    ),
-  );
-}
-
-
-  void _showViewGroomDialog(Map<String, dynamic> groom) {
+  void _showNoInternetDialog() {
     showDialog(
       context: context,
-      builder: (context) => ViewGroomDetailsDialog(groom: groom),
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Icon(Icons.wifi_off, color: Colors.orange),
+            SizedBox(width: 10),
+            Text('لا يوجد اتصال'),
+          ],
+        ),
+        content: Text('يرجى التحقق من اتصالك بالإنترنت'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: Text('إلغاء')),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _checkConnectivityAndLoad();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: Text('إعادة المحاولة', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
     );
   }
 
-
-//   Future<Map<String, dynamic>?> _getGroomReservationStatus(int groomId) async {
-//   try {
-//     // First check for validated reservation (highest priority)
-//     try {
-//       final validated = await ApiService.getMyValidatedReservation();
-//       if (validated.isNotEmpty && validated['groom_id'] == groomId) {
-//         return {
-//           'status': 'validated',
-//           'reservation': validated,
-//           'priority': 1
-//         };
-//       }
-//     } catch (e) {
-//       // No validated reservation found, continue checking
-//     }
-
-//     // Check for pending reservation (second priority)
-//     try {
-//       final pending = await ApiService.getMyPendingReservation();
-//       if (pending.isNotEmpty && pending['groom_id'] == groomId) {
-//         return {
-//           'status': 'pending_validation',
-//           'reservation': pending,
-//           'priority': 2
-//         };
-//       }
-//     } catch (e) {
-//       // No pending reservation found, continue checking
-//     }
-
-//     // Check for cancelled reservations (lowest priority)
-//     try {
-//       final cancelled = await ApiService.getMyCancelledReservations();
-//       if (cancelled.isNotEmpty) {
-//         // Find the most recent cancelled reservation for this groom
-//         final groomCancelled = cancelled.where((res) => res['groom_id'] == groomId).toList();
-//         if (groomCancelled.isNotEmpty) {
-//           // Sort by date and get the most recent
-//           groomCancelled.sort((a, b) => 
-//             DateTime.parse(b['created_at'] ?? '').compareTo(DateTime.parse(a['created_at'] ?? ''))
-//           );
-//           return {
-//             'status': 'cancelled',
-//             'reservation': groomCancelled.first,
-//             'priority': 3
-//           };
-//         }
-//       }
-//     } catch (e) {
-//       // No cancelled reservations found
-//     }
-
-//     // No reservation found
-//     return null;
-//   } catch (e) {
-//     print('Error getting reservation status: $e');
-//     return null;
-//   }
-// }
-static Future<Map<String, dynamic>?> _getGroomReservationStatus(int groomId) async {
-  try {
-    print('🔍 ViewDialog: Checking reservation for groomId: $groomId');
-    
-    // Priority 1: Validated reservation
+  static Future<Map<String, dynamic>?> _getGroomReservationStatus(int groomId) async {
     try {
-      final validatedList = await ApiService.getValidatedReservations();
-      for (var res in validatedList) {
-        final resGroomId = int.tryParse(res['groom_id'].toString());
-        if (resGroomId == groomId) {
-          print('✅ ViewDialog: Found validated reservation');
-          return {'status': 'validated', 'reservation': res, 'priority': 1};
+      try {
+        final validatedList = await ApiService.getValidatedReservations();
+        for (var res in validatedList) {
+          final resGroomId = int.tryParse(res['groom_id'].toString());
+          if (resGroomId == groomId) return {'status': 'validated', 'reservation': res, 'priority': 1};
         }
-      }
-    } catch (e) {
-      print('⚠️ ViewDialog: Error checking validated: $e');
-    }
+      } catch (_) {}
 
-    // Priority 2: Pending reservation
-    try {
-      final pendingList = await ApiService.getPendingReservations();
-      for (var res in pendingList) {
-        final resGroomId = int.tryParse(res['groom_id'].toString());
-        if (resGroomId == groomId) {
-          print('✅ ViewDialog: Found pending reservation');
-          return {'status': 'pending_validation', 'reservation': res, 'priority': 2};
+      try {
+        final pendingList = await ApiService.getPendingReservations();
+        for (var res in pendingList) {
+          final resGroomId = int.tryParse(res['groom_id'].toString());
+          if (resGroomId == groomId) return {'status': 'pending_validation', 'reservation': res, 'priority': 2};
         }
-      }
-    } catch (e) {
-      print('⚠️ ViewDialog: Error checking pending: $e');
-    }
+      } catch (_) {}
 
-    // Priority 3: Most recent cancelled reservation
-    try {
-      final cancelledList = await ApiService.getCancelledReservations();
-      final groomCancelled = <Map<String, dynamic>>[];
-      
-      for (var res in cancelledList) {
-        final resGroomId = int.tryParse(res['groom_id'].toString());
-        if (resGroomId == groomId) {
-          groomCancelled.add(res);
+      try {
+        final cancelledList = await ApiService.getCancelledReservations();
+        final groomCancelled = <Map<String, dynamic>>[];
+        
+        for (var res in cancelledList) {
+          final resGroomId = int.tryParse(res['groom_id'].toString());
+          if (resGroomId == groomId) groomCancelled.add(res);
         }
-      }
-      
-      if (groomCancelled.isNotEmpty) {
-        groomCancelled.sort((a, b) => 
-          (DateTime.tryParse(b['created_at'] ?? '') ?? DateTime(0))
-            .compareTo(DateTime.tryParse(a['created_at'] ?? '') ?? DateTime(0))
-        );
-        print('✅ ViewDialog: Found cancelled reservation');
-        return {'status': 'cancelled', 'reservation': groomCancelled.first, 'priority': 3};
-      }
-    } catch (e) {
-      print('⚠️ ViewDialog: Error checking cancelled: $e');
-    }
+        
+        if (groomCancelled.isNotEmpty) {
+          groomCancelled.sort((a, b) => 
+            (DateTime.tryParse(b['created_at'] ?? '') ?? DateTime(0))
+              .compareTo(DateTime.tryParse(a['created_at'] ?? '') ?? DateTime(0))
+          );
+          return {'status': 'cancelled', 'reservation': groomCancelled.first, 'priority': 3};
+        }
+      } catch (_) {}
 
-    print('🚫 ViewDialog: No reservation found');
-    return null;
-  } catch (e) {
-    print('💥 ViewDialog: Error getting reservation status: $e');
-    return null;
+      return null;
+    } catch (e) {
+      return null;
+    }
   }
-}
 
-// ==================== UPDATED LOAD GROOMS ====================
-Future<void> _loadGrooms() async {
-  setState(() {
-    isLoading = true;
-    errorMessage = null;
-  });
-
-  try {
-    final response = await ApiService.listGrooms();
-    setState(() {
-      grooms = List<Map<String, dynamic>>.from(response);
-      filteredGrooms = grooms; // Initialize filtered list
-      isLoading = false;
-    });
+  Future<void> _loadGrooms() async {
+    if (!mounted) return;
     
-    // Apply filters if any are active
-    if (_searchQuery.isNotEmpty || _statusFilter != 'all' || _reservationFilter != 'all') {
-      _applyFilters();
-      if (_reservationFilter != 'all') {
-        await _applyReservationFilter();
-      }
-    }
-  } catch (e) {
     setState(() {
-      errorMessage = e.toString();
-      isLoading = false;
+      isLoading = true;
+      errorMessage = null;
+    });
+
+    try {
+      final response = await ApiService.listGrooms();
+      
+      if (!mounted) return;
+      
+      setState(() {
+        grooms = List<Map<String, dynamic>>.from(response);
+        filteredGrooms = List<Map<String, dynamic>>.from(grooms);
+        isLoading = false;
+      });
+      
+      if (mounted && (_searchQuery.isNotEmpty || _statusFilter != 'all' || _reservationFilter != 'all')) {
+        _applyFilters();
+        if (_reservationFilter != 'all') await _applyReservationFilter();
+      }
+    } catch (e) {
+      if (!mounted) return;
+      
+      setState(() {
+        errorMessage = e.toString();
+        isLoading = false;
+        grooms = [];
+        filteredGrooms = [];
+      });
+    }
+  }
+
+  void _clearFilters() {
+    setState(() {
+      _searchController.clear();
+      _searchQuery = '';
+      _statusFilter = 'all';
+      _reservationFilter = 'all';
+      filteredGrooms = grooms;
     });
   }
-}
-// ==================== UPDATED CLEAR FILTERS ====================
-void _clearFilters() {
-  setState(() {
-    _searchController.clear();
-    _searchQuery = '';
-    _statusFilter = 'all';
-    _reservationFilter = 'all';
-    filteredGrooms = grooms; // Reset to all grooms
-  });
-}
 
   Future<void> _updateGroomStatus(String phoneNumber, String currentStatus) async {
     try {
       final newStatus = currentStatus == 'active' ? 'inactive' : 'active';
       await ApiService.updateGroomStatus(phoneNumber, newStatus);
       
-      // Update local state
       setState(() {
         final groomIndex = grooms.indexWhere((g) => g['phone_number']?.toString() == phoneNumber);
-        if (groomIndex != -1) {
-          grooms[groomIndex]['status'] = newStatus;
-        }
+        if (groomIndex != -1) grooms[groomIndex]['status'] = newStatus;
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('تم تحديث حالة العريس بنجاح'),
-          backgroundColor: Colors.green,
-        ),
+        SnackBar(content: Text('تم تحديث حالة العريس بنجاح'), backgroundColor: Colors.green),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('خطأ في تحديث الحالة: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
+        SnackBar(content: Text('خطأ في تحديث الحالة: ${e.toString()}'), backgroundColor: Colors.red),
       );
     }
   }
@@ -732,10 +479,7 @@ void _clearFilters() {
         title: Text('تأكيد الحذف'),
         content: Text('هل أنت متأكد من حذف هذا العريس؟'),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text('إلغاء'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text('إلغاء')),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             child: Text('حذف', style: TextStyle(color: Colors.red)),
@@ -752,17 +496,11 @@ void _clearFilters() {
         });
         
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('تم حذف العريس بنجاح'),
-            backgroundColor: Colors.green,
-          ),
+          SnackBar(content: Text('تم حذف العريس بنجاح'), backgroundColor: Colors.green),
         );
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('خطأ في الحذف: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('خطأ في الحذف: ${e.toString()}'), backgroundColor: Colors.red),
         );
       }
     }
@@ -776,90 +514,784 @@ void _clearFilters() {
         onUpdate: (updatedGroom) {
           setState(() {
             final index = grooms.indexWhere((g) => g['id'] == groom['id']);
-            if (index != -1) {
-              grooms[index] = {...grooms[index], ...updatedGroom};
-            }
+            if (index != -1) grooms[index] = {...grooms[index], ...updatedGroom};
           });
         },
       ),
     );
   }
-Widget _buildGroomCard(Map<String, dynamic> groom) {
+
+  void _showViewGroomDialog(Map<String, dynamic> groom) {
+    showDialog(context: context, builder: (context) => ViewGroomDetailsDialog(groom: groom));
+  }
+
+  // NEW: Modern Grid Card
+  Widget _buildGroomGridCard(int crossAxisCount ,Map<String, dynamic> groom) {
+    if (groom.isEmpty || groom['id'] == null) return SizedBox.shrink();
+    
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final status = groom['status']?.toString() ?? 'inactive';
+    final isActive = status == 'active';
+    final groomId = groom['id'] as int?;
+    
+    return Card(
+      margin: EdgeInsets.all(8),
+      elevation: isDark ? 6 : 3,
+      color: isDark ? Color(0xFF2C2C2C) : Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: () => _showViewGroomDialog(groom),
+        child: Container(
+          padding: EdgeInsets.all(16),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              // Avatar and Status
+              Column(
+                children: [
+                  Stack(
+                    children: [
+                      Container(
+                        width: 70,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: LinearGradient(
+                            colors: isActive 
+                              ? [Colors.green.shade400, Colors.green.shade600]
+                              : [Colors.grey.shade400, Colors.grey.shade600],
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: (isActive ? Colors.green : Colors.grey).withOpacity(0.3),
+                              blurRadius: 10,
+                              offset: Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Icon(Icons.person, color: Colors.white, size: 36),
+                      ),
+                      Positioned(
+                        right: 0,
+                        bottom: 0,
+                        child: Container(
+                          padding: EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: isActive ? Colors.green : Colors.red,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: isDark ? Color(0xFF2C2C2C) : Colors.white, width: 2),
+                          ),
+                          child: Icon(
+                            isActive ? Icons.check : Icons.close,
+                            color: Colors.white,
+                            size: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 12),
+                  Text(
+                    '${groom['first_name'] ?? ''} ${groom['last_name'] ?? ''}',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : Colors.black87,
+                    ),
+                    maxLines: 1,
+                    textAlign: TextAlign.center,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  SizedBox(height: 4),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.phone, size: 12, color: isDark ? Colors.white60 : Colors.grey[600]),
+                      SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          groom['phone_number']?.toString() ?? '',
+                          style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.grey[600]),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              
+              // Reservation Badge
+              if (groomId != null  && crossAxisCount > 2) _buildReservationBadge(groomId),
+              
+              // Action Buttons
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _buildGridActionButton(Icons.visibility, Colors.purple, () => _showViewGroomDialog(groom)),
+                  _buildGridActionButton(Icons.edit, Colors.blue, () async {
+                    bool hasAccess = await _verifyAccessForTab();
+                    if (!hasAccess) return;
+                    _showEditGroomDialog(groom);
+                  }),
+                  _buildGridActionButton(Icons.delete, Colors.red, () async {
+                    bool hasAccess = await _verifyAccessForTab();
+                    if (!hasAccess) return;
+                    _deleteGroom(groom['phone_number']?.toString() ?? '');
+                  }),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGridActionButton(IconData icon, Color color, VoidCallback onPressed) {
+    return InkWell(
+      onTap: onPressed,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(icon, size: 18, color: color),
+      ),
+    );
+  }
+
+  // UPDATED: Modern List Card
+  Widget _buildGroomListCard(Map<String, dynamic> groom) {
+    if (groom.isEmpty || groom['id'] == null) return SizedBox.shrink();
+    
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final status = groom['status']?.toString() ?? 'inactive';
+    final isActive = status == 'active';
+    final groomId = groom['id'] as int?;
+    
+    return Card(
+      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      elevation: isDark ? 6 : 3,
+      color: isDark ? Color(0xFF2C2C2C) : Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: () => _showViewGroomDialog(groom),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: isDark 
+                ? [Color(0xFF2C2C2C), Color(0xFF252525)]
+                : [Colors.white, Colors.grey.shade50],
+            ),
+          ),
+          child: Padding(
+            padding: EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    // Avatar with gradient
+                    Container(
+                      width: 60,
+                      height: 60,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          colors: isActive 
+                            ? [Colors.green.shade400, Colors.green.shade600]
+                            : [Colors.grey.shade400, Colors.grey.shade600],
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: (isActive ? Colors.green : Colors.grey).withOpacity(0.3),
+                            blurRadius: 10,
+                            offset: Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Icon(Icons.person, color: Colors.white, size: 30),
+                    ),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${groom['first_name'] ?? ''} ${groom['last_name'] ?? ''}',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? Colors.white : Colors.black87,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          SizedBox(height: 6),
+                          Container(
+                            padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: isDark ? Colors.black26 : Colors.grey.shade100,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.phone, size: 14, color: AppColors.primary),
+                                SizedBox(width: 4),
+                                Text(
+                                  groom['phone_number']?.toString() ?? '',
+                                  style: TextStyle(
+                                    fontSize: 14, 
+                                    color: isDark ? Colors.white70 : Colors.grey[700],
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: isActive 
+                                ? [Colors.green, Colors.green.shade700]
+                                : [Colors.red, Colors.red.shade700],
+                            ),
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color: (isActive ? Colors.green : Colors.red).withOpacity(0.3),
+                                blurRadius: 6,
+                                offset: Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Text(
+                            isActive ? 'نشط' : 'غير نشط',
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
+                          ),
+                        ),
+                        if (groomId != null) ...[
+                          SizedBox(height: 6),
+                          _buildReservationBadge(groomId),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+                SizedBox(height: 16),
+                Divider(height: 1, color: isDark ? Colors.white12 : Colors.grey.shade200),
+                SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _buildModernActionButton(
+                      icon: Icons.visibility,
+                      label: 'عرض',
+                      color: Colors.purple,
+                      onPressed: () => _showViewGroomDialog(groom),
+                      isDark: isDark,
+                    ),
+                    _buildModernActionButton(
+                      icon: Icons.edit,
+                      label: 'تعديل',
+                      color: Colors.blue,
+                      onPressed: () async {
+                        bool hasAccess = await _verifyAccessForTab();
+                        if (!hasAccess) return;
+                        _showEditGroomDialog(groom);
+                      },
+
+                      isDark: isDark,
+                    ),
+                    _buildModernActionButton(
+                      icon: isActive ? Icons.visibility_off : Icons.visibility,
+                      label: isActive ? 'إيقاف' : 'تفعيل',
+                      color: isActive ? Colors.orange : Colors.green,
+                      onPressed: () => _updateGroomStatus(groom['phone_number']?.toString() ?? '', status),
+                      isDark: isDark,
+                    ),
+                    _buildModernActionButton(
+                      icon: Icons.delete,
+                      label: 'حذف',
+                      color: Colors.red,
+                      onPressed: () async {
+                        bool hasAccess = await _verifyAccessForTab();
+                        if (!hasAccess) return;
+                        _deleteGroom(groom['phone_number']?.toString() ?? '');
+                      },
+                      isDark: isDark,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReservationBadge(int groomId) {
+    return FutureBuilder<Map<String, dynamic>?>(
+      future: _getGroomReservationStatus(groomId),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Container(
+            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.grey.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: SizedBox(width: 10, height: 10, child: CircularProgressIndicator(strokeWidth: 1.5)),
+          );
+        }
+        
+        String statusText;
+        List<Color> gradientColors;
+        
+        if (snapshot.hasData && snapshot.data != null) {
+          final reservationStatus = snapshot.data!['status'] as String;
+          switch (reservationStatus) {
+            case 'validated':
+              statusText = 'حجز مؤكد';
+              gradientColors = [Colors.green.shade400, Colors.green.shade600];
+              break;
+            case 'pending_validation':
+              statusText = 'حجز معلق';
+              gradientColors = [Colors.orange.shade400, Colors.orange.shade600];
+              break;
+            case 'cancelled':
+              statusText = 'حجز ملغى';
+              gradientColors = [Colors.red.shade400, Colors.red.shade600];
+              break;
+            default:
+              statusText = 'غير معروف';
+              gradientColors = [Colors.grey.shade400, Colors.grey.shade600];
+          }
+        } else {
+          statusText = 'لا يوجد حجز';
+          gradientColors = [Colors.grey.shade300, Colors.grey.shade400];
+        }
+        
+        return Container(
+          padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(colors: gradientColors),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: gradientColors[0].withOpacity(0.3),
+                blurRadius: 6,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Text(
+            statusText,
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildModernActionButton({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onPressed,
+    required bool isDark,
+  }) {
+    return InkWell(
+      onTap: onPressed,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [color, color.withOpacity(0.8)],
+          ),
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: color.withOpacity(0.3),
+              blurRadius: 6,
+              offset: Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: Colors.white),
+            SizedBox(width: 6),
+            Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchBar() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    return Container(
+      margin: EdgeInsets.all(16),
+      child: Column(
+        children: [
+          TextField(
+            controller: _searchController,
+            style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+            decoration: InputDecoration(
+              hintText: 'ابحث بالاسم أو رقم الهاتف...',
+              hintStyle: TextStyle(color: isDark ? Colors.white54 : Colors.grey[500]),
+              prefixIcon: Icon(Icons.search, color: AppColors.primary),
+              suffixIcon: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_searchQuery.isNotEmpty)
+                    IconButton(
+                      icon: Icon(Icons.clear, size: 20),
+                      onPressed: () => _searchController.clear(),
+                    ),
+                  IconButton(
+                    icon: Icon(
+                      _showFilters ? Icons.filter_alt : Icons.filter_alt_outlined,
+                      color: (_statusFilter != 'all' || _reservationFilter != 'all') ? AppColors.primary : Colors.grey,
+                    ),
+                    onPressed: () => setState(() => _showFilters = !_showFilters),
+                  ),
+                  // NEW: Grid/List toggle
+                  IconButton(
+                    icon: Icon(_isGridView ? Icons.view_list : Icons.grid_view),
+                    onPressed: () => setState(() => _isGridView = !_isGridView),
+                    color: AppColors.primary,
+                    tooltip: _isGridView ? 'عرض قائمة' : 'عرض شبكة',
+                  ),
+                ],
+              ),
+              filled: true,
+              fillColor: isDark ? Color(0xFF2C2C2C) : Colors.white,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+            ),
+          ),
+          if (_showFilters) ...[
+            SizedBox(height: 12),
+            _buildFilterChips(isDark),
+          ],
+          if (_searchQuery.isNotEmpty || _statusFilter != 'all' || _reservationFilter != 'all') ...[
+            SizedBox(height: 8),
+            _buildActiveFiltersRow(),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterChips(bool isDark) {
+    return Container(
+      padding: EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? Color(0xFF2C2C2C) : Colors.grey[50],
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('الحالة:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+          SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            children: [
+              _buildFilterChip('الكل', 'all', _statusFilter, (v) async {
+                _clearFilters();
+                setState(() => _statusFilter = v);
+                await _loadGrooms();
+              }),
+              _buildFilterChip('نشط', 'active', _statusFilter, (v) async {
+                _clearFilters();
+                setState(() => _statusFilter = v);
+                await _loadGrooms();
+              }),
+              _buildFilterChip('غير نشط', 'inactive', _statusFilter, (v) async {
+                _clearFilters();
+                setState(() => _statusFilter = v);
+                await _loadGrooms();
+              }),
+            ],
+          ),
+          SizedBox(height: 12),
+          Text('حالة الحجز:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+          SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            children: [
+              _buildFilterChip('الكل', 'all', _reservationFilter, (v) async {
+                _clearFilters();
+                setState(() => _reservationFilter = v);
+                await _loadGrooms();
+              }),
+              _buildFilterChip('مؤكد', 'validated', _reservationFilter, (v) async {
+                _clearFilters();
+                setState(() => _reservationFilter = v);
+                await _loadGrooms();
+              }),
+              _buildFilterChip('معلق', 'pending_validation', _reservationFilter, (v) async {
+                _clearFilters();
+                setState(() => _reservationFilter = v);
+                await _loadGrooms();
+              }),
+            ],
+          ),
+          SizedBox(height: 12),
+          TextButton.icon(
+            onPressed: () async {
+              _clearFilters();
+              await _loadGrooms();
+            },
+            icon: Icon(Icons.clear_all, size: 16),
+            label: Text('مسح الفلاتر'),
+            style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterChip(String label, String value, String currentValue, Future<void> Function(String) onSelected) {
+    final isSelected = currentValue == value;
+    return InkWell(
+      onTap: isLoading ? null : () async => await onSelected(value),
+      child: Opacity(
+        opacity: isLoading ? 0.5 : 1.0,
+        child: Container(
+          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: isSelected ? AppColors.primary : Colors.grey[200],
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: isSelected ? Colors.white : Colors.grey[700],
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              fontSize: 12,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActiveFiltersRow() {
+    final activeFilters = <String>[];
+    if (_searchQuery.isNotEmpty) activeFilters.add('بحث: "$_searchQuery"');
+    if (_statusFilter != 'all') activeFilters.add(_statusFilter == 'active' ? 'نشط' : 'غير نشط');
+    if (_reservationFilter != 'all') {
+      final labels = {'validated': 'حجز مؤكد', 'pending_validation': 'حجز معلق', 'cancelled': 'حجز ملغى', 'none': 'بدون حجز'};
+      activeFilters.add(labels[_reservationFilter] ?? '');
+    }
+    
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.filter_alt, size: 16, color: AppColors.primary),
+          SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              activeFilters.join(' • '),
+              style: TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.w500),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          Text('(${filteredGrooms.length})', style: TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    return Scaffold(
+      backgroundColor: isDark ? Color(0xFF1E1E1E) : Colors.grey[100],
+      appBar: AppBar(
+        elevation: 0,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [AppColors.primary, AppColors.primary.withOpacity(0.8)],
+            ),
+          ),
+        ),
+        title: Text('إدارة العرسان', style: TextStyle(fontWeight: FontWeight.bold)),
+        foregroundColor: Colors.white,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back_ios_new),
+          onPressed: () => Navigator.pushReplacementNamed(context, '/clan_admin_home'),
+        ),
+        actions: [
+          IconButton(
+            onPressed: () async {
+              final result = await Navigator.push(context, MaterialPageRoute(builder: (context) => MultiStepSignupScreen()));
+              if (result != null) _loadGrooms();
+            },
+            icon: Icon(Icons.person_add),
+            tooltip: 'إضافة عريس جديد',
+          ),
+          IconButton(
+            onPressed: _checkConnectivityAndLoad,
+            icon: Icon(Icons.refresh),
+            tooltip: 'تحديث القائمة',
+          ),
+        ],
+      ),
+      body: RefreshIndicator(
+        onRefresh: _loadGrooms,
+        color: AppColors.primary,
+        child: isLoading
+            ? Center(child: CircularProgressIndicator(color: AppColors.primary))
+            : errorMessage != null
+                ? _buildErrorState()
+                : Column(
+                    children: [
+                      _buildSearchBar(),
+                      Expanded(
+                        child: grooms.isEmpty
+                            ? _buildEmptyState()
+                            : filteredGrooms.isEmpty
+                                ? _buildNoResultsState()
+                                : _isGridView
+                                    ? GridView.builder(
+                                      padding: EdgeInsets.all(8),
+                                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                        crossAxisCount: _getCrossAxisCount(context),
+                                        childAspectRatio: 0.75,
+                                        crossAxisSpacing: 8,
+                                        mainAxisSpacing: 8,
+                                      ),
+                                      itemCount: filteredGrooms.length,
+                                      itemBuilder: (context, index) {
+                                        final crossAxisCount = _getCrossAxisCount(context);
+                                        return _buildGroomGridCard(crossAxisCount, filteredGrooms[index]);
+                                      },
+                                    )
+                                    : ListView.builder(
+                                        padding: EdgeInsets.symmetric(
+                                          horizontal: MediaQuery.of(context).size.width > 1024 
+                                            ? MediaQuery.of(context).size.width * 0.1 
+                                            : 0,
+                                          vertical: 16,
+                                        ),
+                                        itemCount: filteredGrooms.length,
+                                        itemBuilder: (context, index) => _buildGroomCard(filteredGrooms[index]),
+                                      ),
+                      ),
+                    ],
+                  ),
+      ),
+    );
+  }
+
+  Widget _buildGroomCard(Map<String, dynamic> groom) {
+  if (groom.isEmpty || groom['id'] == null) {
+    return SizedBox.shrink();
+  }
+  
+  final isDark = Theme.of(context).brightness == Brightness.dark;
   final status = groom['status']?.toString() ?? 'inactive';
   final isActive = status == 'active';
   final groomId = groom['id'] as int?;
   
-  return LayoutBuilder(
-    builder: (context, constraints) {
-      // More granular screen size detection
-      final screenWidth = MediaQuery.of(context).size.width;
-      final isSmallScreen = screenWidth < 600;
-      final isTablet = screenWidth >= 600 && screenWidth < 1024;
-      final isDesktop = screenWidth >= 1024;
-      
-      // Dynamic sizing based on screen
-      final cardMargin = isSmallScreen ? 8.0 : (isTablet ? 12.0 : 16.0);
-      final cardPadding = isSmallScreen ? 12.0 : (isTablet ? 16.0 : 20.0);
-      final avatarSize = isSmallScreen ? 45.0 : (isTablet ? 55.0 : 65.0);
-      final titleFontSize = isSmallScreen ? 16.0 : (isTablet ? 18.0 : 20.0);
-      
-      return Container(
-        margin: EdgeInsets.symmetric(
-          horizontal: cardMargin, 
-          vertical: 6
-        ),
-        child: Material(
-          elevation: isSmallScreen ? 1 : (isTablet ? 2 : 3),
-          borderRadius: BorderRadius.circular(isSmallScreen ? 12 : 16),
-          color: Colors.white,
-          shadowColor: Colors.black.withOpacity(0.08),
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(isSmallScreen ? 12 : 16),
-              border: Border.all(
-                color: Colors.grey.withOpacity(0.1),
-                width: 1,
-              ),
+  final screenWidth = MediaQuery.of(context).size.width;
+  final isSmallScreen = screenWidth < 600;
+  final isTablet = screenWidth >= 600 && screenWidth < 1024;
+  final isLargeScreen = screenWidth >= 1024;
+  
+  // Responsive sizing
+  final cardMargin = isSmallScreen ? 8.0 : (isTablet ? 12.0 : 16.0);
+  final cardPadding = isSmallScreen ? 12.0 : (isTablet ? 16.0 : 20.0);
+  final avatarSize = isSmallScreen ? 45.0 : (isTablet ? 55.0 : 65.0);
+  final titleFontSize = isSmallScreen ? 16.0 : (isTablet ? 18.0 : 20.0);
+  
+  // Constrain card width on large screens
+  final maxCardWidth = isLargeScreen ? 1200.0 : double.infinity;
+  
+  return Center(
+    child: Container(
+      constraints: BoxConstraints(maxWidth: maxCardWidth),
+      margin: EdgeInsets.symmetric(horizontal: cardMargin, vertical: 6),
+      child: Material(
+        elevation: isSmallScreen ? 1 : (isTablet ? 2 : 3),
+        borderRadius: BorderRadius.circular(isSmallScreen ? 12 : 16),
+        color: isDark ? Colors.grey[850] : Colors.white,
+        shadowColor: Colors.black.withOpacity(0.08),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(isSmallScreen ? 12 : 16),
+            border: Border.all(
+              color: isDark ? Colors.grey[700]!.withOpacity(0.3) : Colors.grey.withOpacity(0.1), 
+              width: 1
             ),
-            child: Padding(
-              padding: EdgeInsets.all(cardPadding),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildHeaderSection(groom, isActive, groomId, 
-                    isSmallScreen, avatarSize, titleFontSize),
-                  
-                  SizedBox(height: isSmallScreen ? 12 : 16),
-                  
-                  _buildInformationGrid(groom, isSmallScreen, isTablet),
-                  
-                  SizedBox(height: isSmallScreen ? 16 : 20),
-                  
-                  _buildActionButtons(groom, status, isActive, isSmallScreen, isTablet),
-                  
-
-                ],
-              ),
+          ),
+          child: Padding(
+            padding: EdgeInsets.all(cardPadding),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildHeaderSection(groom, isActive, groomId, isSmallScreen, isTablet, avatarSize, titleFontSize, isDark),
+                SizedBox(height: isSmallScreen ? 12 : 16),
+                _buildInformationGrid(groom, isSmallScreen, isTablet, isLargeScreen, isDark),
+                SizedBox(height: isSmallScreen ? 16 : 20),
+                _buildActionButtons(groom, status, isActive, isSmallScreen, isTablet),
+              ],
             ),
           ),
         ),
-      );
-    },
+      ),
+    ),
   );
 }
-
 Widget _buildHeaderSection(
   Map<String, dynamic> groom, 
   bool isActive, 
   int? groomId, 
   bool isSmallScreen,
+  bool isTablet,
   double avatarSize,
-  double titleFontSize
+  double titleFontSize,
+  bool isDark,
 ) {
   return Row(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      // Avatar Circle - responsive size
       Container(
         width: avatarSize,
         height: avatarSize,
@@ -873,16 +1305,9 @@ Widget _buildHeaderSection(
             end: Alignment.bottomRight,
           ),
         ),
-        child: Icon(
-          Icons.person,
-          color: Colors.white,
-          size: avatarSize * 0.5,
-        ),
+        child: Icon(Icons.person, color: Colors.white, size: avatarSize * 0.5),
       ),
-      
       SizedBox(width: isSmallScreen ? 8 : 12),
-      
-      // Name and Status - flexible sizing
       Expanded(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -892,26 +1317,32 @@ Widget _buildHeaderSection(
               style: TextStyle(
                 fontSize: titleFontSize,
                 fontWeight: FontWeight.bold,
-                color: Colors.grey[800],
+                color: isDark ? Colors.grey[200] : Colors.grey[800],
               ),
               overflow: TextOverflow.ellipsis,
               maxLines: isSmallScreen ? 1 : 2,
             ),
             SizedBox(height: 4),
-            Text(
-              groom['phone_number']?.toString() ?? '',
-              style: TextStyle(
-                fontSize: isSmallScreen ? 12 : 14,
-                color: Colors.grey[600],
-              ),
+            Row(
+              children: [
+                Icon(Icons.phone, size: isSmallScreen ? 12 : 14, color: AppColors.primary),
+                SizedBox(width: 4),
+                Flexible(
+                  child: Text(
+                    groom['phone_number']?.toString() ?? '',
+                    style: TextStyle(
+                      fontSize: isSmallScreen ? 12 : 14,
+                      color: isDark ? Colors.grey[400] : Colors.grey[600],
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
             ),
           ],
         ),
       ),
-      
       SizedBox(width: 8),
-      
-      // Status Badges Column - responsive sizing
       Column(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
@@ -944,7 +1375,6 @@ Widget _buildHeaderSection(
               ),
             ),
           ),
-          
           if (groomId != null) ...[
             SizedBox(height: 6),
             _buildReservationStatusBadge(groomId, isSmallScreen),
@@ -954,10 +1384,13 @@ Widget _buildHeaderSection(
     ],
   );
 }
+
+
 Widget _buildReservationStatusBadge(int groomId, bool isSmallScreen) {
   return FutureBuilder<Map<String, dynamic>?>(
     future: _getGroomReservationStatus(groomId),
     builder: (context, snapshot) {
+      // Add explicit error handling
       if (snapshot.connectionState == ConnectionState.waiting) {
         return Container(
           padding: EdgeInsets.symmetric(
@@ -971,7 +1404,34 @@ Widget _buildReservationStatusBadge(int groomId, bool isSmallScreen) {
           child: SizedBox(
             width: 10,
             height: 10,
-            child: CircularProgressIndicator(strokeWidth: 1.5),
+            child: CircularProgressIndicator(
+              strokeWidth: 1.5,
+              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+            ),
+          ),
+        );
+      }
+      
+      // Handle errors explicitly
+      if (snapshot.hasError) {
+        print('⚠️ Error in reservation badge: ${snapshot.error}');
+        return Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: isSmallScreen ? 6 : 10, 
+            vertical: isSmallScreen ? 3 : 4
+          ),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade300,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Text(
+            'خطأ',
+            style: TextStyle(
+              color: Colors.grey[700],
+              fontWeight: FontWeight.bold,
+              fontSize: isSmallScreen ? 9 : 10,
+            ),
+            textAlign: TextAlign.center,
           ),
         );
       }
@@ -1039,81 +1499,112 @@ Widget _buildReservationStatusBadge(int groomId, bool isSmallScreen) {
   );
 }
 
-Widget _buildInformationGrid(Map<String, dynamic> groom, bool isSmallScreen, bool isTablet) {
+Widget _buildInformationGrid(Map<String, dynamic> groom, bool isSmallScreen, bool isTablet, bool isLargeScreen, bool isDark) {
   final basicInfo = <Map<String, String>>[
     {'label': 'اسم الأب', 'value': groom['father_name']?.toString() ?? ''},
     {'label': 'اسم الجد', 'value': groom['grandfather_name']?.toString() ?? ''},
     {'label': 'تاريخ الميلاد', 'value': groom['birth_date']?.toString() ?? ''},
     {'label': 'عنوان السكن', 'value': groom['home_address']?.toString() ?? ''},
-  ];
+  ].where((info) => info['value']!.isNotEmpty).toList();
   
   final guardianInfo = <Map<String, String>>[
     {'label': 'اسم الولي', 'value': groom['guardian_name']?.toString() ?? ''},
     {'label': 'هاتف الولي', 'value': groom['guardian_phone']?.toString() ?? ''},
     {'label': 'صلة القرابة', 'value': groom['guardian_relation']?.toString() ?? ''},
-  ];
+  ].where((info) => info['value']!.isNotEmpty).toList();
   
+  // Use grid layout for large screens, column for small
+  if (isLargeScreen && (basicInfo.isNotEmpty || guardianInfo.isNotEmpty)) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (basicInfo.isNotEmpty)
+          Expanded(
+            child: _buildInfoSection(
+              title: 'المعلومات الأساسية',
+              icon: Icons.person_outline,
+              color: Colors.green,
+              items: basicInfo,
+              isSmallScreen: isSmallScreen,
+              isDark: isDark,
+            ),
+          ),
+        if (basicInfo.isNotEmpty && guardianInfo.isNotEmpty)
+          SizedBox(width: 16),
+        if (guardianInfo.isNotEmpty)
+          Expanded(
+            child: _buildInfoSection(
+              title: 'معلومات الولي',
+              icon: Icons.family_restroom,
+              color: Colors.purple,
+              items: guardianInfo,
+              isSmallScreen: isSmallScreen,
+              isDark: isDark,
+            ),
+          ),
+      ],
+    );
+  }
+  
+  // Column layout for smaller screens
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      // Basic Information Section
-      _buildInfoSection(
-        title: 'المعلومات الأساسية',
-        icon: Icons.person_outline,
-        color: Colors.green,
-        items: basicInfo,
-        isSmallScreen: isSmallScreen,
-      ),
-      
-      // Guardian Information Section (only if data exists)
-      if (guardianInfo.any((info) => info['value']!.isNotEmpty)) ...[
+      if (basicInfo.isNotEmpty)
+        _buildInfoSection(
+          title: 'المعلومات الأساسية',
+          icon: Icons.person_outline,
+          color: Colors.green,
+          items: basicInfo,
+          isSmallScreen: isSmallScreen,
+          isDark: isDark,
+        ),
+      if (basicInfo.isNotEmpty && guardianInfo.isNotEmpty)
         SizedBox(height: 16),
+      if (guardianInfo.isNotEmpty)
         _buildInfoSection(
           title: 'معلومات الولي',
           icon: Icons.family_restroom,
           color: Colors.purple,
           items: guardianInfo,
           isSmallScreen: isSmallScreen,
+          isDark: isDark,
         ),
-      ],
     ],
   );
 }
 
+// Update _buildInfoSection signature
 Widget _buildInfoSection({
   required String title,
   required IconData icon,
   required Color color,
   required List<Map<String, String>> items,
   required bool isSmallScreen,
+  required bool isDark,
 }) {
   return Container(
     padding: EdgeInsets.all(12),
     decoration: BoxDecoration(
-      color: color.withOpacity(0.05),
+      color: isDark ? color.withOpacity(0.15) : color.withOpacity(0.05),
       borderRadius: BorderRadius.circular(12),
       border: Border.all(
-        color: color.withOpacity(0.2),
+        color: color.withOpacity(isDark ? 0.3 : 0.2),
         width: 1,
       ),
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Section Header
         Row(
           children: [
             Container(
               padding: EdgeInsets.all(6),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
+                color: color.withOpacity(isDark ? 0.2 : 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Icon(
-                icon,
-                color: color,
-                size: 16,
-              ),
+              child: Icon(icon, color: color, size: 16),
             ),
             SizedBox(width: 8),
             Text(
@@ -1126,23 +1617,22 @@ Widget _buildInfoSection({
             ),
           ],
         ),
-        
         SizedBox(height: 8),
-        
-        // Information Items
         ...items
             .where((item) => item['value']!.isNotEmpty)
             .map((item) => _buildCompactInfoRow(
                   item['label']!, 
                   item['value']!, 
-                  isSmallScreen
+                  isSmallScreen,
+                  isDark,
                 )),
       ],
     ),
   );
 }
 
-Widget _buildCompactInfoRow(String label, String value, bool isSmallScreen) {
+// Update _buildCompactInfoRow signature
+Widget _buildCompactInfoRow(String label, String value, bool isSmallScreen, bool isDark) {
   return Padding(
     padding: EdgeInsets.symmetric(vertical: 3),
     child: Row(
@@ -1154,7 +1644,7 @@ Widget _buildCompactInfoRow(String label, String value, bool isSmallScreen) {
             '$label:',
             style: TextStyle(
               fontWeight: FontWeight.w500,
-              color: Colors.grey[700],
+              color: isDark ? Colors.grey[400] : Colors.grey[700],
               fontSize: 12,
             ),
           ),
@@ -1163,7 +1653,9 @@ Widget _buildCompactInfoRow(String label, String value, bool isSmallScreen) {
           child: Text(
             value.isNotEmpty ? value : 'غير محدد',
             style: TextStyle(
-              color: value.isNotEmpty ? Colors.black87 : Colors.grey,
+              color: value.isNotEmpty 
+                ? (isDark ? Colors.grey[300] : Colors.black87)
+                : Colors.grey,
               fontSize: 12,
             ),
           ),
@@ -1172,7 +1664,6 @@ Widget _buildCompactInfoRow(String label, String value, bool isSmallScreen) {
     ),
   );
 }
-
 Widget _buildActionButtons(
   Map<String, dynamic> groom, 
   String status, 
@@ -1254,6 +1745,7 @@ Widget _buildMobileActionButtons(Map<String, dynamic> groom, String status, bool
     ],
   );
 }
+
 Widget _buildDesktopActionButtons(
   Map<String, dynamic> groom, 
   String status, 
@@ -1414,761 +1906,68 @@ Widget _buildModernButton({
   );
 }
 
-// Updated main build method with modern AppBar
-@override
-Widget build(BuildContext context) {
-  
-  return Scaffold(
-    appBar: _buildModernAppBar(),
-    body: Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Colors.green.shade50,
-            Colors.white,
-          ],
-        ),
-      ),
-      child: RefreshIndicator(
-        onRefresh: _loadGrooms,
-        color: AppColors.primary,
-        child: _buildBody(),
-        
-      ),
 
-    ),
-  );
-}
-
-PreferredSizeWidget _buildModernAppBar() {
-  final isDark = Theme.of(context).brightness == Brightness.dark;
-  return AppBar(
-    elevation: 0,
-    backgroundColor: Colors.transparent,
-    flexibleSpace: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    isDark ? AppColors.primary.withOpacity(0.4):AppColors.primary.withOpacity(0.8) ,
-                    AppColors.primary,
-                    AppColors.primary,
-                    isDark ? AppColors.primary.withOpacity(0.4):AppColors.primary.withOpacity(0.8) ,
-                    // isDark ? AppColors.primary.withOpacity(0.4):const Color.fromARGB(255, 130, 161, 112).withOpacity(0.9),
-                    
-                  ],
-                ),
-              ),
-            ),
-    title: LayoutBuilder(
-      builder: (context, constraints) {
-        final isSmallScreen = MediaQuery.of(context).size.width < 600;
-        return Text(
-          'إدارة العرسان',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: isSmallScreen ? 18 : 20,
-          ),
-        );
-      },
-    ),
-    foregroundColor: Colors.white,
-    leading: IconButton(
-      icon: Icon(Icons.arrow_back_ios_new, size: 20),
-      onPressed: () {
-        Navigator.pushReplacementNamed(context, '/clan_admin_home');
-      },
-    ),
-    actions: [
-      LayoutBuilder(
-        builder: (context, constraints) {
-          final screenWidth = MediaQuery.of(context).size.width;
-          final isSmallScreen = screenWidth < 600;
-          
-          return Row(
-            children: [
-              Container(
-                margin: EdgeInsets.only(right: isSmallScreen ? 4 : 8),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: IconButton(
-                  onPressed: () async {
-                    final result = await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => MultiStepSignupScreen(),
-                      ),
-                    );
-                    if (result != null) {
-                      _loadGrooms();
-                    }
-                  },
-                  icon: Icon(Icons.person_add, size: isSmallScreen ? 18 : 20),
-                  tooltip: 'إضافة عريس جديد',
-                  padding: EdgeInsets.all(isSmallScreen ? 8 : 12),
-                ),
-              ),
-              Container(
-                margin: EdgeInsets.only(
-                  right: isSmallScreen ? 4 : 8, 
-                  left: isSmallScreen ? 8 : 16
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: IconButton(
-                  onPressed: _checkConnectivityAndLoad,
-                  icon: Icon(Icons.refresh, size: isSmallScreen ? 18 : 20),
-                  tooltip: 'تحديث القائمة',
-                  padding: EdgeInsets.all(isSmallScreen ? 8 : 12),
-                ),
-              ),
-            ],
-          );
-        },
-      ),
-    ],
-  );
-}
-
-
-
-  // NEW: Build search bar
-  Widget _buildSearchBar() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isSmallScreen = MediaQuery.of(context).size.width < 600;
-    
-    return Container(
-      margin: EdgeInsets.symmetric(
-        horizontal: isSmallScreen ? 12 : 16,
-        vertical: 8,
-      ),
-      child: Column(
-        children: [
-          // Search TextField
-          Container(
-            decoration: BoxDecoration(
-              color:  Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
-                  offset: Offset(0, 2),
-                ),
-              ],
-            ),
-            child: TextField(
-              controller: _searchController,
-              style: TextStyle(
-                color:  Colors.black87,
-              ),
-              decoration: InputDecoration(
-                hintText: 'ابحث بالاسم أو رقم الهاتف...',
-                hintStyle: TextStyle(
-                  color:  Colors.grey[500],
-                ),
-                prefixIcon: Icon(
-                  Icons.search,
-                  color: AppColors.primary,
-                ),
-                suffixIcon: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (_searchQuery.isNotEmpty)
-                      IconButton(
-                        icon: Icon(Icons.clear, size: 20),
-                        onPressed: () => _searchController.clear(),
-                        color: Colors.grey,
-                      ),
-                    IconButton(
-                      icon: Icon(
-                        _showFilters ? Icons.filter_alt : Icons.filter_alt_outlined,
-                        color: (_statusFilter != 'all' || _reservationFilter != 'all')
-                            ? AppColors.primary
-                            : Colors.grey,
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _showFilters = !_showFilters;
-                        });
-                      },
-                    ),
-                  ],
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-                filled: true,
-                fillColor:  Colors.white,
-                contentPadding: EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
-              ),
-            ),
-          ),
-          
-          // Filter Options (collapsible)
-          if (_showFilters) ...[
-            SizedBox(height: 12),
-            _buildFilterChips(isDark, isSmallScreen),
-          ],
-          
-          // Active filters indicator
-          if (_searchQuery.isNotEmpty || 
-              _statusFilter != 'all' || 
-              _reservationFilter != 'all') ...[
-            SizedBox(height: 8),
-            _buildActiveFiltersRow(isSmallScreen),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFilterChips(bool isDark, bool isSmallScreen) {
-  return Container(
-    padding: EdgeInsets.all(12),
-    decoration: BoxDecoration(
-      color: Colors.grey[50],
-      borderRadius: BorderRadius.circular(12),
-      border: Border.all(
-        color: Colors.grey[200]!,
-      ),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Status Filter
-        Text(
-          'الحالة:',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 12,
-            color: Colors.grey[700],
-          ),
-        ),
-        SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            _buildFilterChip('الكل', 'all', _statusFilter, (value) async {
-              // Clear all filters first
-              _clearFilters();
-              // Then set the new status filter
-              setState(() {
-                _statusFilter = value;
-              });
-              await _loadGrooms();
-            }),
-            _buildFilterChip('نشط', 'active', _statusFilter, (value) async {
-              // Clear all filters first
-              _clearFilters();
-              // Then set the new status filter
-              setState(() {
-                _statusFilter = value;
-              });
-              await _loadGrooms();
-            }),
-            _buildFilterChip('غير نشط', 'inactive', _statusFilter, (value) async {
-              // Clear all filters first
-              _clearFilters();
-              // Then set the new status filter
-              setState(() {
-                _statusFilter = value;
-              });
-              await _loadGrooms();
-            }),
-          ],
-        ),
-        
-        SizedBox(height: 12),
-        
-        // Reservation Filter
-        Text(
-          'حالة الحجز:',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 12,
-            color: Colors.grey[700],
-          ),
-        ),
-        SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            _buildFilterChip('الكل', 'all', _reservationFilter, (value) async {
-              // Clear all filters first
-              _clearFilters();
-              // Then set the new reservation filter
-              setState(() {
-                _reservationFilter = value;
-              });
-              await _loadGrooms();
-            }),
-            _buildFilterChip('مؤكد', 'validated', _reservationFilter, (value) async {
-              // Clear all filters first
-              _clearFilters();
-              // Then set the new reservation filter
-              setState(() {
-                _reservationFilter = value;
-              });
-              await _loadGrooms();
-            }),
-            _buildFilterChip('معلق', 'pending_validation', _reservationFilter, (value) async {
-              // Clear all filters first
-              _clearFilters();
-              // Then set the new reservation filter
-              setState(() {
-                _reservationFilter = value;
-              });
-              await _loadGrooms();
-            }),
-          ],
-        ),
-        
-        SizedBox(height: 12),
-        
-        // Clear filters button
-        TextButton.icon(
-          onPressed: () async {
-            _clearFilters();
-            await _loadGrooms();
-          },
-          icon: Icon(Icons.clear_all, size: 16),
-          label: Text('مسح الفلاتر'),
-          style: TextButton.styleFrom(
-            foregroundColor: AppColors.primary,
-            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          ),
-        ),
-      ],
-    ),
-  );
-}
-// ==================== UPDATED BUILD FILTER CHIP ====================
-Widget _buildFilterChip(
-  String label,
-  String value,
-  String currentValue,
-  Future<void> Function(String) onSelected, // Changed to async function
-) {
-  final isSelected = currentValue == value;
-  
-  return InkWell(
-    onTap: () => onSelected(value),
-    borderRadius: BorderRadius.circular(20),
-    child: Container(
-      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        gradient: isSelected
-            ? LinearGradient(
-                colors: [AppColors.primary, AppColors.primary.withOpacity(0.8)],
-              )
-            : null,
-        color: isSelected ? null : Colors.grey[200],
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isSelected ? AppColors.primary : Colors.grey[300]!,
-          width: isSelected ? 2 : 1,
-        ),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: isSelected ? Colors.white : Colors.grey[700],
-          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-          fontSize: 12,
-        ),
-      ),
-    ),
-  );
-}
-  // NEW: Build active filters row
-  Widget _buildActiveFiltersRow(bool isSmallScreen) {
-    final activeFilters = <String>[];
-    
-    if (_searchQuery.isNotEmpty) {
-      activeFilters.add('بحث: "$_searchQuery"');
-    }
-    if (_statusFilter != 'all') {
-      activeFilters.add(_statusFilter == 'active' ? 'نشط' : 'غير نشط');
-    }
-    if (_reservationFilter != 'all') {
-      final reservationLabels = {
-        'validated': 'حجز مؤكد',
-        'pending_validation': 'حجز معلق',
-        'cancelled': 'حجز ملغى',
-        'none': 'بدون حجز',
-      };
-      activeFilters.add(reservationLabels[_reservationFilter] ?? '');
-    }
-    
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: AppColors.primary.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.filter_alt, size: 16, color: AppColors.primary),
-          SizedBox(width: 6),
-          Expanded(
-            child: Text(
-              activeFilters.join(' • '),
-              style: TextStyle(
-                fontSize: 11,
-                color: AppColors.primary,
-                fontWeight: FontWeight.w500,
-              ),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          Text(
-            '(${filteredGrooms.length})',
-            style: TextStyle(
-              fontSize: 11,
-              color: AppColors.primary,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-   // UPDATE: Build body to use filteredGrooms instead of grooms
-  Widget _buildBody() {
-    if (isLoading) {
-      return _buildLoadingState();
-    }
-    
-    if (errorMessage != null) {
-      return _buildErrorState();
-    }
-    
-    return Column(
-      children: [
-        _buildSearchBar(), // NEW: Add search bar
-        
-        if (grooms.isEmpty)
-          Expanded(child: _buildEmptyState())
-        else if (filteredGrooms.isEmpty)
-          Expanded(child: _buildNoResultsState()) // NEW
-        else
-          Expanded(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final isSmallScreen = constraints.maxWidth < 600;
-                
-                return ListView.builder(
-                  padding: EdgeInsets.only(
-                    top: isSmallScreen ? 8 : 12,
-                    left: 2,
-                    right: 2,
-                    bottom: isSmallScreen ? 150 : 120,
-                  ),
-                  itemCount: filteredGrooms.length, // CHANGED from grooms
-                  itemBuilder: (context, index) => _buildGroomCard(filteredGrooms[index]), // CHANGED
-                );
-              },
-            ),
-          ),
-      ],
-    );
-  }
-
-  // NEW: Build no results state
-  Widget _buildNoResultsState() {
+  Widget _buildErrorState() {
     return Center(
-      child: Container(
-        margin: EdgeInsets.all(32),
-        padding: EdgeInsets.all(32),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
-              blurRadius: 20,
-              offset: Offset(0, 5),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.search_off,
-                size: 64,
-                color: Colors.orange,
-              ),
-            ),
-            SizedBox(height: 20),
-            Text(
-              'لا توجد نتائج',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey[800],
-              ),
-            ),
-            SizedBox(height: 8),
-            Text(
-              'حاول تغيير معايير البحث أو الفلاتر',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[600],
-              ),
-              textAlign: TextAlign.center,
-            ),
-            SizedBox(height: 16),
-            TextButton.icon(
-              onPressed: _clearFilters,
-              icon: Icon(Icons.clear_all),
-              label: Text('مسح الفلاتر'),
-              style: TextButton.styleFrom(
-                foregroundColor: AppColors.primary,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-
-// Widget _buildBody() {
-//   if (isLoading) {
-//     return _buildLoadingState();
-//   }
-  
-//   if (errorMessage != null) {
-//     return _buildErrorState();
-//   }
-  
-//   if (grooms.isEmpty) {
-//     return _buildEmptyState();
-//   }
-  
-//   return LayoutBuilder(
-//     builder: (context, constraints) {
-//       final isSmallScreen = constraints.maxWidth < 600;
-      
-//       return ListView.builder(
-//         padding: EdgeInsets.only(
-//           top: isSmallScreen ? 12 : 16,
-//           left: 2,
-//           right: 2,
-//           bottom: isSmallScreen ? 150 : 120,
-//         ),
-//         itemCount: grooms.length,
-//         itemBuilder: (context, index) => _buildGroomCard(grooms[index]),
-//       );
-//     },
-//   );
-// }
-
-
-Widget _buildLoadingState() {
-  return Center(
-    child: Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Container(
-          padding: EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.grey.withOpacity(0.1),
-                blurRadius: 20,
-                offset: Offset(0, 5),
-              ),
-            ],
-          ),
-          child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-            strokeWidth: 3,
-          ),
-        ),
-        SizedBox(height: 20),
-        Text(
-          'جاري تحميل البيانات...',
-          style: TextStyle(
-            fontSize: 16,
-            color: Colors.grey[600],
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-Widget _buildErrorState() {
-  return Center(
-    child: Container(
-      margin: EdgeInsets.all(32),
-      padding: EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.red.withOpacity(0.1),
-            blurRadius: 20,
-            offset: Offset(0, 5),
-          ),
-        ],
-      ),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Container(
-            padding: EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.red.withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(Icons.error_outline, size: 48, color: Colors.red),
-          ),
+          Icon(Icons.error_outline, size: 64, color: Colors.red),
           SizedBox(height: 16),
-          Text(
-            'خطأ في تحميل البيانات',
-            style: TextStyle(
-              fontSize: 18, 
-              fontWeight: FontWeight.bold,
-              color: Colors.grey[800],
-            ),
-          ),
+          Text('خطأ في تحميل البيانات', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           SizedBox(height: 8),
-          Text(
-            errorMessage!,
-            style: TextStyle(color: Colors.grey[600]),
-            textAlign: TextAlign.center,
-          ),
+          Text(errorMessage!, textAlign: TextAlign.center),
           SizedBox(height: 20),
           ElevatedButton.icon(
             onPressed: _checkConnectivityAndLoad,
             icon: Icon(Icons.refresh),
             label: Text('إعادة المحاولة'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-              padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-Widget _buildEmptyState() {
-  return Center(
-    child: Container(
-      margin: EdgeInsets.all(32),
-      padding: EdgeInsets.all(32),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 20,
-            offset: Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            padding: EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.green.withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.people_outline, 
-              size: 64, 
-              color: AppColors.primary,
-            ),
-          ),
-          SizedBox(height: 20),
-          Text(
-            'لا توجد عرسان مسجلين',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey[800],
-            ),
-          ),
-          SizedBox(height: 8),
-          Text(
-            'ابدأ بإضافة أول عريس',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[600],
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-  Widget _buildInfoRow(String label, String value) {
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 100,
-            child: Text(
-              '$label:',
-              style: TextStyle(
-                fontWeight: FontWeight.w500,
-                color: Colors.grey[700],
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value.isNotEmpty ? value : 'غير محدد',
-              style: TextStyle(
-                color: value.isNotEmpty ? Colors.black87 : Colors.grey,
-              ),
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
           ),
         ],
       ),
     );
   }
 
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.people_outline, size: 64, color: AppColors.primary),
+          SizedBox(height: 16),
+          Text('لا توجد عرسان مسجلين', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          SizedBox(height: 8),
+          Text('ابدأ بإضافة أول عريس'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNoResultsState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.search_off, size: 64, color: Colors.orange),
+          SizedBox(height: 16),
+          Text('لا توجد نتائج', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          SizedBox(height: 8),
+          Text('حاول تغيير معايير البحث أو الفلاتر'),
+          SizedBox(height: 16),
+          TextButton.icon(
+            onPressed: _clearFilters,
+            icon: Icon(Icons.clear_all),
+            label: Text('مسح الفلاتر'),
+            style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+          ),
+        ],
+      ),
+    );
+  }
 }
+
+
 
 class EditGroomDialog extends StatefulWidget {
   final Map<String, dynamic> groom;
@@ -2803,7 +2602,7 @@ static Future<Map<String, dynamic>?> _getGroomReservationStatus(int groomId) asy
               '$label:',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
-                color: isDark ? Colors.white  : Colors.grey[700],
+                color: isDark ? Colors.white  : Colors.grey[900],
               ),
             ),
           ),
@@ -2811,7 +2610,7 @@ static Future<Map<String, dynamic>?> _getGroomReservationStatus(int groomId) asy
             child: Text(
               value.isNotEmpty ? value : 'غير محدد',
               style: TextStyle(
-                color:  const Color.fromARGB(255, 218, 218, 218),
+                color:  isDark ? Colors.white54  : Colors.grey[700],
               ),
             ),
           ),
@@ -2884,8 +2683,8 @@ static Future<Map<String, dynamic>?> _getGroomReservationStatus(int groomId) asy
                   children: [
                     // Basic Information
                     _buildSectionTitle('المعلومات الأساسية'),
-                    _buildDetailRow('الاسم الأول', groom['first_name'] ?? '', isDark),
-                    _buildDetailRow('اسم العائلة', groom['last_name'] ?? '', isDark),
+                    _buildDetailRow('الاسم ', groom['first_name'] ?? '', isDark),
+                    _buildDetailRow('اللقب', groom['last_name'] ?? '', isDark),
                     _buildDetailRow('اسم الأب', groom['father_name'] ?? '' , isDark),
                     _buildDetailRow('اسم الجد', groom['grandfather_name'] ?? '', isDark),
                     _buildDetailRow('رقم الهاتف', groom['phone_number']?.toString() ?? '', isDark),
@@ -2904,73 +2703,10 @@ static Future<Map<String, dynamic>?> _getGroomReservationStatus(int groomId) asy
                     
                     // Additional Information
                     _buildSectionTitle('معلومات إضافية'),
-                    _buildDetailRow('تاريخ الإنشاء', groom['created_at'] ?? '', isDark),
-                    _buildDetailRow('تاريخ آخر تحديث', groom['updated_at'] ?? '', isDark),
-                    _buildDetailRow('معرف العريس', groom['id']?.toString() ?? '', isDark),
+                    _buildDetailRow('تاريخ إنشاء الحساب', groom['created_at'] ?? '', isDark),
 
-                    // reservation info if available
-                    _buildSectionTitle('معلومات الحجز'),
-                    if (groom['id'] != null)
-                      FutureBuilder<Map<String, dynamic>?>(
-                        future: _getGroomReservationStatus(groom['id'] as int),
-                        builder: (context, snapshot) {
-                          if (snapshot.connectionState == ConnectionState.waiting) {
-                            return Padding(
-                              padding: EdgeInsets.symmetric(vertical: 8),
-                              child: Row(
-                                children: [
-                                  SizedBox(width: 140, child: Text('حالة الحجز:', style: TextStyle(fontWeight: FontWeight.bold))),
-                                  SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
-                                ],
-                              ),
-                            );
-                          }
-                          
-                          if (snapshot.hasData && snapshot.data != null) {
-                            final reservationData = snapshot.data!;
-                            final reservation = reservationData['reservation'] as Map<String, dynamic>;
-                            final status = reservationData['status'] as String;
-                            
-                            String statusText;
-                            Color statusColor;
-                             
-                            switch (status) {
-                              case 'validated':
-                                statusText = 'حجز مؤكد';
-                                statusColor = Colors.green;
-                                break;
-                              case 'pending_validation':
-                                statusText = 'حجز معلق';
-                                statusColor = Colors.orange;
-                                break;
-                              case 'cancelled':
-                                statusText = 'حجز ملغى';
-                                statusColor = Colors.red;
-                                break;
-                              default:
-                                statusText = 'حالة غير معروفة';
-                                statusColor = Colors.grey;
-                            }
-                            
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _buildDetailRow('حالة الحجز', statusText, isDark),
-                                if (reservation['hall_name'] != null)
-                                  _buildDetailRow('اسم القاعة', reservation['hall_name'] ?? '', isDark),
-                                if (reservation['event_date'] != null)
-                                  _buildDetailRow('تاريخ الحدث', reservation['event_date'] ?? '', isDark),
-                                if (reservation['created_at'] != null)
-                                  _buildDetailRow('تاريخ الحجز', reservation['created_at'] ?? '', isDark),
-                                if (reservation['total_cost'] != null)
-                                  _buildDetailRow('التكلفة الإجمالية', '${reservation['total_cost']} دينار', isDark),
-                              ],
-                            );
-                          }
-                          
-                          return _buildDetailRow('حالة الحجز', 'لا يوجد حجز', isDark);
-                        },
-                      ),          
+
+                           
                   ],
                 ),
               ),
@@ -2993,3 +2729,4 @@ static Future<Map<String, dynamic>?> _getGroomReservationStatus(int groomId) asy
     );
   }
 }
+// Keep EditGroomDialog and ViewGroomDetailsDialog from your original file unchanged

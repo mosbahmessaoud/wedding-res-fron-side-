@@ -37,10 +37,12 @@ class SettingsTabState extends State<SettingsTab>
   int _calendarYearsAhead = 3;
   int _yearsMaxReservGroomFromOutClan = 1;
   int _yearsMaxReservGroomFromOriginClan = 3;
-
+  double _paymentShouldPay = 0.0;
   // Month selection lists
   List<int> _selectedSingleDayMonths = [11, 12, 1, 2, 3, 4];
   List<int> _selectedTwoDayMonths = [5, 6, 7, 8, 9, 10];
+  double? _currentPayment; // Add this line
+
 
   final List<Map<String, dynamic>> _monthsList = [
     {'value': 1, 'name': 'جانفي'},
@@ -75,6 +77,8 @@ class SettingsTabState extends State<SettingsTab>
     {'value': 7, 'name': 'الأحد'},
   ];
 
+  // double _payment = 0;
+
 @override
 void initState() {
   super.initState();
@@ -88,6 +92,7 @@ void initState() {
       
     });
   }
+
 
 Future<void> _checkConnectivityAndLoad() async {
     setState(() {
@@ -147,7 +152,8 @@ void _showNoInternetDialog() {
 Future<void> _loadInitialData() async {
   await Future.wait([
     _loadSettings(),
-    _saveSettings(), 
+    _loadCurrentPayment(), // Change from _saveSettings() to _loadCurrentPayment()
+    // _saveSettings(), 
   ]);
   
   // Refresh the UI to update dropdown options after menus are loaded
@@ -155,6 +161,21 @@ Future<void> _loadInitialData() async {
     setState(() {});
   }
 }
+
+Future<void> _loadCurrentPayment() async {
+  try {
+    final payment = await ApiService.getRequiredPayment();
+    if (mounted) {
+      setState(() {
+        _currentPayment = payment;
+      });
+    }
+  } catch (e) {
+    print('Error loading payment: $e');
+  }
+}
+
+
   void _initAnimations() {
     _animationController = AnimationController(
       duration: Duration(milliseconds: 1000),
@@ -225,6 +246,224 @@ String _buildTimesString() {
     }
   }
 
+  Future<void> _savePayment() async {
+  setState(() {
+    _isSaving = true;
+    _errorMessage = null;
+  });
+
+  try {
+    await ApiService.updatePayment(_paymentShouldPay);
+    
+    // Reload the current payment after successful save
+    await _loadCurrentPayment();
+
+    if (!mounted) return;
+
+    setState(() {
+      _isSaving = false;
+    });
+
+    _showSuccessDialog();
+
+  } catch (e) {
+    if (!mounted) return;
+    setState(() {
+      _errorMessage = 'فشل في حفظ المبلغ: $e';
+      _isSaving = false;
+    });
+  }
+}
+Future<double> _getCurrentPayment() async {
+  final payment = await ApiService.getRequiredPayment();
+  return payment;
+}
+Widget _buildPaymentCard(bool isMobile, bool isDark) {
+  return Container(
+    padding: EdgeInsets.all(isMobile ? 10 : 20),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(isDark ? 0.3 : 0.04),
+          spreadRadius: 0,
+          blurRadius: 12,
+          offset: Offset(0, 4),
+        ),
+      ],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.green.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(Icons.payments_outlined, color: Colors.green, size: 20),
+            ),
+            SizedBox(width: 12),
+            Text(
+              'المبلغ المطلوب للحجز',
+              style: TextStyle(
+                fontSize: isMobile ? 18 : 20,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 20),
+        _currentPayment == null
+            ? Center(child: CircularProgressIndicator())
+            : Container(
+                padding: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _currentPayment!.toStringAsFixed(2),
+                          style: TextStyle(
+                            fontSize: 32,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                        Text(
+                          'DA',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                    IconButton(
+                      onPressed: () => _showEditPaymentDialog(isDark),
+                      icon: Icon(Icons.edit),
+                      color: AppColors.primary,
+                      iconSize: 28,
+                    ),
+                  ],
+                ),
+              ),
+        // SizedBox(height: 16),
+        // SizedBox(
+        //   width: double.infinity,
+        //   child: ElevatedButton(
+        //     onPressed: _isSaving ? null : _savePayment,
+        //     style: ElevatedButton.styleFrom(
+        //       backgroundColor: Colors.green,
+        //       foregroundColor: Colors.white,
+        //       padding: EdgeInsets.symmetric(vertical: 12),
+        //       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        //     ),
+        //     child: _isSaving
+        //         ? Row(
+        //             mainAxisSize: MainAxisSize.min,
+        //             children: [
+        //               SizedBox(
+        //                 width: 16,
+        //                 height: 16,
+        //                 child: CircularProgressIndicator(
+        //                   strokeWidth: 2,
+        //                   valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+        //                 ),
+        //               ),
+        //               SizedBox(width: 12),
+        //               Text('جارٍ الحفظ...', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+        //             ],
+        //           )
+        //         : Text('حفظ المبلغ', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+        //   ),
+        // ),
+      ],
+    ),
+  );
+}
+
+void _showEditPaymentDialog(bool isDark) {
+final TextEditingController controller = TextEditingController(
+    text: (_currentPayment ?? 0).toStringAsFixed(0) // Use _currentPayment instead
+  );  
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      backgroundColor:  Colors.white,
+      title: Text('تعديل المبلغ', style: TextStyle(color:  AppColors.textPrimary)),
+      content: TextField(
+        controller: controller,
+        keyboardType: TextInputType.number,
+        autofocus: true,
+        style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color:  AppColors.textPrimary),
+        decoration: InputDecoration(
+          labelText: 'المبلغ (DA)',
+          labelStyle: TextStyle(color:  AppColors.textSecondary),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: AppColors.primary, width: 2),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text('إلغاء', style: TextStyle(color:  AppColors.textSecondary)),
+        ),
+        ElevatedButton(
+          onPressed: () async {
+            
+            final value = double.tryParse(controller.text) ?? 0;
+            setState((){
+              _paymentShouldPay = value.clamp(0, 100000);
+              _currentPayment = value.clamp(0, 100000);
+
+            });
+            Navigator.pop(context);
+            await _savePayment();
+
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+          child:_isSaving ? 
+          Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      ),
+                      SizedBox(width: 12),
+                      Text('جارٍ الحفظ...', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                    ],
+                  )
+           : Text('حفظ', style: TextStyle(color: Colors.white)),
+        ),
+      ],
+    ),
+  );
+}
+
+
 void _populateFormFields() {
   _allowCrossClanReservations = _settings['allow_cross_clan_reservations'] ?? true;
   _maxGroomsPerDate = _settings['max_grooms_per_date'] ?? 3;
@@ -233,6 +472,8 @@ void _populateFormFields() {
   _calendarYearsAhead = _settings['calendar_years_ahead'] ?? 3;
   _yearsMaxReservGroomFromOutClan = _settings['years_max_reserv_GroomFromOutClan'] ?? 3;
   _yearsMaxReservGroomFromOriginClan = _settings['years_max_reserv_GrooomFromOriginClan'] ?? 1;
+  _paymentShouldPay = double.tryParse(_settings['payment_should_pay']?.toString() ?? '0') ?? 0.0; // Add this line
+
 
   // Parse month strings to lists
   if (_settings['allowed_months_single_day'] != null) {
@@ -556,8 +797,11 @@ void _showSuccessDialog() {
   }
 
   Widget _buildSettingsForm(bool isMobile, bool isTablet) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
       children: [
+        _buildPaymentCard(isMobile, isDark), // Add this line
+        SizedBox(height: 20),
         _buildGeneralSettingsCard(isMobile, isTablet),
         SizedBox(height: 20),
         _buildInviteAcceptanceCard(isMobile, isTablet), // Add this line
@@ -779,116 +1023,102 @@ void _showSuccessDialog() {
       ),
     );
   }
-
-  Widget _buildReservationRulesCard(bool isMobile, bool isTablet) {
-    return Container(
-      padding: EdgeInsets.all(isMobile ? 16 : 20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            spreadRadius: 0,
-            blurRadius: 12,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.orange.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(Icons.rule_outlined, color: Colors.orange, size: 20),
+Widget _buildReservationRulesCard(bool isMobile, bool isTablet) {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  
+  return Container(
+    padding: EdgeInsets.all(isMobile ? 16 : 20),
+    decoration: BoxDecoration(
+      color:  Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(isDark ? 0.3 : 0.04),
+          spreadRadius: 0,
+          blurRadius: 12,
+          offset: Offset(0, 4),
+        ),
+      ],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
               ),
-              SizedBox(width: 12),
-              Text(
-                'قواعد الحجز',
-                style: TextStyle(
-                  fontSize: isMobile ? 18 : 20,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
-                ),
+              child: Icon(Icons.rule_outlined, color: Colors.orange, size: 20),
+            ),
+            SizedBox(width: 12),
+            Text(
+              'قواعد الحجز',
+              style: TextStyle(
+                fontSize: isMobile ? 18 : 20,
+                fontWeight: FontWeight.w700,
+                color:  AppColors.textPrimary,
               ),
-            ],
-          ),
-          SizedBox(height: 20),
-          
-          // Max grooms per date
-          _buildNumberInputTile(
-            title: 'أقصى عدد عرسان في اليوم الواحد',
-            subtitle: 'العدد الأقصى المسموح للحجز في نفس التاريخ',
-            value: _maxGroomsPerDate,
-            onChanged: (value) => setState(() => _maxGroomsPerDate = value),
-            min: 1,
-            max: 10,
-            icon: Icons.group_outlined,
-          ),
+            ),
+          ],
+        ),
+        SizedBox(height: 20),
+        
+        _buildNumberInputTileWithEdit(
+          title: 'أقصى عدد عرسان في اليوم الواحد',
+          subtitle: 'العدد الأقصى المسموح للحجز في نفس التاريخ',
+          value: _maxGroomsPerDate,
+          onChanged: (value) => setState(() => _maxGroomsPerDate = value),
+          min: 1,
+          max: 10,
+          icon: Icons.group_outlined,
+          isDark: isDark,
+        ),
 
-          SizedBox(height: 20),
-          
-          // Years max reserv from out clan
-          _buildNumberInputTile(
-            title: 'عدد السنوات المسموحة للحجز من خارج العشيرة',
-            subtitle: 'عدد السنوات المستقبلية المتاحة للحجز للاعراس من عشائر أخرى',
-            value: _yearsMaxReservGroomFromOutClan,
-            onChanged: (value) => setState(() => _yearsMaxReservGroomFromOutClan = value),
-            min: 1,
-            max: 8,
-            icon: Icons.event_available_outlined,
-          ),
-          
-          SizedBox(height: 20),
-          
-          // Years max reserv from origin clan
-          _buildNumberInputTile(
-            title: 'عدد السنوات المسموحة للحجز من داخل العشيرة',
-            subtitle: 'عدد السنوات المستقبلية المتاحة للحجز للاعراس من داخل العشيرة ',
-            value: _yearsMaxReservGroomFromOriginClan,
-            onChanged: (value) => setState(() => _yearsMaxReservGroomFromOriginClan = value),
-            min: 1,
-            max: 8,
-            icon: Icons.home_outlined,
-          ),
-
-          
-          SizedBox(height: 20),
-          
-          // Validation deadline
-          _buildNumberInputTile(
-            title: 'مهلة التأكيد (بالأيام)',
-            subtitle: 'عدد الأيام المسموحة للتأكيد على الحجز',
-            value: _validationDeadlineDays,
-            onChanged: (value) => setState(() => _validationDeadlineDays = value),
-            min: 1,
-            max: 30,
-            icon: Icons.schedule_outlined,
-          ),
-          
-          SizedBox(height: 20),
-          
-          // Calendar years ahead
-          // _buildNumberInputTile(
-          //   title: 'سنوات التقويم المستقبلية',
-          //   subtitle: 'عدد السنوات المستقبلية المتاحة للحجز',
-          //   value: _calendarYearsAhead,
-          //   onChanged: (value) => setState(() => _calendarYearsAhead = value),
-          //   min: 1,
-          //   max: 5,
-          //   icon: Icons.calendar_today_outlined,
-          // ),
-        ],
-      ),
-    );
-  }
-
+        SizedBox(height: 20),
+        
+        _buildNumberInputTileWithEdit(
+          title: 'عدد السنوات المسموحة للحجز من خارج العشيرة',
+          subtitle: 'عدد السنوات المستقبلية المتاحة للحجز للاعراس من عشائر أخرى',
+          value: _yearsMaxReservGroomFromOutClan,
+          onChanged: (value) => setState(() => _yearsMaxReservGroomFromOutClan = value),
+          min: 1,
+          max: 8,
+          icon: Icons.event_available_outlined,
+          isDark: isDark,
+        ),
+        
+        SizedBox(height: 20),
+        
+        _buildNumberInputTileWithEdit(
+          title: 'عدد السنوات المسموحة للحجز من داخل العشيرة',
+          subtitle: 'عدد السنوات المستقبلية المتاحة للحجز للاعراس من داخل العشيرة ',
+          value: _yearsMaxReservGroomFromOriginClan,
+          onChanged: (value) => setState(() => _yearsMaxReservGroomFromOriginClan = value),
+          min: 1,
+          max: 8,
+          icon: Icons.home_outlined,
+          isDark: isDark,
+        ),
+        
+        SizedBox(height: 20),
+        
+        _buildNumberInputTileWithEdit(
+          title: 'مهلة التأكيد (بالأيام)',
+          subtitle: 'عدد الأيام المسموحة للتأكيد على الحجز',
+          value: _validationDeadlineDays,
+          onChanged: (value) => setState(() => _validationDeadlineDays = value),
+          min: 1,
+          max: 30,
+          icon: Icons.schedule_outlined,
+          isDark: isDark,
+        ),
+      ],
+    ),
+  );
+}
   Widget _buildMonthSelectionCard(bool isMobile, bool isTablet) {
     return Container(
       padding: EdgeInsets.all(isMobile ? 16 : 20),
@@ -1148,6 +1378,139 @@ void _showSuccessDialog() {
     );
   }
 
+Widget _buildNumberInputTileWithEdit({
+  required String title,
+  required String subtitle,
+  required int value,
+  required Function(int) onChanged,
+  required int min,
+  required int max,
+  required IconData icon,
+  required bool isDark,
+}) {
+  return Row(
+    children: [
+      Container(
+        padding: EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: AppColors.primary.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(icon, color: AppColors.primary, size: 20),
+      ),
+      SizedBox(width: 12),
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            SizedBox(height: 2),
+            Text(
+              subtitle,
+              style: TextStyle(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
+      Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.grey.shade300),
+            ),
+            child: Text(
+              value.toString(),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ),
+          IconButton(
+            onPressed: () => _showEditNumberDialog(
+              title: title,
+              currentValue: value,
+              min: min,
+              max: max,
+              isDark: isDark,
+              onSave: onChanged,
+            ),
+            icon: Icon(Icons.edit),
+            color: AppColors.primary,
+            iconSize: 24,
+          ),
+        ],
+      ),
+    ],
+  );
+}
+void _showEditNumberDialog({
+  required String title,
+  required int currentValue,
+  required int min,
+  required int max,
+  required bool isDark,
+  required Function(int) onSave,
+}) {
+  final TextEditingController controller = TextEditingController(text: currentValue.toString());
+  
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      backgroundColor: isDark ? Color(0xFF1E1E1E) : Colors.white,
+      title: Text(title, style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimary)),
+      content: TextField(
+        controller: controller,
+        keyboardType: TextInputType.number,
+        autofocus: true,
+        style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: isDark ? Colors.white : AppColors.textPrimary),
+        decoration: InputDecoration(
+          labelText: 'أدخل القيمة ($min - $max)',
+          labelStyle: TextStyle(color: isDark ? Colors.white70 : AppColors.textSecondary),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: AppColors.primary, width: 2),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text('إلغاء', style: TextStyle(color: isDark ? Colors.white70 : AppColors.textSecondary)),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            final value = int.tryParse(controller.text) ?? currentValue;
+            final clampedValue = value.clamp(min, max);
+            onSave(clampedValue);
+            Navigator.pop(context);
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+          child: Text('حفظ', style: TextStyle(color: Colors.white)),
+        ),
+      ],
+    ),
+  );
+}
   Widget _buildSaveButton(bool isMobile) {
     return Container(
       width: double.infinity,
@@ -1194,4 +1557,7 @@ void _showSuccessDialog() {
       ),
     );
   }
-}
+} 
+
+
+ 

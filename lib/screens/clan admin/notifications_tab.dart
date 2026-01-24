@@ -300,7 +300,7 @@ Future<void> _loadNotifications() async {
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
             ),
-            child: Text('حذف'),
+            child: Text('حذف '),
           ),
         ],
       ),
@@ -309,7 +309,7 @@ Future<void> _loadNotifications() async {
     if (confirmed == true) {
       try {
         setState(() => _isLoading = true);
-        await ApiService.deleteNotification(notificationId);
+        await ApiService.bulkDeleteNotifications();
         _showSuccessMessage('تم حذف الإشعار بنجاح');
         _loadNotifications();
       } catch (e) {
@@ -325,52 +325,52 @@ Future<void> _loadNotifications() async {
     }
   }
 
-  Future<void> _deleteMultipleNotifications(List<int> notificationIds) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(Icons.warning, color: Colors.orange),
-            SizedBox(width: 8),
-            Text('تأكيد الحذف'),
-          ],
-        ),
-        content: Text('هل أنت متأكد من حذف ${notificationIds.length} إشعار؟'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text('إلغاء'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-            ),
-            child: Text('حذف الكل'),
-          ),
-        ],
-      ),
-    );
+  // Future<void> _deleteMultipleNotifications(List<int> notificationIds) async {
+  //   final confirmed = await showDialog<bool>(
+  //     context: context,
+  //     builder: (context) => AlertDialog(
+  //       title: Row(
+  //         children: [
+  //           Icon(Icons.warning, color: Colors.orange),
+  //           SizedBox(width: 8),
+  //           Text('تأكيد الحذف'),
+  //         ],
+  //       ),
+  //       content: Text('هل أنت متأكد من حذف ${notificationIds.length} إشعار؟'),
+  //       actions: [
+  //         TextButton(
+  //           onPressed: () => Navigator.pop(context, false),
+  //           child: Text('إلغاء'),
+  //         ),
+  //         ElevatedButton(
+  //           onPressed: () => Navigator.pop(context, true),
+  //           style: ElevatedButton.styleFrom(
+  //             backgroundColor: Colors.red,
+  //           ),
+  //           child: Text('حذف الكل'),
+  //         ),
+  //       ],
+  //     ),
+  //   );
 
-    if (confirmed == true) {
-      try {
-        setState(() => _isLoading = true);
-        final result = await ApiService.bulkDeleteNotifications(notificationIds);
-        _showSuccessMessage('تم حذف ${result['count']} إشعار بنجاح');
-        _loadNotifications();
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('خطأ في حذف الإشعارات: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      } finally {
-        setState(() => _isLoading = false);
-      }
-    }
-  }
+  //   if (confirmed == true) {
+  //     try {
+  //       setState(() => _isLoading = true);
+  //       final result = await ApiService.bulkDeleteNotifications();
+  //       _showSuccessMessage('تم حذف ${result['count']} إشعار بنجاح');
+  //       _loadNotifications();
+  //     } catch (e) {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         SnackBar(
+  //           content: Text('خطأ في حذف الإشعارات: ${e.toString()}'),
+  //           backgroundColor: Colors.red,
+  //         ),
+  //       );
+  //     } finally {
+  //       setState(() => _isLoading = false);
+  //     }
+  //   }
+  // }
 
   void _showSuccessMessage(String message) {
     ScaffoldMessenger.of(context).showSnackBar(

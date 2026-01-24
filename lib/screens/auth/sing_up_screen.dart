@@ -23,9 +23,9 @@ class _MultiStepSignupScreenState extends State<MultiStepSignupScreen>
   final PageController _pageController = PageController();
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
-  
+  bool _SmsToGroom = false; // Default: send to guardian's phone
   int _currentStep = 0;
-  final int _totalSteps = 4;
+  final int _totalSteps = 5;
   
   // Form keys for each step
   final List<GlobalKey<FormState>> _formKeys = [
@@ -33,6 +33,7 @@ class _MultiStepSignupScreenState extends State<MultiStepSignupScreen>
     GlobalKey<FormState>(),
     GlobalKey<FormState>(),
     GlobalKey<FormState>(),
+    GlobalKey<FormState>(), // Add this new one
   ];
   
   // Controllers for personal info
@@ -59,7 +60,7 @@ class _MultiStepSignupScreenState extends State<MultiStepSignupScreen>
   DateTime? _guardianBirthDate;
   County? _selectedCounty;
   Clan? _selectedClan;
-  String? _selectedGuardianRelation;
+  // String? _selectedGuardianRelation;
   
   // State
   bool _isLoading = false;
@@ -70,6 +71,7 @@ class _MultiStepSignupScreenState extends State<MultiStepSignupScreen>
   List<Clan> _filteredClans = [];
   // bool _hasInternet = true;
   bool _isLoadingClans = false;
+  String? _selectedGuardianRelation = AppConstants.guardianRelations.first;
 
 // Also update the _checkConnectivity method to be more reliable
 Future<bool> _checkConnectivity() async {
@@ -223,7 +225,7 @@ void initState() {
     CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
   );
   _animationController.forward();
-  
+
   // Check connectivity after the first frame is rendered
   WidgetsBinding.instance.addPostFrameCallback((_) async {
     final hasInternet = await _checkConnectivity();
@@ -345,26 +347,89 @@ Future<void> _loadClans() async {
   //     ),
   //   );
   // }
-  void _showErrorDialog(String message) {
+
+//   void _showErrorDialog(String message) {
+//   showDialog(
+//     context: context,
+//     builder: (BuildContext context) {
+//       return AlertDialog(
+//         shape: RoundedRectangleBorder(
+//           borderRadius: BorderRadius.circular(16),
+//         ),
+//         title: Row(
+//           children: [
+//             Icon(Icons.error_outline, color: AppColors.error, size: 28),
+//             const SizedBox(width: 12),
+//             const Text('خطأ'),
+//           ],
+//         ),
+//         content: Text(message),
+//         actions: [
+//           TextButton(
+//             onPressed: () => Navigator.of(context).pop(),
+//             child: const Text('حسناً'),
+//           ),
+//         ],
+//       );
+//     },
+//   );
+// }
+void _showErrorDialog(String message) {
   showDialog(
     context: context,
     builder: (BuildContext context) {
+      final screenWidth = MediaQuery.of(context).size.width;
+      final isSmallScreen = screenWidth < 360;
+      
       return AlertDialog(
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),
+        contentPadding: EdgeInsets.symmetric(
+          horizontal: isSmallScreen ? 16 : 24,
+          vertical: 20,
+        ),
         title: Row(
           children: [
-            Icon(Icons.error_outline, color: AppColors.error, size: 28),
-            const SizedBox(width: 12),
-            const Text('خطأ'),
+            Icon(
+              Icons.error_outline, 
+              color: AppColors.error, 
+              size: isSmallScreen ? 24 : 28,
+            ),
+            SizedBox(width: isSmallScreen ? 8 : 12),
+            Expanded(
+              child: Text(
+                'تنبيه',
+                style: TextStyle(
+                  fontSize: isSmallScreen ? 16 : 18,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
           ],
         ),
-        content: Text(message),
+        content: Text(
+          message,
+          style: TextStyle(
+            fontSize: isSmallScreen ? 13 : 15,
+          ),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('حسناً'),
+            style: TextButton.styleFrom(
+              padding: EdgeInsets.symmetric(
+                horizontal: isSmallScreen ? 12 : 16,
+                vertical: 8,
+              ),
+            ),
+            child: Text(
+              'حسناً',
+              style: TextStyle(
+                fontSize: isSmallScreen ? 13 : 15,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       );
@@ -377,8 +442,8 @@ Future<void> _loadClans() async {
       context: context,
       locale: const Locale('ar', 'DZ'), 
       initialDate: DateTime.now().subtract(Duration(days: isGuardian ? 40 * 365 : 21 * 365)),
-      firstDate: DateTime.now().subtract(Duration(days: 90 * 365)),
-      lastDate: DateTime.now().subtract(Duration(days: isGuardian ? 20 * 365 : 16 * 365)),
+      firstDate: DateTime.now().subtract(Duration(days: isGuardian ? 100 * 365 : 80 * 365)),
+      lastDate: DateTime.now().subtract(Duration(days: isGuardian ? 15 * 365 : 5 * 365)),
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
@@ -405,15 +470,104 @@ Future<void> _loadClans() async {
     }
   }
 
-  String? _validatePhone(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'رقم الهاتف مطلوب';
-    }
-    if (!RegExp(r'^[0-9]{10}$').hasMatch(value)) {
-      return 'رقم الهاتف يجب أن يكون 10 أرقام';
-    }
+  // String? _validatePhone(String? value) {
+  //   if (value == null || value.isEmpty) {
+  //     return 'رقم الهاتف مطلوب';
+  //   }
+  //   if (!RegExp(r'^[0-9]{10}$').hasMatch(value)) {
+  //     return 'رقم الهاتف يجب أن يكون 10 أرقام';
+  //   }
+  //   return null;
+  // }
+
+String? _validatePhone(String? value) {
+
+  if (value == null || value.isEmpty) {
+    return 'رقم الهاتف مطلوب';
+  }
+  
+  String phone = value.trim();
+  
+  if (phone.length != 10) {
+    return 'رقم الهاتف يجب أن يتكون من 10 أرقام بالضبط';
+  }
+  
+  if (!RegExp(r'^[0-9]+$').hasMatch(phone)) {
+    return 'رقم الهاتف يجب أن يحتوي على أرقام فقط';
+  }
+  
+  if (!phone.startsWith('05') && !phone.startsWith('06') && !phone.startsWith('07')) {
+    return 'رقم الهاتف يجب أن يبدأ بـ 05 أو 06 أو 07';
+  }
+  
+  return null;
+}
+
+String? _validateGuardianPhone(String? value) {
+  if (value == null || value.isEmpty) {
+    return 'رقم هاتف ولي الأمر مطلوب';
+  }
+  
+  String phone = value.trim();
+  
+  if (phone.length != 10) {
+    return 'رقم هاتف ولي الأمر يجب أن يتكون من 10 أرقام بالضبط';
+  }
+  
+  if (!RegExp(r'^[0-9]+$').hasMatch(phone)) {
+    return 'رقم الهاتف يجب أن يحتوي على أرقام فقط';
+  }
+  
+  if (!phone.startsWith('05') && !phone.startsWith('06') && !phone.startsWith('07')) {
+    return 'رقم هاتف ولي الأمر يجب أن يبدأ بـ 05 أو 06 أو 07';
+  }
+  
+  return null;
+}
+
+
+
+/// Async validation for groom phone - checks API for existing phone
+Future<String?> _validateGroomPhoneAsync(String? value) async {
+  // First do basic validation
+  String? basicValidation = _validatePhone(value);
+  if (basicValidation != null) {
+    return basicValidation;
+  }
+  
+  // Skip API check if phone is optional (SMS going to guardian)
+  if (!_SmsToGroom && (value == null || value.isEmpty)) {
     return null;
   }
+  
+  // Check if phone exists in database
+  try {
+    String? existenceError = await ApiService.validateGroomPhoneAvailability(value!.trim());
+    return existenceError; // Returns error message if exists, null if available
+  } catch (e) {
+    print('Error checking groom phone: $e');
+    return null; // Don't block registration on API error
+  }
+}
+
+/// Async validation for guardian phone - checks API for existing phone
+Future<String?> _validateGuardianPhoneAsync(String? value) async {
+  // First do basic validation
+  String? basicValidation = _validateGuardianPhone(value);
+  if (basicValidation != null) {
+    return basicValidation;
+  }
+  
+  // Check if phone exists in database
+  try {
+    String? existenceError = await ApiService.validateGuardianPhoneAvailability(value!.trim());
+    return existenceError; // Returns error message if exists, null if available
+  } catch (e) {
+    print('Error checking guardian phone: $e');
+    return null; // Don't block registration on API error
+  }
+}
+
 
   String? _validateRequired(String? value, String fieldName) {
     if (value == null || value.isEmpty) {
@@ -439,25 +593,204 @@ Future<void> _loadClans() async {
     return null;
   }
 
-  bool _validateCurrentStep() {
-    switch (_currentStep) {
-      case 0:
-        return _formKeys[0].currentState!.validate() && 
-              _guardianBirthDate != null && 
-              _selectedGuardianRelation != null;
-      case 1:
-        return _formKeys[1].currentState!.validate() && _birthDate != null;
-      case 2:
-        return _selectedCounty != null && _selectedClan != null;
-      case 3:
-        return _formKeys[3].currentState!.validate();
-      default:
-        return false;
-    }
-  }
 
-  void _nextStep() {
-  if (_validateCurrentStep()) {
+// // Replace the existing _validateCurrentStep method
+// bool _validateCurrentStep() {
+//   switch (_currentStep) {
+//     case 0:
+//       return _formKeys[0].currentState!.validate() && 
+//             _guardianBirthDate != null && 
+//             _selectedGuardianRelation != null;
+//     case 1:
+//       return _formKeys[1].currentState!.validate() && _birthDate != null;
+//     case 2:
+//       return _selectedCounty != null && _selectedClan != null;
+//     case 3:
+//       return _formKeys[3].currentState!.validate();
+//     case 4:
+//       // Validate that at least one phone number is available
+//       return _SmsToGroom 
+//           ? _phoneController.text.trim().isNotEmpty
+//           : _guardianPhoneController.text.trim().isNotEmpty;
+//     default:
+//       return false;
+//   }
+// }
+
+// bool _validateCurrentStep() {
+//   switch (_currentStep) {
+//     case 0:
+//       // Explicitly validate guardian phone before form validation
+//       if (_guardianPhoneController.text.trim().isEmpty) {
+//         return false;
+//       }
+//       String? guardianPhoneError = _validateGuardianPhone(_guardianPhoneController.text);
+//       if (guardianPhoneError != null) {
+//         return false;
+//       }
+//       return _formKeys[0].currentState!.validate() && 
+//             _guardianBirthDate != null && 
+//             _selectedGuardianRelation != null;
+//     case 1:
+//       return _formKeys[1].currentState!.validate() && _birthDate != null;
+//     case 2:
+//       return _selectedCounty != null && _selectedClan != null;
+//     case 3:
+//       return _formKeys[3].currentState!.validate();
+//     case 4:
+//       // Validate that the selected phone number is valid
+//       if (_SmsToGroom) {
+//         return _validatePhone(_phoneController.text) == null;
+//       } else {
+//         return _validateGuardianPhone(_guardianPhoneController.text) == null;
+//       }
+//     default:
+//       return false;
+//   }
+// }
+Future<bool> _validateCurrentStepAsync() async {
+  switch (_currentStep) {
+    case 0:
+      // Location step validation
+      if (_selectedCounty == null) {
+        _showErrorDialog('يرجى اختيار القصر');
+        return false;
+      }
+      if (_selectedClan == null) {
+        _showErrorDialog('يرجى اختيار العشيرة');
+        return false;
+      }
+      return true;
+      
+    case 1:
+      // Guardian info validation
+      if (_guardianPhoneController.text.trim().isEmpty) {
+        _showErrorDialog('رقم هاتف الولي مطلوب');
+        return false;
+      }
+      
+      // Check basic validation
+      String? guardianPhoneError = _validateGuardianPhone(_guardianPhoneController.text);
+      if (guardianPhoneError != null) {
+        _showErrorDialog(guardianPhoneError);
+        return false;
+      }
+      
+      // Check if phone exists in database
+      String? guardianExistenceError = await _validateGuardianPhoneAsync(_guardianPhoneController.text);
+      if (guardianExistenceError != null) {
+        _showErrorDialog(guardianExistenceError);
+        return false;
+      }
+      
+      // Validate rest of the form
+      if (!_formKeys[0].currentState!.validate()) {
+        return false;
+      }
+      
+      if (_guardianBirthDate == null) {
+        _showErrorDialog('يرجى اختيار تاريخ ميلاد ولي العريس');
+        return false;
+      }
+      
+      if (_selectedGuardianRelation == null) {
+        _showErrorDialog('يرجى اختيار صلة القرابة');
+        return false;
+      }
+      
+      return true;
+      
+    case 2:
+      // Personal info validation (Groom)
+      if (_phoneController.text.trim().isNotEmpty || _SmsToGroom) {
+        String? groomPhoneError = await _validateGroomPhoneAsync(_phoneController.text);
+        if (groomPhoneError != null) {
+          _showErrorDialog(groomPhoneError);
+          return false;
+        }
+      }
+      
+      if (!_formKeys[1].currentState!.validate()) {
+        return false;
+      }
+      
+      if (_birthDate == null) {
+        _showErrorDialog('يرجى اختيار تاريخ الميلاد');
+        return false;
+      }
+      
+      return true;
+      
+    case 3:
+      // Security step validation
+      return _formKeys[3].currentState!.validate();
+      
+    case 4:
+      // Phone selection validation
+      if (_SmsToGroom) {
+        String? phoneError = await _validateGroomPhoneAsync(_phoneController.text);
+        if (phoneError != null) {
+          _showErrorDialog(phoneError);
+          return false;
+        }
+      } else {
+        String? guardianError = await _validateGuardianPhoneAsync(_guardianPhoneController.text);
+        if (guardianError != null) {
+          _showErrorDialog(guardianError);
+          return false;
+        }
+      }
+      return true;
+      
+    default:
+      return false;
+  }
+}
+
+
+//   void _nextStep() {
+//   if (_validateCurrentStep()) {
+//     if (_currentStep < _totalSteps - 1) {
+//       setState(() {
+//         _currentStep++;
+//       });
+//       _pageController.animateToPage(
+//         _currentStep,
+//         duration: Duration(milliseconds: 300),
+//         curve: Curves.easeInOut,
+//       );
+//     } else {
+//       _signup();
+//     }
+//   } else {
+//     if (_currentStep == 0) {
+//       if (_guardianBirthDate == null) {
+//         _showErrorDialog('يرجى اختيار تاريخ ميلاد ولي العريس');
+//       } else if (_selectedGuardianRelation == null) {
+//         _showErrorDialog('يرجى اختيار صلة القرابة');
+//       }
+//     } else if (_currentStep == 1 && _birthDate == null) {
+//       _showErrorDialog('يرجى اختيار تاريخ الميلاد');
+//     } else if (_currentStep == 2 && (_selectedCounty == null || _selectedClan == null)) {
+//       _showErrorDialog('يرجى اختيار القصر والعشيرة');
+//     }
+//   }
+// }
+
+
+Future<void> _nextStep() async {
+  // Show loading indicator during validation
+  setState(() {
+    _isLoading = true;
+  });
+  
+  bool isValid = await _validateCurrentStepAsync();
+  
+  setState(() {
+    _isLoading = false;
+  });
+  
+  if (isValid) {
     if (_currentStep < _totalSteps - 1) {
       setState(() {
         _currentStep++;
@@ -469,18 +802,6 @@ Future<void> _loadClans() async {
       );
     } else {
       _signup();
-    }
-  } else {
-    if (_currentStep == 0) {
-      if (_guardianBirthDate == null) {
-        _showErrorDialog('يرجى اختيار تاريخ ميلاد ولي العريس');
-      } else if (_selectedGuardianRelation == null) {
-        _showErrorDialog('يرجى اختيار صلة القرابة');
-      }
-    } else if (_currentStep == 1 && _birthDate == null) {
-      _showErrorDialog('يرجى اختيار تاريخ الميلاد');
-    } else if (_currentStep == 2 && (_selectedCounty == null || _selectedClan == null)) {
-      _showErrorDialog('يرجى اختيار القصر والعشيرة');
     }
   }
 }
@@ -530,18 +851,32 @@ Future<void> _signup() async {
       'guardian_birth_address': _guardianBirthAddressController.text.trim(),
       'guardian_home_address': _guardianHomeAddressController.text.trim(),
       'guardian_relation': _selectedGuardianRelation,
+      'sms_to_groom_phone' : _SmsToGroom,
     };
 
-    final response = await ApiService.registerGroom(userData);
+    await ApiService.registerGroom(userData);
     
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => OTPVerificationScreen(
-          phoneNumber: _phoneController.text.trim(),
-        ),
-      ),
-    );
+    if (_SmsToGroom){
+      Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => OTPVerificationScreen(
+                phoneNumber: _phoneController.text.trim(),
+              ),
+            ),
+          );
+
+    }else{
+      Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => OTPVerificationScreen(
+                phoneNumber: _guardianPhoneController.text.trim(),
+              ),
+            ),
+          );
+    }
+    
 
   } catch (e) {
     _showErrorDialog('فشل في التسجيل: $e');
@@ -672,7 +1007,7 @@ Future<void> _signup() async {
 
   Widget _buildStepTitle(String title, [String subtitle = '']) {
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 24),
+      padding: EdgeInsets.symmetric(horizontal: 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -684,6 +1019,7 @@ Future<void> _signup() async {
               fontWeight: FontWeight.bold,
             ),
           ),
+           
           SizedBox(height: 8),
           if (subtitle.isNotEmpty) ...[
             Text(
@@ -699,8 +1035,6 @@ Future<void> _signup() async {
     );
   }
 // Replace the build method's AppBar section with this:
-
-@override
 Widget build(BuildContext context) {
   return Scaffold(
     backgroundColor: Colors.grey[50],
@@ -713,8 +1047,8 @@ Widget build(BuildContext context) {
       elevation: 0,
       foregroundColor: AppColors.primary,
       centerTitle: true,
-      automaticallyImplyLeading: _currentStep == 0, // Show back button only on first step
-      leading: _currentStep > 0 ? SizedBox.shrink() : null, // Hide back button on other steps
+      automaticallyImplyLeading: _currentStep == 0,
+      leading: _currentStep > 0 ? SizedBox.shrink() : null,
     ),
     body: FadeTransition(
       opacity: _fadeAnimation,
@@ -726,10 +1060,11 @@ Widget build(BuildContext context) {
               controller: _pageController,
               physics: NeverScrollableScrollPhysics(),
               children: [
-                _buildGuardianInfoStep(),
-                _buildPersonalInfoStep(),
-                _buildLocationStep(),
-                _buildSecurityStep(),
+                _buildLocationStep(),        // Step 0 - Location (was step 2)
+                _buildGuardianInfoStep(),    // Step 1 - Guardian (was step 0)
+                _buildPersonalInfoStep(),    // Step 2 - Personal (was step 1)
+                _buildSecurityStep(),        // Step 3 - Security (was step 3)
+                _buildPhoneSelectionStep(),  // Step 4 - Phone Selection (was step 4)
               ],
             ),
           ),
@@ -741,7 +1076,7 @@ Widget build(BuildContext context) {
 }
   Widget _buildPersonalInfoStep() {
     return SingleChildScrollView(
-      padding: EdgeInsets.all(24),
+      padding: EdgeInsets.all(10),
       child: Form(
         key: _formKeys[1],
         child: Column(
@@ -750,29 +1085,29 @@ Widget build(BuildContext context) {
             _buildStepTitle('المعلومات الشخصية للعريس'),
             SizedBox(height: 32),
 
-            // CustomTextField(
+            CustomTextField(
+              controller: _phoneController,
+              label: 'رقم الهاتف ',
+              keyboardType: TextInputType.phone,
+              validator: _validatePhone,
+              prefixIcon: Icons.phone,
+              hint: ' رقم هاتف العريس',
+            ),
+            SizedBox(height: 20),
+
+            // In _buildPersonalInfoStep method, replace the phone field section with:
+
+            // _AnimatedUnderlineTextField(
             //   controller: _phoneController,
-            //   label: 'رقم الهاتف (سيتم إرسال رمز التحقق  SMS إلي هذا الرقم)',
+            //   label: 'رقم الهاتف',
+            //   labelColor: AppColors.textPrimary,
+            //   boxcolor: Colors.green,
             //   keyboardType: TextInputType.phone,
             //   validator: _validatePhone,
             //   prefixIcon: Icons.phone,
             //   hint: '0xxxxxxxxx',
             // ),
-            // SizedBox(height: 20),
-
-            // In _buildPersonalInfoStep method, replace the phone field section with:
-
-_AnimatedUnderlineTextField(
-  controller: _phoneController,
-  label: 'رقم الهاتف (سيتم إرسال رمز التحقق  SMS إلي هذا الرقم)',
-  labelColor: AppColors.textPrimary,
-  boxcolor: AppColors.primary,
-  keyboardType: TextInputType.phone,
-  validator: _validatePhone,
-  prefixIcon: Icons.phone,
-  hint: '0xxxxxxxxx',
-),
-SizedBox(height: 20),
+            SizedBox(height: 20),
 
 
             Row(
@@ -855,229 +1190,178 @@ Widget _buildLocationStep() {
         _buildStepTitle('معلومات الجهة'),
         SizedBox(height: 32),
 
-        // Theme(
-        //   data: Theme.of(context).copyWith(
-        //     hintColor:  Colors.grey.shade600,
-        //     canvasColor:  Colors.white,
-        //   ),
-        //   child: CustomDropdown<County>(
-        //     label: 'القصر',
-        //     value: _selectedCounty,
-        //     hint: ' اختر القصر الذي تنتمي اليه ',
-        //     items: _counties.map((county) => DropdownMenuItem<County>(
-        //       value: county,
-        //       child: Text(
-        //         county.name,
-        //         style: TextStyle(
-        //           color:  Colors.black87,
-        //         ),
-        //       ),
-        //     )).toList(),
-        //     onChanged: _onCountyChanged,
-        //     prefixIcon: Icons.location_city,
-        //   ),
-        // ),
-        // SizedBox(height: 20),
-
-        // Theme(
-        //   data: Theme.of(context).copyWith(
-        //     hintColor:   Colors.grey.shade600,
-        //     canvasColor:  Colors.white,
-        //   ),
-        //   child: CustomDropdown<Clan>(
-        //     label: 'العشيرة',
-        //     value: _selectedClan,
-        //     hint: ' اختر العشيرة التي تنتمي اليها ',
-        //     items: _filteredClans.map((clan) => DropdownMenuItem<Clan>(
-        //       value: clan,
-        //       child: Text(
-        //         clan.name,
-        //         style: TextStyle(
-        //           color:  Colors.black87,
-        //         ),
-        //       ),
-        //     )).toList(),
-        //     onChanged: (clan) {
-        //       setState(() {
-        //         _selectedClan = clan;
-        //       });
-        //     },
-        //     prefixIcon: Icons.groups,
-        //     enabled: _filteredClans.isNotEmpty,
-        //   ),
-        // ),
-Theme(
-  data: Theme.of(context).copyWith(
-    canvasColor: Colors.white,
-  ),
-  child: DropdownButtonFormField<County>(
-    value: _selectedCounty,
-    isExpanded: true,
-    decoration: InputDecoration(
-      labelText: 'القصر *',
-      labelStyle: TextStyle(
-        color: AppColors.textSecondary,
-        fontSize: 14,
-        fontWeight: FontWeight.w500,
-      ),
-      prefixIcon: Container(
-        padding: EdgeInsets.all(12),
-        child: Icon(
-          Icons.location_city,
-          color: AppColors.primary,
-          size: 20,
-        ),
-      ),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide(color: AppColors.border),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide(color: AppColors.border),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide(color: AppColors.primary, width: 2),
-      ),
-      filled: true,
-      fillColor: Colors.white,
-      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-    ),
-    items: _counties.map((county) {
-      return DropdownMenuItem<County>(
-        value: county,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            return SizedBox(
-              width: constraints.maxWidth,
-              child: Text(
-                county.name,
-                style: TextStyle(
-                  fontWeight: FontWeight.w500,
-                  color: Colors.black87,
-                ),
-                overflow: TextOverflow.ellipsis,
-                maxLines: 1,
-              ),
-            );
-          },
-        ),
-      );
-    }).toList(),
-    onChanged: _onCountyChanged,
-    hint: Text(
-      'اختر القصر الذي تنتمي اليه',
-      style: TextStyle(
-        color: AppColors.textSecondary,
-        fontSize: 14,
-      ),
-    ),
-    icon: Icon(
-      Icons.keyboard_arrow_down,
-      color: AppColors.textSecondary,
-    ),
-    dropdownColor: Colors.white,
-  ),
-),
-SizedBox(height: 20),
-// Replace the entire clan CustomDropdown Theme widget with this:
-Theme(
-  data: Theme.of(context).copyWith(
-    canvasColor: Colors.white,
-  ),
-  child: DropdownButtonFormField<Clan>(
-    value: _selectedClan,
-    isExpanded: true,
-    decoration: InputDecoration(
-      labelText: 'العشيرة *',
-      labelStyle: TextStyle(
-        color: AppColors.textSecondary,
-        fontSize: 14,
-        fontWeight: FontWeight.w500,
-      ),
-      prefixIcon: Container(
-        padding: EdgeInsets.all(12),
-        child: Icon(
-          Icons.groups,
-          color: AppColors.primary,
-          size: 20,
-        ),
-      ),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide(color: AppColors.border),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide(color: AppColors.border),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide(color: AppColors.primary, width: 2),
-      ),
-      filled: true,
-      fillColor: Colors.white,
-      helperText: _filteredClans.isEmpty 
-          ? null 
-          : 'العشائر المتاحة في القصر المختار',
-      helperStyle: TextStyle(
-        color: AppColors.textSecondary,
-        fontSize: 12,
-      ),
-      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-    ),
-    items: _filteredClans.map((clan) {
-      return DropdownMenuItem<Clan>(
-        value: clan,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            return SizedBox(
-              width: constraints.maxWidth,
-              child: Text(
-                clan.name,
-                style: TextStyle(
-                  fontWeight: FontWeight.w500,
-                  color: Colors.black87,
-                ),
-                overflow: TextOverflow.ellipsis,
-                maxLines: 1,
-              ),
-            );
-          },
-        ),
-      );
-    }).toList(),
-    onChanged: _filteredClans.isEmpty 
-        ? null 
-        : (clan) {
-            setState(() {
-              _selectedClan = clan;
-            });
-          },
-    hint: Text(
-      'اختر العشيرة التي تنتمي اليها',
-      style: TextStyle(
-        color: AppColors.textSecondary,
-        fontSize: 14,
-      ),
-    ),
-    icon: _isLoadingClans 
-        ? SizedBox(
-            width: 20,
-            height: 20,
-            child: CircularProgressIndicator(
-              strokeWidth: 2.5,
-              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-            ),
-          )
-        : Icon(
-            Icons.keyboard_arrow_down,
-            color: AppColors.textSecondary,
+        Theme(
+          data: Theme.of(context).copyWith(
+            canvasColor: Colors.white,
           ),
-    dropdownColor: Colors.white,
-  ),
-),
+          child: DropdownButtonFormField<County>(
+            value: _selectedCounty,
+            isExpanded: true,
+            decoration: InputDecoration(
+              labelText: 'القصر *',
+              labelStyle: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+              prefixIcon: Container(
+                padding: EdgeInsets.all(12),
+                child: Icon(
+                  Icons.location_city,
+                  color: AppColors.primary,
+                  size: 20,
+                ),
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(color: AppColors.border),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(color: AppColors.border),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(color: AppColors.primary, width: 2),
+              ),
+              filled: true,
+              fillColor: Colors.white,
+              contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+            ),
+            items: _counties.map((county) {
+              return DropdownMenuItem<County>(
+                value: county,
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    return SizedBox(
+                      width: constraints.maxWidth,
+                      child: Text(
+                        county.name,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w500,
+                          color: Colors.black87,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                    );
+                  },
+                ),
+              );
+            }).toList(),
+            onChanged: _onCountyChanged,
+            hint: Text(
+              'اختر القصر الذي تنتمي اليه',
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 14,
+              ),
+            ),
+            icon: Icon(
+              Icons.keyboard_arrow_down,
+              color: AppColors.textSecondary,
+            ),
+            dropdownColor: Colors.white,
+          ),
+        ),
+        SizedBox(height: 20),
+        // Replace the entire clan CustomDropdown Theme widget with this:
+        Theme(
+          data: Theme.of(context).copyWith(
+            canvasColor: Colors.white,
+          ),
+          child: DropdownButtonFormField<Clan>(
+            value: _selectedClan,
+            isExpanded: true,
+            decoration: InputDecoration(
+              labelText: 'العشيرة *',
+              labelStyle: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+              prefixIcon: Container(
+                padding: EdgeInsets.all(12),
+                child: Icon(
+                  Icons.groups,
+                  color: AppColors.primary,
+                  size: 20,
+                ),
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(color: AppColors.border),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(color: AppColors.border),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(color: AppColors.primary, width: 2),
+              ),
+              filled: true,
+              fillColor: Colors.white,
+              helperText: _filteredClans.isEmpty 
+                  ? null 
+                  : 'العشائر المتاحة في القصر المختار',
+              helperStyle: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 12,
+              ),
+              contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+            ),
+            items: _filteredClans.map((clan) {
+              return DropdownMenuItem<Clan>(
+                value: clan,
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    return SizedBox(
+                      width: constraints.maxWidth,
+                      child: Text(
+                        clan.name,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w500,
+                          color: Colors.black87,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                    );
+                  },
+                ),
+              );
+            }).toList(),
+            onChanged: _filteredClans.isEmpty 
+                ? null 
+                : (clan) {
+                    setState(() {
+                      _selectedClan = clan;
+                    });
+                  },
+            hint: Text(
+              'اختر العشيرة التي تنتمي اليها',
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 14,
+              ),
+            ),
+            icon: _isLoadingClans 
+                ? SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                    ),
+                  )
+                : Icon(
+                    Icons.keyboard_arrow_down,
+                    color: AppColors.textSecondary,
+                  ),
+            dropdownColor: Colors.white,
+          ),
+        ),
         if (_selectedCounty != null && _filteredClans.isEmpty) ...[
           SizedBox(height: 20),
           Container(
@@ -1133,7 +1417,7 @@ Widget _buildGuardianInfoStep() {
           CustomTextField(
             controller: _guardianNameController,
             label: 'الإسم الكامل',
-            hint: "الإسم و اللقب  ,إسم الاب ,إسم الجد الاول و الثاني",
+            hint: "الإسم اللقب, إسم الاب, الجد الاول و الثاني",
             validator: (value) => _validateRequired(value, 'الإسم الكامل'),
             prefixIcon: Icons.person_4,
           ),
@@ -1141,11 +1425,11 @@ Widget _buildGuardianInfoStep() {
 
           CustomTextField(
             controller: _guardianPhoneController,
-            label: 'رقم هاتف ',
+            label: 'رقم الهاتف ',
             keyboardType: TextInputType.phone,
-            validator: _validatePhone,
+            validator: _validateGuardianPhone,
             prefixIcon: Icons.phone,
-            hint: '0xxxxxxxxx',
+            hint: 'رقم هاتف الولي ',
           ),
           SizedBox(height: 20),
 
@@ -1303,6 +1587,160 @@ Widget _buildGuardianInfoStep() {
       ),
     );
   }
+
+
+// Add this new widget method after _buildPasswordRequirement
+Widget _buildPhoneSelectionStep() {
+  return SingleChildScrollView(
+    padding: EdgeInsets.all(24),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildStepTitle(
+          'اختيار رقم الهاتف لاستقبال رمز التحقق',
+          'حدد الرقم الذي سيستقبل رسالة SMS',
+        ),
+        SizedBox(height: 32),
+
+        Container(
+          padding: EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: AppColors.primary.withOpacity(0.2),
+            ),
+          ),
+          child: Column(
+            children: [
+              _buildPhoneOption(
+                title: 'رقم هاتف الولي',
+                phoneNumber: _guardianPhoneController.text.trim(),
+                isSelected: !_SmsToGroom,
+                onTap: () {
+                  setState(() {
+                    _SmsToGroom = false;
+                  });
+                },
+                icon: Icons.supervisor_account,
+              ),
+              SizedBox(height: 16),
+              _buildPhoneOption(
+                title: 'رقم هاتف العريس',
+                phoneNumber: _phoneController.text.trim(),
+                isSelected: _SmsToGroom,
+                onTap: () {
+                  setState(() {
+                    _SmsToGroom = true;
+                  });
+                },
+                icon: Icons.person,
+              ),
+            ],
+          ),
+        ),
+
+        SizedBox(height: 24),
+        
+        Container(
+          padding: EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.blue.shade50,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.blue.shade200),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.info_outline, color: Colors.blue.shade700, size: 20),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'سيتم إرسال رمز التحقق SMS إلى الرقم المحدد',
+                  style: TextStyle(
+                    color: Colors.blue.shade900,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+Widget _buildPhoneOption({
+  required String title,
+  required String phoneNumber,
+  required bool isSelected,
+  required VoidCallback onTap,
+  required IconData icon,
+}) {
+  return InkWell(
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(12),
+    child: Container(
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isSelected ? AppColors.primary.withOpacity(0.1) : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isSelected ? AppColors.primary : AppColors.border,
+          width: isSelected ? 2 : 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: isSelected 
+                  ? AppColors.primary 
+                  : AppColors.primary.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              icon,
+              color: isSelected ? Colors.white : AppColors.primary,
+              size: 20,
+            ),
+          ),
+          SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 15,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  phoneNumber.isNotEmpty ? phoneNumber : 'غير محدد',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Radio<bool>(
+            value: true,
+            groupValue: isSelected,
+            onChanged: (_) => onTap(),
+            activeColor: AppColors.primary,
+          ),
+        ],
+      ),
+    ),
+  );
+}
 
   Widget _buildNavigationButtons() {
     return Container(

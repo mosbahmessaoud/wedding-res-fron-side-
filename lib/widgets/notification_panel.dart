@@ -90,8 +90,8 @@ class _NotificationPanelState extends State<NotificationPanel> {
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('حذف الإشعارات المقروءة'),
-        content: const Text('هل أنت متأكد من حذف جميع الإشعارات المقروءة؟'),
+        title: const Text('حذف الإشعارات '),
+        content: const Text('هل أنت متأكد من حذف جميع الإشعارات ؟'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -239,7 +239,7 @@ class _NotificationPanelState extends State<NotificationPanel> {
                   children: [
                     Icon(Icons.delete_sweep, color: Colors.red),
                     SizedBox(width: 8),
-                    Text('حذف المقروء'),
+                    Text('حذف '),
                   ],
                 ),
               ),

@@ -39,10 +39,13 @@ class _ClanAdminHomeScreenState extends State<ClanAdminHomeScreen>
   String? _clanName;
 
 
+
+
   // ADD THESE NEW VARIABLES:
   bool _hasAccessPassword = false;
   bool _isVerifyingAccess = false;
-  
+  bool _isVerifyingPassword = false;
+
   // ADD THESE NEW VARIABLES FOR BOTTOM NAV VISIBILITY:
   bool _isBottomNavVisible = true;
   Timer? _hideNavTimer;
@@ -183,25 +186,43 @@ Future<void> _checkAccessPassword() async {
     _startHideTimer();
   }
 
-  // Method to verify access before navigating to protected tabs
+  // UPDATED METHOD - Prevents duplicate calls and shows loading
 Future<bool> _verifyAccessForTab(int tabIndex) async {
+  print('Verifying access for tab index: $tabIndex');
   
-  print('Verifying access for tab index--------: $tabIndex');
   // Check if tab requires protection
   if (!_protectedTabs.contains(tabIndex)) {
     return true; // Not a protected tab, allow access
   }
-  await _checkAccessPassword();
-  // Check if user has access password set
-  if (!_hasAccessPassword) {
-    _showAccessPasswordNotSetDialog();
+  
+  // Prevent multiple simultaneous verifications
+  if (_isVerifyingPassword) {
     return false;
   }
+  
+  setState(() {
+    _isVerifyingPassword = true;
+  });
+  
+  try {
+    await _checkAccessPassword();
+    
+    // Check if user has access password set
+    if (!_hasAccessPassword) {
+      _showAccessPasswordNotSetDialog();
+      return false;
+    }
 
-  // Show password verification dialog
-  return await _showAccessPasswordDialog();
+    // Show password verification dialog
+    return await _showAccessPasswordDialog();
+  } finally {
+    if (mounted) {
+      setState(() {
+        _isVerifyingPassword = false;
+      });
+    }
+  }
 }
-
 // Dialog when user doesn't have access password
 void _showAccessPasswordNotSetDialog() {
   final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -446,50 +467,42 @@ Future<bool> _showAccessPasswordDialog() async {
   return result ?? false;
 }
 
-// UPDATE THE _navigateToTab METHOD TO RESET TIMER:
-  void _navigateToTab(int index) async {
-    bool hasAccess = await _verifyAccessForTab(index);
-    final screenSize = MediaQuery.of(context).size;
-    final isLargeScreen = screenSize.width > 1024;
-
-    
-    if (!hasAccess) {
-      return;
-    }
-    
-    if (_lastTabIndex != index) {
-      setState(() {
-        _currentIndex = index;
-      });
-      
-      _refreshCurrentTab(index);
-      _lastTabIndex = index;
-    } else {
-      setState(() {
-        _currentIndex = index;
-      });
-    }
-    
-    // Reset hide timer when navigating
-    if (!isLargeScreen) {
-      _startHideTimer();
-    }
+// UPDATED METHOD - Cleaner verification flow
+void _navigateToTab(int index) async {
+  // Prevent action if already verifying
+  if (_isVerifyingPassword) {
+    return;
   }
-  // // Navigation method with tab refresh logic
-  // void _navigateToTab(int index) {
-  //   if (_lastTabIndex != index) {
-  //     setState(() {
-  //       _currentIndex = index;
-  //     });
-      
-  //     _refreshCurrentTab(index);
-  //     _lastTabIndex = index;
-  //   } else {
-  //     setState(() {
-  //       _currentIndex = index;
-  //     });
-  //   }
-  // }
+  
+  // Verify access for protected tabs
+  bool hasAccess = await _verifyAccessForTab(index);
+  
+  if (!hasAccess) {
+    return;
+  }
+  
+  final screenSize = MediaQuery.of(context).size;
+  final isLargeScreen = screenSize.width > 1024;
+  
+  if (_lastTabIndex != index) {
+    setState(() {
+      _currentIndex = index;
+    });
+    
+    _refreshCurrentTab(index);
+    _lastTabIndex = index;
+  } else {
+    setState(() {
+      _currentIndex = index;
+    });
+  }
+  
+  // Reset hide timer when navigating
+  if (!isLargeScreen) {
+    _startHideTimer();
+  }
+}
+
 
   // Method for refreshing specific tabs
   void _refreshCurrentTab(int index) {
@@ -919,12 +932,18 @@ Future<bool> _showAccessPasswordDialog() async {
   //   );
   // }
 
-  Widget _buildRightNavItem(IconData icon, String label, int index, bool isDark) {
+Widget _buildRightNavItem(IconData icon, String label, int index, bool isDark) {
   final isSelected = _currentIndex == index;
   final isProtected = _protectedTabs.contains(index);
   
   return GestureDetector(
-    onTap: () => _navigateToTab(index),
+    onTap: () {
+      // Prevent action if already verifying
+      if (_isVerifyingPassword) {
+        return;
+      }
+      _navigateToTab(index);
+    },
     child: AnimatedContainer(
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeOutCubic,
@@ -1211,12 +1230,18 @@ Future<bool> _showAccessPasswordDialog() async {
 
 
   Widget _buildNavItem(IconData icon, String label, int index, bool isDark) {
-    final isSelected = _currentIndex == index;
-    
-    return GestureDetector(
-      onTap: () => _navigateToTab(index),
-      behavior: HitTestBehavior.opaque,
-      child: AnimatedContainer(
+  final isSelected = _currentIndex == index;
+  
+  return GestureDetector(
+    onTap: () {
+      // Prevent action if already verifying
+      if (_isVerifyingPassword) {
+        return;
+      }
+      _navigateToTab(index);
+    },
+    behavior: HitTestBehavior.opaque,
+    child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeOutCubic,
         padding: EdgeInsets.symmetric(

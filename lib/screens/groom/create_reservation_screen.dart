@@ -41,7 +41,9 @@ class CreateReservationScreenState extends State<CreateReservationScreen> {
   Map<String, dynamic>? _selectedHall;
   Map<String, dynamic>? _selectedHaiaCommittee;
   Map<String, dynamic>? _selectedMadaehCommittee;
-  
+  final _customMadaehCommitteeController = TextEditingController();
+  bool _showCustomMadaehInput = false;
+
   // User information (will be loaded from profile)
   Map<String, dynamic>? _userProfile;
   // Map<String, dynamic>? _response; // This will store the reservation response
@@ -70,6 +72,13 @@ class CreateReservationScreenState extends State<CreateReservationScreen> {
   bool _isLoadingClans = false;
   bool _isLoadingHalls = false;
 
+
+  // Add these with other state variables (around line 28-30)
+  String? _selectedTilawaType; // null, 'جماعية', or 'فردية'
+  final _customTilawaNameController = TextEditingController();
+  bool _showCustomTilawaInput = false;
+
+
   @override
   void initState() {
     super.initState();
@@ -96,6 +105,10 @@ void dispose() {
   _date1Controller.dispose();
   // Remove or comment out this line:
   // _pageController.dispose();
+  _customMadaehCommitteeController.dispose(); 
+  _customTilawaNameController.dispose(); 
+
+
   super.dispose();
 }
 // Add this method in the CreateReservationScreenState class
@@ -229,6 +242,208 @@ void _showMessageDialog({
 //     }
 //   }
 // }
+
+
+// Add this method in the CreateReservationScreenState class
+
+void _handleSpecialReservationDate(DateTime selectedDate, DateAvailability availability, TextEditingController controller) {
+  final reservation = availability.specialReservation;
+  
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      title: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.star,
+              color: Colors.black,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text(
+              'حجز خاص من العشيرة',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: Colors.black.withOpacity(0.1),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.event, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'اسم الحجز',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    reservation?.reservName ?? 'غير محدد',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            if (reservation?.reservDescription != null) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Colors.black.withOpacity(0.1),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.description, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'الوصف',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[600],
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      reservation!.reservDescription!,
+                      style: const TextStyle(
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            
+            const SizedBox(height: 16),
+            
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.orange.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: Colors.orange[700], size: 24),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'هذا التاريخ محجوز لمناسبة خاصة من قبل العشيرة ولا يمكن حجزه.',
+                      style: TextStyle(
+                        color: Colors.orange[900],
+                        fontSize: 14,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            if (reservation?.fullName != null || reservation?.phoneNumber != null) ...[
+              const SizedBox(height: 16),
+              const Text(
+                'معلومات الاتصال:',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey,
+                ),
+              ),
+              const SizedBox(height: 8),
+              
+              if (reservation?.fullName != null)
+                Row(
+                  children: [
+                    const Icon(Icons.person, size: 18, color: Colors.grey),
+                    const SizedBox(width: 8),
+                    Text(reservation!.fullName!),
+                  ],
+                ),
+              
+              if (reservation?.phoneNumber != null) ...[
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    const Icon(Icons.phone, size: 18, color: Colors.grey),
+                    const SizedBox(width: 8),
+                    Text(reservation!.phoneNumber!),
+                  ],
+                ),
+              ],
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          style: TextButton.styleFrom(
+            foregroundColor: Colors.black,
+          ),
+          child: const Text('حسناً'),
+        ),
+      ],
+    ),
+  );
+}
+
+
 Future<void> _refreshData() async {
   setState(() => _isLoading = true);
   
@@ -273,7 +488,11 @@ Future<void> _refreshData() async {
         curve: Curves.easeInOut,
       );
     }
-    
+    _customMadaehCommitteeController.clear();
+    _selectedTilawaType = null;
+    _showCustomTilawaInput = false;
+    _customTilawaNameController.clear();
+        
     await _loadData();
     
     if (mounted) {
@@ -609,7 +828,6 @@ Widget _buildReservationInstructionWidget() {
         return;
       }
     }
-    
     // Prepare the reservation data matching backend expectations
     final reservationData = {
       'date1': _date1Controller.text,
@@ -621,6 +839,23 @@ Widget _buildReservationInstructionWidget() {
       'haia_committee_id': _selectedHaiaCommittee!['id'],
       'madaeh_committee_id': _selectedMadaehCommittee!['id'],
     };
+
+    // Add custom madaeh committee name if provided
+    if (_showCustomMadaehInput && _customMadaehCommitteeController.text.trim().isNotEmpty) {
+      reservationData['custom_madaeh_committee_name'] = _customMadaehCommitteeController.text.trim();
+    }
+
+    // Add tilawa type
+    if (_selectedTilawaType != null) {
+      
+      if (_showCustomTilawaInput && _customTilawaNameController.text.trim().isNotEmpty) {
+        reservationData['tilawa_type'] = _customTilawaNameController.text.trim();
+      }else{
+        reservationData['tilawa_type'] = _selectedTilawaType;
+      }
+
+
+    }
 
     print('Submitting reservation data: $reservationData');
 
@@ -1183,7 +1418,8 @@ Future<void> _selectDate(TextEditingController controller, String title) async {
           allowTwoConsecutiveDays: _canSelectTwoDays,
           onDateSelected: (selectedDate, availability) {
             Navigator.of(context).pop();
-            
+            // In the _selectDate method, update the switch statement:
+
             if (availability != null) {
               switch (availability.status) {
                 case DateStatus.available:
@@ -1207,10 +1443,13 @@ Future<void> _selectDate(TextEditingController controller, String title) async {
                     );
                   }
                   break;
+                case DateStatus.specialReservation: // ADD THIS CASE
+                  _handleSpecialReservationDate(selectedDate, availability, controller);
+                  break;
                 case DateStatus.reserved:
                   _showMessageDialog(
                     title: 'التاريخ محجوز',
-                    message: 'هذا التاريخ محجوز بالكامل.\n\nيرجى اختيار تاريخ آخر.',
+                    message: 'هذا التاريخ محجوز بالفعل.\n\nيرجى اختيار تاريخ آخر.',
                     icon: Icons.event_busy,
                     isError: true,
                   );
@@ -1224,14 +1463,55 @@ Future<void> _selectDate(TextEditingController controller, String title) async {
                   );
                   break;
               }
-            } else {
-              _showMessageDialog(
-                title: 'خطأ في التحميل',
-                message: 'خطأ في تحميل معلومات التاريخ.\n\nيرجى المحاولة مرة أخرى.',
-                icon: Icons.error,
-                isError: true,
-              );
             }
+            // if (availability != null) {
+            //   switch (availability.status) {
+            //     case DateStatus.available:
+            //       _handleAvailableDate(selectedDate, controller);
+            //       break;
+            //     case DateStatus.massWeddingOpen:
+            //       _handleMassWeddingDate(selectedDate, availability, controller);
+            //       break;
+            //     case DateStatus.mixed:
+            //       _handleMixedStatusDate(selectedDate, availability, controller);
+            //       break;
+            //     case DateStatus.pending:
+            //       if (availability.allowMassWedding) {
+            //         _handlePendingMassWeddingDate(selectedDate, availability, controller);
+            //       } else {
+            //         _showMessageDialog(
+            //           title: 'التاريخ غير متاح',
+            //           message: 'هذا التاريخ في انتظار التأكيد ولا يسمح بالانضمام.\n\nيرجى اختيار تاريخ آخر.',
+            //           icon: Icons.pending,
+            //           titleColor: Colors.orange,
+            //         );
+            //       }
+            //       break;
+            //     case DateStatus.reserved:
+            //       _showMessageDialog(
+            //         title: 'التاريخ محجوز',
+            //         message: 'هذا التاريخ محجوز بالكامل.\n\nيرجى اختيار تاريخ آخر.',
+            //         icon: Icons.event_busy,
+            //         isError: true,
+            //       );
+            //       break;
+            //     case DateStatus.disabled:
+            //       _showMessageDialog(
+            //         title: 'التاريخ غير متاح',
+            //         message: 'هذا التاريخ غير متاح للحجز.\n\nيرجى اختيار تاريخ آخر.',
+            //         icon: Icons.block,
+            //         isError: true,
+            //       );
+            //       break;
+            //   }
+            // } else {
+            //   _showMessageDialog(
+            //     title: 'خطأ في التحميل',
+            //     message: 'خطأ في تحميل معلومات التاريخ.\n\nيرجى المحاولة مرة أخرى.',
+            //     icon: Icons.error,
+            //     isError: true,
+            //   );
+            // }
           },
           onCancel: () {
             Navigator.of(context).pop();
@@ -1828,7 +2108,7 @@ Widget _buildReservationDetailsStep() {
                 ),
                 Expanded(
                   child: Text(
-                    'هل تريد حجز يومين متتاليين؟',
+                    'هل تريد حجز يومين (اقامة أمنسي الوزران في نفس العشيرة)؟',
                     style: TextStyle(
                       color: Colors.green[700],
                       fontWeight: FontWeight.w500,
@@ -1865,8 +2145,8 @@ Widget _buildReservationDetailsStep() {
                   Expanded(
                     child: Text(
                       _getSelectedMonthName() != null 
-                        ? 'العشيرة تسمح بحجز يومين متتاليين لشهر ${_getSelectedMonthName()}. '
-                        : 'العشيرة تسمح بحجز يومين متتاليين لهذا الشهر. ',
+                        ? 'العشيرة تسمح بحجز يومين متتاليين (اقامة أمنسي الوزران في نفس العشيرة) لشهر ${_getSelectedMonthName()}. '
+                        : 'العشيرة تسمح بالقامة أمنسي الوزران في نفس العشيرة لهذا الشهر. ',
                       style: TextStyle(color: Colors.green[700]),
                     ),
                   ),
@@ -1889,8 +2169,8 @@ Widget _buildReservationDetailsStep() {
                   Expanded(
                     child: Text(
                       _getSelectedMonthName() != null 
-                        ? 'العشيرة تسمح بيوم واحد فقط لشهر ${_getSelectedMonthName()}'
-                        : 'العشيرة تسمح بيوم واحد فقط لهذا الشهر',
+                        ? 'العشيرة لا تسمح بالقامة أمنسي الوزران في نفس العشيرة لشهر ${_getSelectedMonthName()}'
+                        : 'العشيرة لا تسمح بالقامة أمنسي الوزران في نفس العشيرة لهذا الشهر',
                       style: TextStyle(color: Colors.orange[700]),
                     ),
                   ),
@@ -1913,7 +2193,7 @@ Widget _buildReservationDetailsStep() {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'اختر التاريخ أولاً لمعرفة إمكانية الحجز ليومين متتاليين ',
+                    'اختر التاريخ أولاً لمعرفة إمكانية اقامة أمنسي الوزران في نفس العشيرة.',
                     style: TextStyle(color: Colors.grey[600]),
                   ),
                 ),
@@ -1962,7 +2242,111 @@ Widget _buildReservationDetailsStep() {
           validator: (value) => value == null ? ' الهيئة مطلوبة' : null,
         ),
         const SizedBox(height: 16),
+
+        // Tilawa Type Selection
+        DropdownButtonFormField<String>(
+          value: _selectedTilawaType,
+          decoration: InputDecoration(
+            labelText: 'نوع التلاوة *',
+            prefixIcon: const Icon(Icons.book_outlined),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            helperText: 'اختر نوع التلاوة',
+          ),
+          items: const [
+            DropdownMenuItem<String>(
+              value: 'تلاوة جماعية',
+              child: Text(
+                'تلاوة جماعية',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+            DropdownMenuItem<String>(
+              value: 'تلاوة فردية',
+              child: Text(
+                'تلاوة فردية',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+          onChanged: (value) {
+            setState(() {
+              _selectedTilawaType = value;
+              // Check if "تلاوة فردية" is selected
+              _showCustomTilawaInput = value == 'تلاوة فردية';
+              // Clear the custom input if switching away from "تلاوة فردية"
+              if (!_showCustomTilawaInput) {
+                _customTilawaNameController.clear();
+              }
+            });
+          },
+          validator: (value) => value == null ? 'نوع التلاوة مطلوب' : null,
+        ),
+
+        const SizedBox(height: 16),
+
+        // Custom Tilawa Name Input (shown when "تلاوة فردية" is selected)
+        if (_showCustomTilawaInput) ...[
+          TextFormField(
+            controller: _customTilawaNameController,
+            decoration: InputDecoration(
+              labelText: 'اسم القارئ (اختياري)',
+              prefixIcon: const Icon(Icons.person_outline),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              helperText: 'أدخل اسم القارئ إذا كنت تريد تحديده',
+              helperMaxLines: 2,
+            ),
+            maxLength: 100,
+            // Optional: Add validation if you want to make it required
+            // validator: (value) {
+            //   if (_showCustomTilawaInput && (value == null || value.trim().isEmpty)) {
+            //     return 'يرجى إدخال اسم القارئ';
+            //   }
+            //   return null;
+            // },
+          ),
+          const SizedBox(height: 16),
+        ],
         
+        const SizedBox(height: 16),
+        
+        // // Madaeh Committee Selection
+        // DropdownButtonFormField<Map<String, dynamic>>(
+        //   value: _selectedMadaehCommittee,
+        //   decoration: InputDecoration(
+        //     labelText: ' اللجنة *',
+        //     prefixIcon: const Icon(Icons.group_outlined),
+        //     border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+        //     helperText: 'اختر لجنة المدائح و الانشاد ',
+        //   ),
+        //   items: _madaehCommittees.map((committee) {
+        //     return DropdownMenuItem<Map<String, dynamic>>(
+        //       value: committee,
+        //       child: Column(
+        //         crossAxisAlignment: CrossAxisAlignment.start,
+        //         mainAxisSize: MainAxisSize.min,
+        //         children: [
+        //           Text(
+        //             committee['name']?.toString() ?? 'لجنة غير مسماة',
+        //             style: const TextStyle(fontWeight: FontWeight.bold),
+        //           ),
+        //           if (committee['description'] != null)
+        //             Text(
+        //               committee['description'].toString(),
+        //               style: TextStyle(
+        //                 fontSize: 12,
+        //                 color: AppColors.textSecondary,
+        //               ),
+        //               maxLines: 1,
+        //               overflow: TextOverflow.ellipsis,
+        //             ),
+        //         ],
+        //       ),
+        //     );
+        //   }).toList(),
+        //   onChanged: (value) => setState(() => _selectedMadaehCommittee = value),
+        //   validator: (value) => value == null ? 'لجنة المدائح و الانشاد مطلوبة' : null,
+        // ),
+
         // Madaeh Committee Selection
         DropdownButtonFormField<Map<String, dynamic>>(
           value: _selectedMadaehCommittee,
@@ -1970,7 +2354,7 @@ Widget _buildReservationDetailsStep() {
             labelText: ' اللجنة *',
             prefixIcon: const Icon(Icons.group_outlined),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-            helperText: 'اختر لجنة المدائح و الانشاد و الانشاد',
+            helperText: 'اختر لجنة المدائح و الانشاد ',
           ),
           items: _madaehCommittees.map((committee) {
             return DropdownMenuItem<Map<String, dynamic>>(
@@ -1997,9 +2381,45 @@ Widget _buildReservationDetailsStep() {
               ),
             );
           }).toList(),
-          onChanged: (value) => setState(() => _selectedMadaehCommittee = value),
+          onChanged: (value) {
+            setState(() {
+              _selectedMadaehCommittee = value;
+              // Check if "لجنة خاصة" is selected
+              _showCustomMadaehInput = value?['name']?.toString() == 'لجنة خاصة';
+              // Clear the custom input if switching away from "لجنة خاصة"
+              if (!_showCustomMadaehInput) {
+                _customMadaehCommitteeController.clear();
+              }
+            });
+          },
           validator: (value) => value == null ? 'لجنة المدائح و الانشاد مطلوبة' : null,
         ),
+
+        // Add this spacing and conditional custom input field
+        const SizedBox(height: 16),
+
+        // Custom Madaeh Committee Input (shown when "لجنة خاصة" is selected)
+        if (_showCustomMadaehInput) ...[
+          TextFormField(
+            controller: _customMadaehCommitteeController,
+            decoration: InputDecoration(
+              labelText: 'اسم اللجنة الخاصة (اختياري)',
+              prefixIcon: const Icon(Icons.edit),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              helperText: 'أدخل اسم اللجنة الخاصة إذا كنت تريد تحديدها',
+              helperMaxLines: 2,
+            ),
+            maxLength: 100,
+            // Optional: Add validation if you want to make it required
+            // validator: (value) {
+            //   if (_showCustomMadaehInput && (value == null || value.trim().isEmpty)) {
+            //     return 'يرجى إدخال اسم اللجنة الخاصة';
+            //   }
+            //   return null;
+            // },
+          ),
+          const SizedBox(height: 16),
+        ],
         
         const SizedBox(height: 24),
         
@@ -2029,14 +2449,14 @@ Widget _buildReservationDetailsStep() {
                   contentPadding: EdgeInsets.zero,
                 ),
                 
-                SwitchListTile(
-                  // title: const Text('الانضمام لعرس جماعي'),
-                  title: const Text('هل تريد الانضمام الى العرس الجماعي؟'),
-                  // subtitle: const Text('هل تريد الانضمام الى العرس الجماعي ؟'),
-                  value: _joinToMassWedding,
-                  onChanged: (value) => setState(() => _joinToMassWedding = value),
-                  contentPadding: EdgeInsets.zero,
-                ),
+                // SwitchListTile(
+                //   // title: const Text('الانضمام لعرس جماعي'),
+                //   title: const Text('هل تريد الانضمام الى العرس الجماعي؟'),
+                //   // subtitle: const Text('هل تريد الانضمام الى العرس الجماعي ؟'),
+                //   value: _joinToMassWedding,
+                //   onChanged: (value) => setState(() => _joinToMassWedding = value),
+                //   contentPadding: EdgeInsets.zero,
+                // ),
               ],
             ),
           ),
@@ -2111,6 +2531,7 @@ Widget _buildConfirmationStep() {
         const SizedBox(height: 16),
         
         // Selection Summary
+        // Selection Summary
         _buildSummaryCard('تفاصيل الحجز', [
           _buildSummaryItem('التاريخ المحدد', _date1Controller.text),
           if (_selectedClan != null)
@@ -2119,8 +2540,22 @@ Widget _buildConfirmationStep() {
             _buildSummaryItem('القاعة', _selectedHall!['name']?.toString() ?? ''),
           if (_selectedHaiaCommittee != null)
             _buildSummaryItem('الهيئة الدينية', _selectedHaiaCommittee!['name']?.toString() ?? ''),
-          if (_selectedMadaehCommittee != null)
+          if (_selectedMadaehCommittee != null) ...[
             _buildSummaryItem('لجنة المدائح و الانشاد', _selectedMadaehCommittee!['name']?.toString() ?? ''),
+            // Show custom committee name if provided
+            if (_showCustomMadaehInput && _customMadaehCommitteeController.text.trim().isNotEmpty)
+              _buildSummaryItem('  ↳ اسم اللجنة الخاصة', _customMadaehCommitteeController.text.trim()),
+          ],
+          // Add tilawa type summary
+          if (_selectedTilawaType != null) ...[
+            _buildSummaryItem(
+              'نوع التلاوة', 
+              _selectedTilawaType == 'جماعية' ? 'تلاوة جماعية' : 'تلاوة فردية'
+            ),
+            // Show custom reader name if provided
+            if (_showCustomTilawaInput && _customTilawaNameController.text.trim().isNotEmpty)
+              _buildSummaryItem('  ↳ اسم القارئ', _customTilawaNameController.text.trim()),
+          ],
         ]),
 
         const SizedBox(height: 16),

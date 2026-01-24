@@ -7,6 +7,7 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as path;
 import 'package:wedding_reservation_app/models/reservation.dart';
+import 'package:wedding_reservation_app/models/reservation_special.dart';
 import 'package:wedding_reservation_app/services/token_manager.dart';
 
 import '../models/clan.dart';
@@ -1222,52 +1223,211 @@ static Future<Map<String, dynamic>> getSettingsByClanId(String clanId) async {
 /// Update payment status for a groom's reservation
 /// Toggles between pending_validation and validated status
 /// PUT /reservations/payment_update/{groom_id}
-static Future<Map<String, dynamic>> markPaymentCompleted(int groomId) async {
-  try {
-    final response = await http.put(
-      Uri.parse('$baseUrl/clan-admin/reservations/payment_update/$groomId'),
+// static Future<Map<String, dynamic>> markPaymentCompleted(int groomId) async {
+//   try {
+//     final response = await http.put(
+//       Uri.parse('$baseUrl/clan-admin/reservations/payment_update/$groomId'),
+//       headers: await _headers,
+//     );
+
+//     print('Update payment response status: ${response.statusCode}');
+//     print('Update payment response body: ${response.body}');
+
+//     if (response.statusCode == 200) {
+//       return json.decode(response.body);
+//     } else if (response.statusCode == 404) {
+//       final error = json.decode(response.body);
+//       throw Exception(error['detail'] ?? 'العريس غير موجود أو ليس في عشيرتك');
+//     } else {
+//       final error = json.decode(response.body);
+//       throw Exception(error['detail'] ?? 'فشل في تحديث حالة الدفع');
+//     }
+//   } catch (e) {
+//     throw Exception('خطأ في تحديث حالة الدفع: $e');
+//   }
+// }
+
+static Future<double> postPymentonClanSetting() async {
+  try{
+    final response = await http.post(
+      Uri.parse('$baseUrl/clan-admin/update_payment'),
       headers: await _headers,
+
     );
-
-    print('Update payment response status: ${response.statusCode}');
-    print('Update payment response body: ${response.body}');
-
+    
     if (response.statusCode == 200) {
-      return json.decode(response.body);
-    } else if (response.statusCode == 404) {
-      final error = json.decode(response.body);
-      throw Exception(error['detail'] ?? 'العريس غير موجود أو ليس في عشيرتك');
+      final paymentAmount = json.decode(response.body);
+      return paymentAmount is double ? paymentAmount : (paymentAmount as num).toDouble();
+    } else if (response.statusCode == 401) {
+      throw Exception('غير مصرح لك بالوصول إلى هذه البيانات');
     } else {
       final error = json.decode(response.body);
-      throw Exception(error['detail'] ?? 'فشل في تحديث حالة الدفع');
-    }
-  } catch (e) {
-    throw Exception('خطأ في تحديث حالة الدفع: $e');
+      throw Exception(error['detail'] ?? 'فشل في جلب المبلغ المطلوب');
+    }    
+  }catch (e) {
+    throw Exception('خطأ في جلب المبلغ المطلوب: $e');
+
   }
 }
 
-// this route can change payment status from true to false or the opposite
-static Future<Map<String, dynamic>> changePaymentStatus(int reservationId) async {
+// /// geting the payment of the clan 
+// static Future<double> getRequiredPayment() async {
+//   try {
+//     final response = await http.get(
+//       Uri.parse('$baseUrl/clan-admin/required_payment'),
+//       headers: await _headers,
+//     );
+    
+//     print('Get required payment response: ${response.statusCode}');
+//     print('Get required payment body: ${response.body}');
+    
+//     if (response.statusCode == 200) {
+//       final paymentAmount = json.decode(response.body);
+//       return paymentAmount is double ? paymentAmount : (paymentAmount as num).toDouble();
+//     } else if (response.statusCode == 401) {
+//       throw Exception('غير مصرح لك بالوصول إلى هذه البيانات');
+//     } else {
+//       final error = json.decode(response.body);
+//       throw Exception(error['detail'] ?? 'فشل في جلب المبلغ المطلوب');
+//     }
+//   } catch (e) {
+//     throw Exception('خطأ في جلب المبلغ المطلوب: $e');
+//   }
+// }
+
+
+// In api_service.dart
+
+/// Get the required payment amount
+static Future<double> getRequiredPayment() async {
+  try {
+    final response = await http.get(
+      Uri.parse('$baseUrl/clan-admin/required_payment'),
+      headers: await _headers,
+    );
+    
+    if (response.statusCode == 200) {
+      final paymentAmount = json.decode(response.body);
+      return paymentAmount is double ? paymentAmount : (paymentAmount as num).toDouble();
+    } else if (response.statusCode == 401) {
+      throw Exception('غير مصرح لك بالوصول إلى هذه البيانات');
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل في جلب المبلغ المطلوب');
+    }
+  } catch (e) {
+    throw Exception('خطأ في جلب المبلغ المطلوب: $e');
+  }
+}
+
+/// Update payment amount
+static Future<void> updatePayment(double amount) async {
+  try {
+    final response = await http.post(
+      Uri.parse('$baseUrl/clan-admin/update_payment'),
+      headers: await _headers,
+      body: json.encode({
+        'payment_should_pay': amount.toStringAsFixed(2), // Send as string for Decimal
+      }),
+    );
+    
+    if (response.statusCode == 200) {
+      return;
+    } else if (response.statusCode == 401) {
+      throw Exception('غير مصرح لك بالوصول');
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل في تحديث المبلغ');
+    }
+  } catch (e) {
+    throw Exception('خطأ في تحديث المبلغ: $e');
+  }
+}
+
+
+// Update payment status and amount for a reservation
+static Future<Map<String, dynamic>> changePaymentStatus(
+  int reservationId, 
+  double paymentAmount
+) async {
   try {
     final response = await http.post(
       Uri.parse('$baseUrl/clan-admin/$reservationId/change_payment_status'),
       headers: await _headers,
+      body: json.encode({
+        'payment': paymentAmount,
+      }),
     );
-
+    
     print('Change payment status response: ${response.statusCode}');
     print('Change payment status body: ${response.body}');
-
+    
     if (response.statusCode == 200) {
       return json.decode(response.body);
     } else if (response.statusCode == 404) {
       final error = json.decode(response.body);
       throw Exception(error['detail'] ?? 'لا يوجد حجز معلق أو مصدق عليه');
+    } else if (response.statusCode == 400) {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'خطأ في البيانات المدخلة');
     } else {
       final error = json.decode(response.body);
       throw Exception(error['detail'] ?? 'فشل في تغيير حالة الدفع');
     }
   } catch (e) {
     throw Exception('خطأ في تغيير حالة الدفع: $e');
+  }
+}
+// // Update payment status and amount for a reservation
+// static Future<Map<String, dynamic>> changePaymentStatus(
+//   int reservationId, 
+//   double paymentAmount
+// ) async {
+//   try {
+//     final response = await http.post(
+//       Uri.parse('$baseUrl/clan-admin/$reservationId/change_payment_status'),
+//       headers: await _headers,
+//       body: json.encode({
+//         'payment': paymentAmount,
+//       }),
+//     );
+    
+//     print('Change payment status response: ${response.statusCode}');
+//     print('Change payment status body: ${response.body}');
+    
+//     if (response.statusCode == 200) {
+//       return json.decode(response.body);
+//     } else if (response.statusCode == 404) {
+//       final error = json.decode(response.body);
+//       throw Exception(error['detail'] ?? 'لا يوجد حجز معلق أو مصدق عليه');
+//     } else if (response.statusCode == 400) {
+//       final error = json.decode(response.body);
+//       throw Exception(error['detail'] ?? 'خطأ في البيانات المدخلة');
+//     } else {
+//       final error = json.decode(response.body);
+//       throw Exception(error['detail'] ?? 'فشل في تغيير حالة الدفع');
+//     }
+//   } catch (e) {
+//     throw Exception('خطأ في تغيير حالة الدفع: $e');
+//   }
+// }
+
+// Optional: Get payment info for a reservation
+static Future<Map<String, dynamic>> getPaymentInfo(int reservationId) async {
+  try {
+    final response = await http.get(
+      Uri.parse('$baseUrl/clan-admin/$reservationId/payment-info'),
+      headers: await _headers,
+    );
+    
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل في جلب معلومات الدفع');
+    }
+  } catch (e) {
+    throw Exception('خطأ في جلب معلومات الدفع: $e');
   }
 }
 
@@ -4240,20 +4400,44 @@ static Map<String, String> validateSpecialReservationData({
 
 /// get all special reservation 
 
-// Get special reservations for the current county
-static Future<List<dynamic>> getSpecialReservations() async {
+// // Get special reservations for the current county
+// static Future<List<dynamic>> getSpecialReservations() async {
+//   try {
+//     final response = await http.get(
+//       Uri.parse('$baseUrl/clan-admin/special_reservations'),
+//       headers: await _headers,
+//     );
+
+//     print('Get special reservations response: ${response.statusCode}');
+//     print('Get special reservations body: ${response.body}');
+
+//     if (response.statusCode == 200) {
+//       final List<dynamic> data = json.decode(response.body);
+//       return data;
+//     } else if (response.statusCode == 401) {
+//       throw Exception('غير مصرح. يرجى تسجيل الدخول مرة أخرى');
+//     } else if (response.statusCode == 403) {
+//       throw Exception('ليس لديك صلاحية للوصول إلى هذه البيانات');
+//     } else {
+//       final error = json.decode(response.body);
+//       throw Exception(error['detail'] ?? 'فشل في تحميل الحجوزات الخاصة');
+//     }
+//   } catch (e) {
+//     print('Error fetching special reservations: $e');
+//     throw Exception('خطأ في تحميل الحجوزات الخاصة: $e');
+//   }
+// }
+// In api_service.dart - Update the method return type
+static Future<List<ReservationSpecial>> getSpecialReservations() async {
   try {
     final response = await http.get(
       Uri.parse('$baseUrl/clan-admin/special_reservations'),
       headers: await _headers,
     );
-
-    print('Get special reservations response: ${response.statusCode}');
-    print('Get special reservations body: ${response.body}');
-
+    
     if (response.statusCode == 200) {
       final List<dynamic> data = json.decode(response.body);
-      return data;
+      return data.map((json) => ReservationSpecial.fromJson(json)).toList();
     } else if (response.statusCode == 401) {
       throw Exception('غير مصرح. يرجى تسجيل الدخول مرة أخرى');
     } else if (response.statusCode == 403) {
@@ -4267,29 +4451,6 @@ static Future<List<dynamic>> getSpecialReservations() async {
     throw Exception('خطأ في تحميل الحجوزات الخاصة: $e');
   }
 }
-
-// Add this to your ApiService class
-// static Future<Uint8List?> downloadPdfFromUrl(String pdfUrl) async {
-//   try {
-//     final response = await http.get(
-//       Uri.parse(pdfUrl),
-//       headers: await _headers,
-//     );
-
-//     if (response.statusCode == 200) {
-//       return response.bodyBytes;
-//     } else {
-//       print('Failed to download PDF: ${response.statusCode}');
-//       return null;
-//     }
-//   } catch (e) {
-//     print('Error downloading PDF: $e');
-//     return null;
-//   }
-// }
-
-
-
 
 // ==================== STATISTICS ENDPOINTS ====================
 
@@ -4769,11 +4930,58 @@ static Future<Map<String, dynamic>> markAllNotificationsAsRead() async {
 // ========== DELETE NOTIFICATIONS ==========
 
 /// Delete a specific notification
-/// DELETE /notifications/{notification_id}
+/// DELETE /notifications
 static Future<Map<String, dynamic>> deleteNotification(int notificationId) async {
   try {
     final response = await http.delete(
       Uri.parse('$baseUrl/notifications/$notificationId'),
+      headers: await _headers,
+    );
+
+
+    print('Delete notification response: ${response.statusCode}');
+    print('Delete notification body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else if (response.statusCode == 404) {
+      throw Exception('الإشعار غير موجود');
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل في حذف الإشعار');
+    }
+  } catch (e) {
+    throw Exception('خطأ في حذف الإشعار: $e');
+  }
+}
+static Future<Map<String, dynamic>> deleteNotifications() async {
+  try {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/notifications/clan_admin'),
+      headers: await _headers,
+    );
+
+
+    print('Delete notification response: ${response.statusCode}');
+    print('Delete notification body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else if (response.statusCode == 404) {
+      throw Exception('الإشعار غير موجود');
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل في حذف الإشعار');
+    }
+  } catch (e) {
+    throw Exception('خطأ في حذف الإشعار: $e');
+  }
+}
+
+static Future<Map<String, dynamic>> deleteNotificationOld2Month() async {
+  try {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/notifications'),
       headers: await _headers,
     );
 
@@ -4799,16 +5007,57 @@ static Future<Map<String, dynamic>> deleteNotification(int notificationId) async
 /// 
 /// Parameters:
 /// - notificationIds: List of notification IDs to delete
-static Future<Map<String, dynamic>> bulkDeleteNotifications(List<int> notificationIds) async {
+static Future<Map<String, dynamic>> bulkDeleteNotifications() async {
   try {
-    if (notificationIds.isEmpty) {
-      throw Exception('قائمة معرفات الإشعارات فارغة');
-    }
+
 
     final response = await http.delete(
       Uri.parse('$baseUrl/notifications/bulk-delete'),
       headers: await _headers,
-      body: json.encode(notificationIds),
+    );
+
+    print('Bulk delete notifications response: ${response.statusCode}');
+    print('Bulk delete notifications body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل في حذف الإشعارات');
+    }
+  } catch (e) {
+    throw Exception('خطأ في حذف الإشعارات: $e');
+  }
+}
+static Future<Map<String, dynamic>> bulkDeleteNotification2Month() async {
+  try {
+
+
+    final response = await http.delete(
+      Uri.parse('$baseUrl/notifications/bulk-delete/2month'),
+      headers: await _headers,
+    );
+
+    print('Bulk delete notifications response: ${response.statusCode}');
+    print('Bulk delete notifications body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل في حذف الإشعارات');
+    }
+  } catch (e) {
+    throw Exception('خطأ في حذف الإشعارات: $e');
+  }
+}
+static Future<Map<String, dynamic>> bulkDeleteNotificationAdmin() async {
+  try {
+
+
+    final response = await http.delete(
+      Uri.parse('$baseUrl/notifications/bulk-delete/clan_admin'),
+      headers: await _headers,
     );
 
     print('Bulk delete notifications response: ${response.statusCode}');
@@ -5032,17 +5281,8 @@ static Future<List<bool>> markMultipleNotificationsAsRead(List<int> notification
 /// Delete all read notifications
 static Future<int> deleteAllReadNotifications() async {
   try {
-    final notifications = await getNotifications(limit: 100);
-    final readNotificationIds = notifications
-        .where((notif) => notif['is_read'] == true)
-        .map((notif) => notif['id'] as int)
-        .toList();
-    
-    if (readNotificationIds.isEmpty) {
-      return 0;
-    }
-    
-    final result = await bulkDeleteNotifications(readNotificationIds);
+
+    final result = await bulkDeleteNotifications();
     return result['count'] as int;
   } catch (e) {
     print('Error deleting read notifications: $e');
@@ -6260,6 +6500,182 @@ static Future<List<dynamic>> listReservationsForClanAdmin() async {
     }
   } catch (e) {
     throw Exception('خطأ في تحميل الحجوزات: $e');
+  }
+}
+
+
+
+
+// ==================== PHONE NUMBER VALIDATION ENDPOINTS ====================
+// Add these methods in the AUTH ENDPOINTS section
+
+/// Check if groom phone number already exists
+/// POST /auth/check_groom_phone
+/// 
+/// Parameters:
+/// - phoneNumber: The phone number to check
+/// 
+/// Returns:
+/// - exists: bool (true if phone exists, false otherwise)
+/// - message: String (status message in Arabic)
+static Future<Map<String, dynamic>> checkGroomPhoneExists(String phoneNumber) async {
+  try {
+    final response = await http.post(
+      Uri.parse('$baseUrl/auth/check_groom_phone'),
+      headers: await _headers,
+      body: json.encode({
+        'phone_number': phoneNumber,
+      }),
+    );
+
+    print('Check groom phone response status: ${response.statusCode}');
+    print('Check groom phone response body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return {
+        'exists': data['exists'],
+        'message': data['message'],
+      };
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل في التحقق من رقم الهاتف');
+    }
+  } catch (e) {
+    throw Exception('خطأ في التحقق من رقم الهاتف: $e');
+  }
+}
+
+/// Check if guardian phone number already exists
+/// POST /auth/check_guardian_phone
+/// 
+/// Parameters:
+/// - phoneNumber: The guardian phone number to check
+/// 
+/// Returns:
+/// - exists: bool (true if phone exists, false otherwise)
+/// - message: String (status message in Arabic)
+static Future<Map<String, dynamic>> checkGuardianPhoneExists(String phoneNumber) async {
+  try {
+    final response = await http.post(
+      Uri.parse('$baseUrl/auth/check_guardian_phone'),
+      headers: await _headers,
+      body: json.encode({
+        'phone_number': phoneNumber,
+      }),
+    );
+
+    print('Check guardian phone response status: ${response.statusCode}');
+    print('Check guardian phone response body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return {
+        'exists': data['exists'],
+        'message': data['message'],
+      };
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل في التحقق من رقم هاتف الولي');
+    }
+  } catch (e) {
+    throw Exception('خطأ في التحقق من رقم هاتف الولي: $e');
+  }
+}
+
+// ==================== UTILITY METHODS FOR PHONE VALIDATION ====================
+
+/// Validate groom phone number before registration
+/// Returns error message if phone exists, null if available
+static Future<String?> validateGroomPhoneAvailability(String phoneNumber) async {
+  try {
+    final result = await checkGroomPhoneExists(phoneNumber);
+    
+    if (result['exists'] == true) {
+      return result['message']; // Returns: "رقم هاتف العريس موجود بالفعل."
+    }
+    
+    return null; // Phone is available
+  } catch (e) {
+    print('Error validating groom phone: $e');
+    return 'خطأ في التحقق من رقم الهاتف';
+  }
+}
+
+/// Validate guardian phone number before registration
+/// Returns error message if phone exists, null if available
+static Future<String?> validateGuardianPhoneAvailability(String phoneNumber) async {
+  try {
+    final result = await checkGuardianPhoneExists(phoneNumber);
+    
+    if (result['exists'] == true) {
+      return result['message']; // Returns: "رقم هاتف الولي موجود بالفعل."
+    }
+    
+    return null; // Phone is available
+  } catch (e) {
+    print('Error validating guardian phone: $e');
+    return 'خطأ في التحقق من رقم هاتف الولي';
+  }
+}
+
+
+// ==================== PHONE NUMBER LOOKUP ENDPOINT ====================
+// Add this method in the AUTH ENDPOINTS section (around line 100-200)
+
+/// Get groom by phone number (groom or guardian phone)
+/// POST /auth/get_groom_phone/{phone}
+/// 
+/// Parameters:
+/// - phone: The phone number to search (can be groom or guardian phone)
+/// 
+/// Returns:
+/// - phone_number: String (the groom's primary phone number)
+static Future<String> getGroomPhoneBySearch(String phone) async {
+  try {
+    final response = await http.post(
+      Uri.parse('$baseUrl/auth/get_groom_phone/$phone'),
+      headers: await _headers,
+    );
+
+    print('Get groom phone response status: ${response.statusCode}');
+    print('Get groom phone response body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return data['phone_number'];
+    } else if (response.statusCode == 404) {
+      throw Exception('المستخدم غير موجود');
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل في البحث عن رقم الهاتف');
+    }
+  } catch (e) {
+    throw Exception('خطأ في البحث عن رقم الهاتف: $e');
+  }
+}
+
+// ==================== UTILITY METHOD ====================
+// Add this in the UTILITY METHODS section (around line 1500-1600)
+
+/// Search for groom by phone (handles both groom and guardian phone)
+/// Returns null if not found instead of throwing exception
+static Future<String?> searchGroomPhone(String phone) async {
+  try {
+    return await getGroomPhoneBySearch(phone);
+  } catch (e) {
+    print('Groom not found with phone: $phone');
+    return null;
+  }
+}
+
+/// Validate if phone belongs to any groom (as primary or guardian phone)
+static Future<bool> isPhoneAssociatedWithGroom(String phone) async {
+  try {
+    await getGroomPhoneBySearch(phone);
+    return true;
+  } catch (e) {
+    return false;
   }
 }
 

@@ -16,12 +16,10 @@ class HomeTab extends StatefulWidget {
 }
 
 class HomeTabState extends State<HomeTab> with TickerProviderStateMixin {
-  // bool _isLoading = true;
   Map<String, dynamic>? _userProfile;
   Map<String, dynamic>? _pendingReservation;
   Map<String, dynamic>? _validatedReservation;
 
-    // Initialize with default data
   Map<String, int> _reservationStats = {
     'total': 0,
     'validated': 0,
@@ -48,49 +46,19 @@ class HomeTabState extends State<HomeTab> with TickerProviderStateMixin {
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
 
-    // Add these after the existing state variables (around line 16)
   bool _hasValidReservation = false;
   bool _isCheckingReservation = true;
-@override
-void initState() {
-  super.initState();
-  _initAnimations();
-  // MODIFIED: Check reservation first, then load data
-  _checkReservationStatus().then((_) {
-    _loadDataInBackground();
-  });
-}
 
-/// Check if user has a valid reservation
-Future<void> _checkReservationStatus() async {
-  setState(() {
-    _isCheckingReservation = true;
-  });
-
-  try {
-    // Check for validated reservation
-    final validatedReservation = await ApiService.getMyValidatedReservation();
-    
-    if (validatedReservation != null && validatedReservation.isNotEmpty) {
-      setState(() {
-        _hasValidReservation = true;
-        _isCheckingReservation = false;
-      });
-      return;
-    }
-  } catch (e) {
-    print('No validated reservation found: $e');
-  }
-
-  setState(() {
-    _hasValidReservation = false;
-    _isCheckingReservation = false;
-  });
-}
-
-  // New method to load data in background without showing loading state
-  void _loadDataInBackground() {
-    _checkConnectivityAndLoad();
+  
+  @override
+  void initState() {
+    super.initState();
+    _initAnimations();
+    _checkReservationStatus().then((_) {
+      if (mounted) {
+        _loadDataInBackground();
+      }
+    });
   }
 
   @override
@@ -99,27 +67,60 @@ Future<void> _checkReservationStatus() async {
     super.dispose();
   }
 
-  // void refreshData() {
-  //   _loadDashboardData();
-  //   _loadReservationStats();
-  //   _loadChartStatistics();
-  //   _isClanChartExpanded = true;
-  //   _isCountyChartExpanded = false;
+  /// Check if user has a valid reservation
+  Future<void> _checkReservationStatus() async {
+    if (!mounted) return;
+    
+    setState(() {
+      _isCheckingReservation = true;
+    });
 
-  // }
+    try {
+      final validatedReservation = await ApiService.getMyValidatedReservation();
+      
+      if (!mounted) return;
+      
+      if (validatedReservation != null && validatedReservation.isNotEmpty) {
+        setState(() {
+          _hasValidReservation = true;
+          _isCheckingReservation = false;
+        });
+        return;
+      }
+    } catch (e) {
+      debugPrint('No validated reservation found: $e');
+    }
+
+    if (!mounted) return;
+    
+    setState(() {
+      _hasValidReservation = false;
+      _isCheckingReservation = false;
+    });
+  }
+
+  void _loadDataInBackground() {
+    if (!mounted) return;
+    _checkConnectivityAndLoad();
+  }
 
   void refreshData() async {
-  final connectivityResult = await Connectivity().checkConnectivity();
-  
-  if (connectivityResult.contains(ConnectivityResult.none)) {
-    _showNoInternetDialog();
-    return;
+    if (!mounted) return;
+    
+    final connectivityResult = await Connectivity().checkConnectivity();
+    
+    if (connectivityResult.contains(ConnectivityResult.none)) {
+      if (mounted) {
+        _showNoInternetDialog();
+      }
+      return;
+    }
+    
+    await _checkReservationStatus();
+    if (mounted) {
+      _loadDashboardData();
+    }
   }
-  
-  // Re-check reservation status on refresh
-  await _checkReservationStatus();
-  _loadDashboardData();
-}
 
   Future<void> _loadData() async {
     try {
@@ -147,9 +148,6 @@ Future<void> _checkReservationStatus() async {
     }
   }
 
-
-
-
   Future<void> _loadUserProfile() async {
     try {
       final profile = await ApiService.getProfile();
@@ -157,7 +155,9 @@ Future<void> _checkReservationStatus() async {
         setState(() => _userProfile = profile);
       }
     } catch (e) {
-      _userProfile = null;
+      if (mounted) {
+        setState(() => _userProfile = null);
+      }
     }
   }
 
@@ -168,56 +168,61 @@ Future<void> _checkReservationStatus() async {
         setState(() => _pendingReservation = pending);
       }
     } catch (e) {
-      _pendingReservation = null;
+      if (mounted) {
+        setState(() => _pendingReservation = null);
+      }
     }
   }
-
 
   Future<void> _checkConnectivityAndLoad() async {
     final connectivityResult = await Connectivity().checkConnectivity();
     
     if (connectivityResult.contains(ConnectivityResult.none)) {
-      _showNoInternetDialog();
+      if (mounted) {
+        _showNoInternetDialog();
+      }
       return;
     }
     
     await _loadData();
   }
 
-void _showNoInternetDialog() {
-  showDialog(
-    context: context,
-    barrierDismissible: false,
-    builder: (context) => AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: Row(
-        children: [
-          Icon(Icons.wifi_off, color: Colors.orange),
-          SizedBox(width: 10),
-          Text('لا يوجد اتصال'),
+  void _showNoInternetDialog() {
+    if (!mounted) return;
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.wifi_off, color: Colors.orange),
+            SizedBox(width: 10),
+            Text('لا يوجد اتصال'),
+          ],
+        ),
+        content: const Text('يرجى التحقق من اتصالك بالإنترنت'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _checkConnectivityAndLoad();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('إعادة المحاولة', style: TextStyle(color: Colors.white)),
+          ),
         ],
       ),
-      content: Text('يرجى التحقق من اتصالك بالإنترنت'),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text('إلغاء'),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            Navigator.pop(context);
-            _checkConnectivityAndLoad();
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.blue,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-          child: Text('إعادة المحاولة', style: TextStyle(color: Colors.white)),
-        ),
-      ],
-    ),
-  );
-}
+    );
+  }
 
   void _initAnimations() {
     _animationController = AnimationController(
@@ -238,15 +243,16 @@ void _showNoInternetDialog() {
     final connectivityResult = await Connectivity().checkConnectivity();
     
     if (connectivityResult.contains(ConnectivityResult.none)) {
-      _showNoInternetDialog();
+      if (mounted) {
+        _showNoInternetDialog();
+      }
       return;
     }
     
     await _loadData();
   }
 
-
-Future<void> _loadReservationStats() async {
+  Future<void> _loadReservationStats() async {
     try {
       final results = await Future.wait([
         ApiService.getMyAllReservations(),
@@ -254,54 +260,61 @@ Future<void> _loadReservationStats() async {
         ApiService.getMyCancelledReservations(),
       ]);
       
+      if (!mounted) return;
+      
       final allReservations = results[0] as List;
       final validatedReservation = results[1] as Map<String, dynamic>?;
       final cancelledReservations = results[2] as List;
       
+      setState(() {
+        _validatedReservation = validatedReservation;
+        
+        _reservationStats = {
+          'total': allReservations.length,
+          'validated': validatedReservation != null ? 1 : 0,
+          'cancelled': cancelledReservations.length,
+          'pending': _pendingReservation != null ? 1 : 0,
+        };
+
+        if (allReservations.isNotEmpty) {
+          _recentReservations = allReservations
+              .take(3)
+              .map((r) => Map<String, dynamic>.from(r))
+              .toList();
+        }
+      });
+    } catch (e) {
       if (mounted) {
         setState(() {
-          _validatedReservation = validatedReservation;
-          
-          _reservationStats = {
-            'total': allReservations.length,
-            'validated': validatedReservation != null ? 1 : 0,
-            'cancelled': cancelledReservations.length,
-            'pending': _pendingReservation != null ? 1 : 0,
-          };
-
-          if (allReservations.isNotEmpty) {
-            _recentReservations = allReservations
-                .take(3)
-                .map((r) => Map<String, dynamic>.from(r))
-                .toList();
-          }
+          _reservationStats = {'total': 0, 'validated': 0, 'cancelled': 0, 'pending': 0};
         });
       }
-    } catch (e) {
-      _reservationStats = {'total': 0, 'validated': 0, 'cancelled': 0, 'pending': 0};
     }
   }
-Future<void> _loadChartStatistics() async {
-  // Don't load chart data if no valid reservation
-  if (!_hasValidReservation) {
-    setState(() {
-      _clanStats = {'today': 0, 'month': 0, 'year': 0, 'today_data': [], 'month_data': [], 'year_data': []};
-      _countyStats = {'today': 0, 'month': 0, 'year': 0, 'today_data': [], 'month_data': [], 'year_data': []};
-    });
-    return;
-  }
 
-  try {
-    final results = await Future.wait([
-      ApiService.getValidatedReservationsToday(),
-      ApiService.getValidatedReservationsMonth(),
-      ApiService.getValidatedReservationsYear(),
-      ApiService.getValidatedReservationsTodayCounty(),
-      ApiService.getValidatedReservationsMonthCounty(),
-      ApiService.getValidatedReservationsYearCounty(),
-    ]);
-    
-    if (mounted) {
+  Future<void> _loadChartStatistics() async {
+    if (!_hasValidReservation) {
+      if (mounted) {
+        setState(() {
+          _clanStats = {'today': 0, 'month': 0, 'year': 0, 'today_data': [], 'month_data': [], 'year_data': []};
+          _countyStats = {'today': 0, 'month': 0, 'year': 0, 'today_data': [], 'month_data': [], 'year_data': []};
+        });
+      }
+      return;
+    }
+
+    try {
+      final results = await Future.wait([
+        ApiService.getValidatedReservationsToday(),
+        ApiService.getValidatedReservationsMonth(),
+        ApiService.getValidatedReservationsYear(),
+        ApiService.getValidatedReservationsTodayCounty(),
+        ApiService.getValidatedReservationsMonthCounty(),
+        ApiService.getValidatedReservationsYearCounty(),
+      ]);
+      
+      if (!mounted) return;
+      
       setState(() {
         _clanStats = {
           'today': results[0]['count'] ?? 0,
@@ -321,14 +334,19 @@ Future<void> _loadChartStatistics() async {
           'year_data': results[5]['reservations'] ?? [],
         };
       });
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _clanStats = {'today': 0, 'month': 0, 'year': 0, 'today_data': [], 'month_data': [], 'year_data': []};
+          _countyStats = {'today': 0, 'month': 0, 'year': 0, 'today_data': [], 'month_data': [], 'year_data': []};
+        });
+      }
     }
-  } catch (e) {
-    _clanStats = {'today': 0, 'month': 0, 'year': 0, 'today_data': [], 'month_data': [], 'year_data': []};
-    _countyStats = {'today': 0, 'month': 0, 'year': 0, 'today_data': [], 'month_data': [], 'year_data': []};
   }
-}
 
-void _showExitDialog(bool isDark) {
+  void _showExitDialog(bool isDark) {
+    if (!mounted) return;
+    
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -370,48 +388,45 @@ void _showExitDialog(bool isDark) {
     );
   }
 
-@override
-Widget build(BuildContext context) {
-  // final themeProvider = Provider.of<ThemeProvider>(context);
-  // final isDark = themeProvider.isDarkMode;
-      final isDark = Theme.of(context).brightness == Brightness.dark;
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-
-  return PopScope(
-    canPop: false,
-    onPopInvokedWithResult: (bool didPop, Object? result) async {
-      if (didPop) {
-        return;
-      }
-      _showExitDialog(isDark);
-    },
-    child: Container(
-      color: isDark ? const Color(0xFF121212) : const Color(0xFFF6F6F6),
-      child: RefreshIndicator(
-        onRefresh: _loadDashboardData,
-        color: const Color(0xFF1DB954),
-        backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-        child: ListView(
-          padding: EdgeInsets.zero,
-          physics: const BouncingScrollPhysics(),
-          children: [
-            _buildHeader(isDark),
-            _buildStatusCard(isDark),
-            const SizedBox(height: 24),
-            _buildStatsSection(isDark),
-            const SizedBox(height: 32),
-            _buildQuickActions(isDark),
-            if (_recentReservations.isNotEmpty) ...[
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (bool didPop, Object? result) async {
+        if (didPop) {
+          return;
+        }
+        _showExitDialog(isDark);
+      },
+      child: Container(
+        color: isDark ? const Color(0xFF121212) : const Color(0xFFF6F6F6),
+        child: RefreshIndicator(
+          onRefresh: _loadDashboardData,
+          color: const Color(0xFF1DB954),
+          backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          child: ListView(
+            padding: EdgeInsets.zero,
+            physics: const BouncingScrollPhysics(),
+            children: [
+              _buildHeader(isDark),
+              _buildStatusCard(isDark),
+              const SizedBox(height: 24),
+              _buildStatsSection(isDark),
               const SizedBox(height: 32),
-              _buildRecentReservations(isDark),
+              _buildQuickActions(isDark),
+              if (_recentReservations.isNotEmpty) ...[
+                const SizedBox(height: 32),
+                _buildRecentReservations(isDark),
+              ],
+              const SizedBox(height: 100),
             ],
-            const SizedBox(height: 100),
-          ],
+          ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   Widget _buildHeader(bool isDark) {
     final userName = _userProfile != null 
@@ -712,239 +727,242 @@ Widget build(BuildContext context) {
   }
 
   Widget _buildStatsSection(bool isDark) {
-  // Don't show charts if no valid reservation
-  if (!_hasValidReservation) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isDark ? Colors.grey[800]! : Colors.grey[200]!,
-          ),
-        ),
-        child: Column(
-          children: [
-            Icon(
-              Icons.lock_outline,
-              size: 48,
-              color: isDark ? Colors.grey[600] : Colors.grey[400],
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'الإحصائيات متاحة بعد تأكيد الحجز',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: isDark ? Colors.grey[400] : Colors.grey[600],
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'قم بإنشاء حجز وانتظر التأكيد لعرض الإحصائيات',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 13,
-                color: isDark ? Colors.grey[500] : Colors.grey[500],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // Original stats section for users with valid reservation
-  return Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 16),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'إحصائيات',
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w900,
-            color: isDark ? Colors.white : const Color(0xFF121212),
-          ),
-        ),
-        const SizedBox(height: 20),
-        _buildChartCard(
-          title: 'أعراس العشيرة',
-          icon: Icons.groups_rounded,
-          selectedPeriod: _clanSelectedPeriod,
-          data: _clanStats,
-          onPeriodChanged: (period) => setState(() => _clanSelectedPeriod = period),
-          isDark: isDark,
-          color: const Color(0xFF1DB954),
-          isExpanded: _isClanChartExpanded,
-          onToggleExpand: () => setState(() => _isClanChartExpanded = !_isClanChartExpanded),
-        ),
-        const SizedBox(height: 16),
-        _buildChartCard(
-          title: 'أعراس القصر',
-          icon: Icons.location_city_rounded,
-          selectedPeriod: _countySelectedPeriod,
-          data: _countyStats,
-          onPeriodChanged: (period) => setState(() => _countySelectedPeriod = period),
-          isDark: isDark,
-          color: const Color(0xFF1ED760),
-          isExpanded: _isCountyChartExpanded,
-          onToggleExpand: () => setState(() => _isCountyChartExpanded = !_isCountyChartExpanded),
-        ),
-      ],
-    ),
-  );
-}
-
-
-Widget _buildChartCard({
-  required String title,
-  required IconData icon,
-  required String selectedPeriod,
-  required Map<String, dynamic> data,
-  required Function(String) onPeriodChanged,
-  required bool isDark,
-  required Color color,
-  required bool isExpanded,
-  required VoidCallback onToggleExpand,
-}) {
-  return AnimatedContainer(
-    duration: const Duration(milliseconds: 300),
-    curve: Curves.easeInOut,
-    padding: const EdgeInsets.all(20),
-    decoration: BoxDecoration(
-      color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-      borderRadius: BorderRadius.circular(12),
-      boxShadow: [
-        BoxShadow(
-          color: AppColors.darkBorderFocus.withOpacity(isDark ? 0.2 : 0.1),
-          blurRadius: 15,
-          offset: const Offset(0, 0),
-        ),
-      ],
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Header row with toggle
-        InkWell(
-          onTap: onToggleExpand,
-          borderRadius: BorderRadius.circular(8),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(icon, color: color, size: 20),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: isDark ? Colors.white : const Color(0xFF121212),
-                        ),
-                      ),
-                      if (!isExpanded) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          '  أعراس هذا الشهر  ${(data['month'] as num?) ?? 0} ',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: color,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                AnimatedRotation(
-                  turns: isExpanded ? 0.5 : 0,
-                  duration: const Duration(milliseconds: 300),
-                  child: Icon(
-                    Icons.keyboard_arrow_down_rounded,
-                    color: isDark ? Colors.grey[400] : const Color(0xFF6A6A6A),
-                    size: 28,
-                  ),
-                ),
-              ],
+    if (!_hasValidReservation) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isDark ? Colors.grey[800]! : Colors.grey[200]!,
             ),
           ),
-        ),
-        
-        // Expandable content
-        AnimatedCrossFade(
-          firstChild: const SizedBox.shrink(),
-          secondChild: Column(
+          child: Column(
             children: [
+              Icon(
+                Icons.lock_outline,
+                size: 48,
+                color: isDark ? Colors.grey[600] : Colors.grey[400],
+              ),
               const SizedBox(height: 16),
-              Row(
-                children: [
-                  _buildPeriodButton('اليوم', 'today', selectedPeriod, onPeriodChanged, color, isDark),
-                  const SizedBox(width: 8),
-                  _buildPeriodButton('الشهر', 'month', selectedPeriod, onPeriodChanged, color, isDark),
-                  const SizedBox(width: 8),
-                  _buildPeriodButton('السنة', 'year', selectedPeriod, onPeriodChanged, color, isDark),
-                ],
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                height: 180,
-                child: _buildLineChart(data, selectedPeriod, color, isDark),
-              ),
-              const SizedBox(height: 12),
-              Center(
-                child: Column(
-                  children: [
-                    Text(
-                      '${(data[selectedPeriod] as num?) ?? 0}',
-                      style: TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.w900,
-                        color: color,
-                      ),
-                    ),
-                    Text(
-                      selectedPeriod == 'today' 
-                          ? 'أعراس اليوم' 
-                          : selectedPeriod == 'month' 
-                              ? 'أعراس هذا الشهر' 
-                              : 'أعراس هذه السنة',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: isDark ? Colors.grey[400] : const Color(0xFF6A6A6A),
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
+              Text(
+                'الإحصائيات متاحة بعد تأكيد الحجز',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.grey[400] : Colors.grey[600],
                 ),
               ),
             ],
           ),
-          crossFadeState: isExpanded 
-              ? CrossFadeState.showSecond 
-              : CrossFadeState.showFirst,
-          duration: const Duration(milliseconds: 300),
         ),
-      ],
-    ),
-  );
-}
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'إحصائيات',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+              color: isDark ? Colors.white : const Color(0xFF121212),
+            ),
+          ),
+          const SizedBox(height: 20),
+          _buildChartCard(
+            title: 'أعراس العشيرة',
+            icon: Icons.groups_rounded,
+            selectedPeriod: _clanSelectedPeriod,
+            data: _clanStats,
+            onPeriodChanged: (period) {
+              if (mounted) {
+                setState(() => _clanSelectedPeriod = period);
+              }
+            },
+            isDark: isDark,
+            color: const Color(0xFF1DB954),
+            isExpanded: _isClanChartExpanded,
+            onToggleExpand: () {
+              if (mounted) {
+                setState(() => _isClanChartExpanded = !_isClanChartExpanded);
+              }
+            },
+          ),
+          const SizedBox(height: 16),
+          _buildChartCard(
+            title: 'أعراس القصر',
+            icon: Icons.location_city_rounded,
+            selectedPeriod: _countySelectedPeriod,
+            data: _countyStats,
+            onPeriodChanged: (period) {
+              if (mounted) {
+                setState(() => _countySelectedPeriod = period);
+              }
+            },
+            isDark: isDark,
+            color: const Color(0xFF1ED760),
+            isExpanded: _isCountyChartExpanded,
+            onToggleExpand: () {
+              if (mounted) {
+                setState(() => _isCountyChartExpanded = !_isCountyChartExpanded);
+              }
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChartCard({
+    required String title,
+    required IconData icon,
+    required String selectedPeriod,
+    required Map<String, dynamic> data,
+    required Function(String) onPeriodChanged,
+    required bool isDark,
+    required Color color,
+    required bool isExpanded,
+    required VoidCallback onToggleExpand,
+  }) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.darkBorderFocus.withOpacity(isDark ? 0.2 : 0.1),
+            blurRadius: 15,
+            offset: const Offset(0, 0),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            onTap: onToggleExpand,
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: color.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(icon, color: color, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: isDark ? Colors.white : const Color(0xFF121212),
+                          ),
+                        ),
+                        if (!isExpanded) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            '  أعراس هذا الشهر  ${(data['month'] as num?) ?? 0} ',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: color,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  AnimatedRotation(
+                    turns: isExpanded ? 0.5 : 0,
+                    duration: const Duration(milliseconds: 300),
+                    child: Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      color: isDark ? Colors.grey[400] : const Color(0xFF6A6A6A),
+                      size: 28,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          
+          AnimatedCrossFade(
+            firstChild: const SizedBox.shrink(),
+            secondChild: Column(
+              children: [
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    _buildPeriodButton('اليوم', 'today', selectedPeriod, onPeriodChanged, color, isDark),
+                    const SizedBox(width: 8),
+                    _buildPeriodButton('الشهر', 'month', selectedPeriod, onPeriodChanged, color, isDark),
+                    const SizedBox(width: 8),
+                    _buildPeriodButton('السنة', 'year', selectedPeriod, onPeriodChanged, color, isDark),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  height: 180,
+                  child: _buildLineChart(data, selectedPeriod, color, isDark),
+                ),
+                const SizedBox(height: 12),
+                Center(
+                  child: Column(
+                    children: [
+                      Text(
+                        '${(data[selectedPeriod] as num?) ?? 0}',
+                        style: TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.w900,
+                          color: color,
+                        ),
+                      ),
+                      Text(
+                        selectedPeriod == 'today' 
+                            ? 'أعراس اليوم' 
+                            : selectedPeriod == 'month' 
+                                ? 'أعراس هذا الشهر' 
+                                : 'أعراس هذه السنة',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: isDark ? Colors.grey[400] : const Color(0xFF6A6A6A),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            crossFadeState: isExpanded 
+                ? CrossFadeState.showSecond 
+                : CrossFadeState.showFirst,
+            duration: const Duration(milliseconds: 300),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildPeriodButton(
     String label,
     String value,
@@ -997,7 +1015,6 @@ Widget _buildChartCard({
     Map<String, int> dateCounts = {};
     
     if (selectedPeriod == 'today') {
-      // Group by hour (0-23)
       for (var res in reservations) {
         try {
           final dateStr = res['date1'] ?? res['wedding_date'] ?? '';
@@ -1013,7 +1030,6 @@ Widget _buildChartCard({
       spots = List.generate(24, (i) => FlSpot(i.toDouble(), (dateCounts[i.toString()] ?? 0).toDouble()));
       
     } else if (selectedPeriod == 'month') {
-      // Group by day (1-30/31)
       for (var res in reservations) {
         try {
           final dateStr = res['date1'] ?? res['wedding_date'] ?? '';
@@ -1034,7 +1050,6 @@ Widget _buildChartCard({
       );
       
     } else {
-      // Group by month (1-12)
       for (var res in reservations) {
         try {
           final dateStr = res['date1'] ?? res['wedding_date'] ?? '';
@@ -1242,124 +1257,125 @@ Widget _buildChartCard({
       duration: const Duration(milliseconds: 250),
     );
   }
-Widget _buildQuickActions(bool isDark) {
-  final actions = [
-    {
-      'icon': Icons.add_circle_rounded,
-      'title': 'حجز جديد',
-      'subtitle': 'احجز موعد زفافك',
-      'onTap': () => widget.onTabChanged!(1)
-    },
-    {
-      'icon': Icons.calendar_month_rounded,
-      'title': 'حجوزاتي',
-      'subtitle': 'عرض وإدارة الحجوزات',
-      'onTap': () => widget.onTabChanged!(2)
-    },
-    {
-      'icon': Icons.restaurant_menu_rounded,
-      'title': 'قائمة مقادير الوليمة',
-      'subtitle': 'اطلع على قائمة الطعام',
-      'onTap': () => widget.onTabChanged!(3)
-    },
-    {
-      'icon': Icons.person_rounded,
-      'title': 'الملف الشخصي',
-      'subtitle': 'إعدادات وتفضيلات',
-      'onTap': () => widget.onTabChanged!(4)
-    },
-    {
-      'icon': Icons.rule_outlined,
-      'title': 'اللوازم',
-      'subtitle': 'اطلع على القوانين والقواعد',
-      'onTap': () => widget.onTabChanged!(5)
-    },
-  ];
 
-  return Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 16),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'الإجراءات السريعة',
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w900,
-            color: isDark ? Colors.white : const Color(0xFF121212),
-          ),
-        ),
-        const SizedBox(height: 16),
-        ...actions.map((action) => Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: GestureDetector(
-            onTap: action['onTap'] as VoidCallback,
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                borderRadius: BorderRadius.circular(8),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.darkBorderFocus.withOpacity(isDark ? 0.15 : 0.15),
-                    blurRadius: 15,
-                    offset: const Offset(0, 0),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1DB954).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Icon(
-                      action['icon'] as IconData,
-                      color: const Color(0xFF1DB954),
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          action['title'] as String,
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            color: isDark ? Colors.white : const Color(0xFF121212),
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          action['subtitle'] as String,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isDark ? Colors.grey[400] : const Color(0xFF6A6A6A),
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Icon(
-                    Icons.chevron_right_rounded,
-                    color: isDark ? Colors.grey[400] : const Color(0xFF6A6A6A),
-                    size: 24,
-                  ),
-                ],
-              ),
+  Widget _buildQuickActions(bool isDark) {
+    final actions = [
+      {
+        'icon': Icons.add_circle_rounded,
+        'title': 'حجز جديد',
+        'subtitle': 'احجز موعد زفافك',
+        'onTap': () => widget.onTabChanged!(1)
+      },
+      {
+        'icon': Icons.calendar_month_rounded,
+        'title': 'حجوزاتي',
+        'subtitle': 'عرض وإدارة الحجوزات',
+        'onTap': () => widget.onTabChanged!(2)
+      },
+      {
+        'icon': Icons.restaurant_menu_rounded,
+        'title': 'قائمة مقادير الوليمة',
+        'subtitle': 'اطلع على قائمة الطعام',
+        'onTap': () => widget.onTabChanged!(3)
+      },
+      {
+        'icon': Icons.person_rounded,
+        'title': 'الملف الشخصي',
+        'subtitle': 'إعدادات وتفضيلات',
+        'onTap': () => widget.onTabChanged!(4)
+      },
+      {
+        'icon': Icons.rule_outlined,
+        'title': 'اللوازم',
+        'subtitle': 'اطلع على القوانين والقواعد',
+        'onTap': () => widget.onTabChanged!(5)
+      },
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'الإجراءات السريعة',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+              color: isDark ? Colors.white : const Color(0xFF121212),
             ),
           ),
-        )),
-      ],
-    ),
-  );
-}
+          const SizedBox(height: 16),
+          ...actions.map((action) => Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: GestureDetector(
+              onTap: action['onTap'] as VoidCallback,
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.darkBorderFocus.withOpacity(isDark ? 0.15 : 0.15),
+                      blurRadius: 15,
+                      offset: const Offset(0, 0),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1DB954).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Icon(
+                        action['icon'] as IconData,
+                        color: const Color(0xFF1DB954),
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            action['title'] as String,
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: isDark ? Colors.white : const Color(0xFF121212),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            action['subtitle'] as String,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isDark ? Colors.grey[400] : const Color(0xFF6A6A6A),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      color: isDark ? Colors.grey[400] : const Color(0xFF6A6A6A),
+                      size: 24,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          )),
+        ],
+      ),
+    );
+  }
 
   Widget _buildRecentReservations(bool isDark) {
     return Padding(

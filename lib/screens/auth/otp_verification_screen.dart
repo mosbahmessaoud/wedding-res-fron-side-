@@ -1,12 +1,12 @@
 // lib/screens/auth/otp_verification_screen.dart
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:wedding_reservation_app/screens/auth/login_screen.dart';
 import 'package:wedding_reservation_app/widgets/common/custom_text_field.dart';
-import 'dart:async';
-import '../../utils/colors.dart' hide AppColors;
+
 import '../../services/api_service.dart';
-import '../groom/home_tab.dart';
 
 class OTPVerificationScreen extends StatefulWidget {
   final String phoneNumber;
@@ -33,7 +33,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen>
   
   bool _isLoading = false;
   bool _isResending = false;
-  int _resendTimer = 60;
+  int _resendTimer = 90;
   Timer? _timer;
   String _errorMessage = '';
   
@@ -159,7 +159,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen>
       _showSuccessSnackBar('تم إرسال الرمز مرة أخرى');
 
       setState(() {
-        _resendTimer = 60;
+        _resendTimer = 90;
       });
       _startResendTimer();
       _clearOTP();

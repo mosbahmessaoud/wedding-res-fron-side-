@@ -1,10 +1,9 @@
 // lib/widgets/beautiful_custom_calendar_picker.dart
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:intl/intl.dart';
+import 'package:wedding_reservation_app/models/reservation_special.dart';
 import 'package:wedding_reservation_app/services/api_service.dart';
-import '../../utils/colors.dart'; 
-import '../../widgets/theme_toggle_button.dart'; 
 
 // Export DateStatus and DateAvailability for use in other files
 export 'custom_calendar_picker.dart' show DateStatus, DateAvailability;
@@ -16,6 +15,7 @@ enum DateStatus {
   disabled,
   massWeddingOpen,
   mixed,
+  specialReservation, // ADD THIS
 }
 
 class DateAvailability {
@@ -30,6 +30,7 @@ class DateAvailability {
   final List<dynamic> validatedReservations;
   final List<dynamic> pendingReservations;
   final bool allowMassWedding;
+  final ReservationSpecial? specialReservation; // ADD THIS
 
   DateAvailability({
     required this.date,
@@ -43,6 +44,7 @@ class DateAvailability {
     this.validatedReservations = const [],
     this.pendingReservations = const [],
     this.allowMassWedding = false,
+    this.specialReservation, // ADD THIS
   });
 }
 class BeautifulCustomCalendarPicker extends StatefulWidget {
@@ -86,7 +88,6 @@ class _BeautifulCustomCalendarPickerState extends State<BeautifulCustomCalendarP
   DateTime? _selectedDate;
   bool _isLocaleInitialized = false;
   bool _isLoading = false;
-  bool _allowsMassWedding=true;
   Map<String, DateAvailability> _dateAvailabilities = {};
   int _maxGroomsPerDate = 3;
   Map<String, List<String>> _groomMultiDayReservations = {};
@@ -94,6 +95,9 @@ class _BeautifulCustomCalendarPickerState extends State<BeautifulCustomCalendarP
   Map<String, List<DateTime>> _connectedDateRanges = {};
   
   Set<String> _specialReservationDates = {};
+  Map<String, ReservationSpecial> _specialReservationsMap = {}; 
+
+
 
   bool _showYearPicker = false;
   late int _maxYearsAllowed;
@@ -111,10 +115,7 @@ class _BeautifulCustomCalendarPickerState extends State<BeautifulCustomCalendarP
   late Animation<double> _bounceAnimation;
 
 
-
-  // ADD THESE TWO NEW ONES
   bool _showDayPickerDialog = false;
-  DateTime? _tempSelectedDate;
 
 
 
@@ -226,13 +227,12 @@ Future<void> _loadMonthData() async {
     // ADD THIS - Fetch special reservations
     final specialReservations = await ApiService.getSpecialReservations();
     Set<String> specialDates = {};
-    
+    Map<String, ReservationSpecial> specialMap = {}; // ADD THIS
+
     for (var reservation in specialReservations) {
-      final date1 = reservation['date1']?.toString();
-      final date2 = reservation['date2']?.toString();
-      
-      if (date1 != null) specialDates.add(date1);
-      if (date2 != null && date2 != date1) specialDates.add(date2);
+      final dateStr = reservation.date;
+      specialDates.add(dateStr);
+      specialMap[dateStr] = reservation; // ADD THIS
     }
     
     final validatedDates = await ApiService.getValidatedDates(widget.clanId);
@@ -365,7 +365,7 @@ Future<void> _loadMonthData() async {
         }
 
         if (pendingCount > 0) {
-          note += '\nتنبيه: الحجوزات المعلقة قد تُلغى خلال 10 أيام';
+          note += '\nتنبيه: الحجوزات المعلقة ليست مأكدة قد تُلغى في أي وقت';
         }
 
         newAvailabilities[dateStr] = DateAvailability(
@@ -389,7 +389,7 @@ Future<void> _loadMonthData() async {
         _dateToGroomMap = newDateToGroomMap;
         _connectedDateRanges = newConnectedDateRanges;
         _specialReservationDates = specialDates; 
-
+        _specialReservationsMap = specialMap; 
         _isLoading = false;
       });
     } catch (e) {
@@ -415,6 +415,7 @@ String _getMonthYearText(DateTime date) {
     return '${monthsDZ[date.month]} ${date.year}';
   }
 }
+
 DateAvailability _getDateAvailability(DateTime date) {
   final key = DateFormat('yyyy-MM-dd').format(date);
   
@@ -432,13 +433,14 @@ DateAvailability _getDateAvailability(DateTime date) {
     );
   }
   
-  // ADD THIS - Check if date is a special reservation
+  // Check if date is a special reservation
   if (_specialReservationDates.contains(key)) {
     return DateAvailability(
       date: date,
-      status: DateStatus.disabled,
+      status: DateStatus.specialReservation, // CHANGED
       maxCapacity: _maxGroomsPerDate,
-      note: 'حجز خاص - غير متاح',
+      note: 'حجز خاص من العشيرة',
+      specialReservation: _specialReservationsMap[key], // ADD THIS
     );
   }
   
@@ -460,6 +462,8 @@ DateAvailability _getDateAvailability(DateTime date) {
     maxCapacity: _maxGroomsPerDate,
   );
 }
+
+
   bool _isSameDay(DateTime date1, DateTime date2) {
     return date1.year == date2.year &&
         date1.month == date2.month &&
@@ -493,7 +497,7 @@ DateAvailability _getDateAvailability(DateTime date) {
             if (groomDateAvailability.currentCount >= groomDateAvailability.maxCapacity) isCapacityFull = true;
           }
         }
-        _allowsMassWedding= allowsMassWedding;
+        // _allowsMassWedding= allowsMassWedding;
         
         if (hasValidated && hasPending) {
           return allowsMassWedding && !isCapacityFull 
@@ -522,6 +526,8 @@ DateAvailability _getDateAvailability(DateTime date) {
         return const Color(0xFF00BCD4);
       case DateStatus.mixed:
         return const Color.fromARGB(255, 5, 150, 247);
+      case DateStatus.specialReservation: // ADD THIS
+        return const Color(0xFF000000); // Black color
       case DateStatus.disabled:
         return const Color(0xFFBDBDBD);
     }
@@ -542,6 +548,8 @@ DateAvailability _getDateAvailability(DateTime date) {
       case DateStatus.massWeddingOpen:
         return Colors.white;
       case DateStatus.mixed:
+        return Colors.white;
+      case DateStatus.specialReservation: // ADD THIS
         return Colors.white;
       case DateStatus.disabled:
         return const Color(0xFF757575);
@@ -569,39 +577,41 @@ DateAvailability _getDateAvailability(DateTime date) {
       },
     );
   }
-
-  bool _isDateSelectable(DateTime date, DateAvailability availability) {
-    bool isBasicallyAvailable = availability.status == DateStatus.available || 
-                               availability.status == DateStatus.massWeddingOpen ||
-                               availability.status == DateStatus.mixed ||
-                               (availability.status == DateStatus.pending && availability.allowMassWedding);
-    
-    if (!isBasicallyAvailable) {
-      return false;
-    }
-    
-    final dateStr = DateFormat('yyyy-MM-dd').format(date);
-    
-    if (_dateToGroomMap.containsKey(dateStr)) {
-      final groomId = _dateToGroomMap[dateStr]!;
-      final groomDates = _connectedDateRanges[groomId];
-      
-      if (groomDates != null && groomDates.length > 1) {
-        final currentIndex = groomDates.indexWhere((d) => _isSameDay(d, date));
-        final isFirstDay = currentIndex == 0;
-        
-        if (!isFirstDay) {
-          return false;
-        }
-        
-        return availability.allowMassWedding;
-      }
-    }
-    
-    return true;
+bool _isDateSelectable(DateTime date, DateAvailability availability) {
+  // Special reservations are NOT selectable - CHANGED THIS
+  if (availability.status == DateStatus.specialReservation) {
+    return false; // CHANGED from true to false
   }
 
-// / Update _buildCalendarDay to handle dialog context
+  bool isBasicallyAvailable = availability.status == DateStatus.available || 
+                             availability.status == DateStatus.massWeddingOpen ||
+                             availability.status == DateStatus.mixed ||
+                             (availability.status == DateStatus.pending && availability.allowMassWedding);
+  
+  if (!isBasicallyAvailable) {
+    return false;
+  }
+  
+  final dateStr = DateFormat('yyyy-MM-dd').format(date);
+  
+  if (_dateToGroomMap.containsKey(dateStr)) {
+    final groomId = _dateToGroomMap[dateStr]!;
+    final groomDates = _connectedDateRanges[groomId];
+    
+    if (groomDates != null && groomDates.length > 1) {
+      final currentIndex = groomDates.indexWhere((d) => _isSameDay(d, date));
+      final isFirstDay = currentIndex == 0;
+      
+      if (!isFirstDay) {
+        return false;
+      }
+      
+      return availability.allowMassWedding;
+    }
+  }
+  
+  return true;
+}
 Widget _buildCalendarDay(DateTime date, {BuildContext? dialogContext}) {
   final availability = _getDateAvailability(date);
   final isCurrentMonth = date.month == _currentMonth.month && date.year == _currentMonth.year;
@@ -647,9 +657,14 @@ Widget _buildCalendarDay(DateTime date, {BuildContext? dialogContext}) {
         Navigator.of(dialogContext).pop();
       }
     } : null,
-    onLongPress: isCurrentMonth && availability.reservations.isNotEmpty ? () {
-      _showReservationDetails(date, availability);
-    } : null,
+    // UPDATE THIS - Allow long press for both reservations and special reservations
+    onLongPress: isCurrentMonth && 
+                (availability.reservations.isNotEmpty || 
+                 availability.status == DateStatus.specialReservation) 
+        ? () {
+            _showReservationDetails(date, availability);
+          } 
+        : null,
     child: AnimatedBuilder(
       animation: Listenable.merge([_pulseAnimation, _bounceAnimation]),
       builder: (context, child) {
@@ -714,8 +729,35 @@ Widget _buildCalendarDay(DateTime date, {BuildContext? dialogContext}) {
                   ),
                 ),
                 
+                // ADD THIS - Special icon for special reservations
+                if (isCurrentMonth && availability.status == DateStatus.specialReservation)
+                  Positioned(
+                    top: 2,
+                    right: 2,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.2),
+                            blurRadius: 3,
+                            offset: const Offset(0, 1),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.star,
+                        size: 12,
+                        color: Colors.black,
+                      ),
+                    ),
+                  ),
+                
                 // Rest of the Stack children remain the same...
-                if (isCurrentMonth && availability.currentCount > 0)
+                if (isCurrentMonth && availability.currentCount > 0 && 
+                    availability.status != DateStatus.specialReservation) // Don't show count for special reservations
                   Positioned(
                     top: 2,
                     right: 2,
@@ -744,7 +786,6 @@ Widget _buildCalendarDay(DateTime date, {BuildContext? dialogContext}) {
                       ),
                     ),
                   ),
-                // ... rest of indicators
               ],
             ),
           ),
@@ -754,90 +795,584 @@ Widget _buildCalendarDay(DateTime date, {BuildContext? dialogContext}) {
   );
 }
 
-  void _showReservationDetails(DateTime date, DateAvailability availability) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      isDismissible: true,
-      enableDrag: true,
-      builder: (context) => Container(
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.8,
-        ),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(24),
-            topRight: Radius.circular(24),
-          ),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Drag indicator
-            Container(
-              width: 50,
-              height: 5,
-              margin: const EdgeInsets.symmetric(vertical: 12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFE0E0E0),
-                borderRadius: BorderRadius.circular(3),
-              ),
-            ),
+  // void _showReservationDetails(DateTime date, DateAvailability availability) {
+  //   showModalBottomSheet(
+  //     context: context,
+  //     backgroundColor: Colors.transparent,
+  //     isScrollControlled: true,
+  //     isDismissible: true,
+  //     enableDrag: true,
+
+  //     builder: (context) => Container(
+  //       constraints: BoxConstraints(
+  //         maxHeight: MediaQuery.of(context).size.height * 0.8,
+  //       ),
+  //       decoration: const BoxDecoration(
+  //         color: Colors.white,
+  //         borderRadius: BorderRadius.only(
+  //           topLeft: Radius.circular(24),
+  //           topRight: Radius.circular(24),
+  //         ),
+  //       ),
+  //       child: Column(
+  //         mainAxisSize: MainAxisSize.min,
+  //         children: [
+  //           // Drag indicator
+  //           Container(
+  //             width: 50,
+  //             height: 5,
+  //             margin: const EdgeInsets.symmetric(vertical: 12),
+  //             decoration: BoxDecoration(
+  //               color: const Color(0xFFE0E0E0),
+  //               borderRadius: BorderRadius.circular(3),
+  //             ),
+  //           ),
             
-            Flexible(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Header with gradient background
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(20),
-                      margin: const EdgeInsets.only(bottom: 20),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            const Color(0xFF6C63FF),
-                            const Color(0xFF6C63FF).withOpacity(0.8),
+  //           Flexible(
+  //             child: SingleChildScrollView(
+  //               padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+  //               child: Column(
+  //                 crossAxisAlignment: CrossAxisAlignment.start,
+  //                 children: [
+  //                   // Header with gradient background
+  //                   Container(
+  //                     width: double.infinity,
+  //                     padding: const EdgeInsets.all(20),
+  //                     margin: const EdgeInsets.only(bottom: 20),
+  //                     decoration: BoxDecoration(
+  //                       gradient: LinearGradient(
+  //                         begin: Alignment.topLeft,
+  //                         end: Alignment.bottomRight,
+  //                         colors: [
+  //                           const Color(0xFF6C63FF),
+  //                           const Color(0xFF6C63FF).withOpacity(0.8),
+  //                         ],
+  //                       ),
+  //                       borderRadius: BorderRadius.circular(16),
+  //                       boxShadow: [
+  //                         BoxShadow(
+  //                           color: const Color(0xFF6C63FF).withOpacity(0.3),
+  //                           blurRadius: 12,
+  //                           offset: const Offset(0, 6),
+  //                         ),
+  //                       ],
+  //                     ),
+  //                     child: Column(
+  //                       children: [
+  //                         Text(
+  //                           'تفاصيل الحجوزات',
+  //                           style: const TextStyle(
+  //                             fontSize: 22,
+  //                             fontWeight: FontWeight.bold,
+  //                             color: Colors.white,
+  //                           ),
+  //                         ),
+  //                         const SizedBox(height: 8),
+  //                         Text(
+  //                           DateFormat('dd/MM/yyyy').format(date),
+  //                           style: TextStyle(
+  //                             fontSize: 16,
+  //                             color: Colors.white.withOpacity(0.9),
+  //                             fontWeight: FontWeight.w500,
+  //                           ),
+  //                         ),
+  //                       ],
+  //                     ),
+  //                   ),
+                    
+  //                   // Beautiful statistics cards
+  //                   Row(
+  //                     children: [
+  //                       Expanded(
+  //                         child: _buildStatCard(
+  //                           '${availability.validatedCount}',
+  //                           'مؤكد',
+  //                           const Color(0xFF4CAF50),
+  //                           Icons.verified,
+  //                         ),
+  //                       ),
+  //                       const SizedBox(width: 12),
+  //                       Expanded(
+  //                         child: _buildStatCard(
+  //                           '${availability.pendingCount}',
+  //                           'في الانتظار',
+  //                           const Color(0xFFFFB74D),
+  //                           Icons.schedule,
+  //                         ),
+  //                       ),
+
+  //                       const SizedBox(width: 12),
+  //                         Expanded(
+  //                           child: _buildStatCard(
+  //                             '${availability.currentCount}/${availability.maxCapacity}',
+  //                             'الإجمالي',
+  //                             const Color(0xFF9E9E9E),
+  //                             Icons.people,
+  //                           ),
+  //                         ),
+  //                     ],
+  //                   ),
+                    
+  //                   const SizedBox(height: 20),
+                    
+  //                   // Enhanced status indicator
+  //                   Container(
+  //                     width: double.infinity,
+  //                     padding: const EdgeInsets.all(20),
+  //                     decoration: BoxDecoration(
+  //                       color: _getDateColor(date, availability).withOpacity(0.1),
+  //                       borderRadius: BorderRadius.circular(16),
+  //                       border: Border.all(
+  //                         color: _getDateColor(date, availability).withOpacity(0.2),
+  //                         width: 1.5,
+  //                       ),
+  //                     ),
+  //                     child: Column(
+  //                       crossAxisAlignment: CrossAxisAlignment.start,
+  //                       children: [
+  //                         Row(
+  //                           children: [
+  //                             Container(
+  //                               width: 16,
+  //                               height: 16,
+  //                               decoration: BoxDecoration(
+  //                                 color: _getDateColor(date, availability),
+  //                                 shape: BoxShape.circle,
+  //                                 boxShadow: [
+  //                                   BoxShadow(
+  //                                     color: _getDateColor(date, availability).withOpacity(0.3),
+  //                                     blurRadius: 6,
+  //                                     spreadRadius: 2,
+  //                                   ),
+  //                                 ],
+  //                               ),
+  //                             ),
+  //                             const SizedBox(width: 12),
+  //                             Expanded(
+  //                               child: Text(
+  //                                 availability.note ?? _getStatusText(availability.status),
+  //                                 style: const TextStyle(
+  //                                   fontSize: 16,
+  //                                   fontWeight: FontWeight.w600,
+  //                                 ),
+  //                               ),
+  //                             ),
+  //                           ],
+  //                         ),
+  //                         if (availability.pendingCount > 0) ...[
+  //                           const SizedBox(height: 16),
+  //                           Container(
+  //                             padding: const EdgeInsets.all(16),
+  //                             decoration: BoxDecoration(
+  //                               color: const Color(0xFFFFB74D).withOpacity(0.1),
+  //                               borderRadius: BorderRadius.circular(12),
+  //                               border: Border.all(
+  //                                 color: const Color(0xFFFFB74D).withOpacity(0.3),
+  //                               ),
+  //                             ),
+  //                             child: Row(
+  //                               children: [
+  //                                 Container(
+  //                                   padding: const EdgeInsets.all(8),
+  //                                   decoration: BoxDecoration(
+  //                                     color: const Color(0xFFFFB74D).withOpacity(0.2),
+  //                                     shape: BoxShape.circle,
+  //                                   ),
+  //                                   child: const Icon(
+  //                                     Icons.warning_amber,
+  //                                     size: 18,
+  //                                     color: Color(0xFFE65100),
+  //                                   ),
+  //                                 ),
+  //                                 const SizedBox(width: 12),
+  //                                 const Expanded(
+  //                                   child: Text(
+  //                                     'تنبيه: الحجوزات المعلقة ليست مأكدة قد تُلغى في أي وقت',
+  //                                     style: TextStyle(
+  //                                       fontSize: 14,
+  //                                       fontWeight: FontWeight.w500,
+  //                                       color: Color(0xFFE65100),
+  //                                     ),
+  //                                   ),
+  //                                 ),
+  //                               ],
+  //                             ),
+  //                           ),
+  //                         ],
+  //                       ],
+  //                     ),
+  //                   ),
+                    
+  //                   const SizedBox(height: 24),
+
+
+
+  //                   // ADD THIS - Special Reservation Section
+  //                   if (availability.status == DateStatus.specialReservation && 
+  //                       availability.specialReservation != null) ...[
+  //                     Container(
+  //                       width: double.infinity,
+  //                       padding: const EdgeInsets.all(20),
+  //                       margin: const EdgeInsets.only(bottom: 20),
+  //                       decoration: BoxDecoration(
+  //                         gradient: const LinearGradient(
+  //                           begin: Alignment.topLeft,
+  //                           end: Alignment.bottomRight,
+  //                           colors: [
+  //                             Color(0xFF000000),
+  //                             Color(0xFF424242),
+  //                           ],
+  //                         ),
+  //                         borderRadius: BorderRadius.circular(16),
+  //                         boxShadow: [
+  //                           BoxShadow(
+  //                             color: Colors.black.withOpacity(0.3),
+  //                             blurRadius: 12,
+  //                             offset: const Offset(0, 6),
+  //                           ),
+  //                         ],
+  //                       ),
+  //                       child: Column(
+  //                         crossAxisAlignment: CrossAxisAlignment.start,
+  //                         children: [
+  //                           Row(
+  //                             children: [
+  //                               Container(
+  //                                 padding: const EdgeInsets.all(8),
+  //                                 decoration: BoxDecoration(
+  //                                   color: Colors.white.withOpacity(0.2),
+  //                                   shape: BoxShape.circle,
+  //                                 ),
+  //                                 child: const Icon(
+  //                                   Icons.star,
+  //                                   color: Colors.white,
+  //                                   size: 24,
+  //                                 ),
+  //                               ),
+  //                               const SizedBox(width: 12),
+  //                               const Text(
+  //                                 'حجز خاص من العشيرة',
+  //                                 style: TextStyle(
+  //                                   fontSize: 20,
+  //                                   fontWeight: FontWeight.bold,
+  //                                   color: Colors.white,
+  //                                 ),
+  //                               ),
+  //                             ],
+  //                           ),
+  //                           const SizedBox(height: 16),
+  //                           _buildSpecialReservationInfo(
+  //                             Icons.event,
+  //                             'اسم الحجز',
+  //                             availability.specialReservation!.reservName ?? 'غير محدد',
+  //                           ),
+  //                           if (availability.specialReservation!.reservDescription != null)
+  //                             _buildSpecialReservationInfo(
+  //                               Icons.description,
+  //                               'الوصف',
+  //                               availability.specialReservation!.reservDescription!,
+  //                             ),
+  //                           if (availability.specialReservation!.fullName != null)
+  //                             _buildSpecialReservationInfo(
+  //                               Icons.person,
+  //                               'اسم المسؤول',
+  //                               availability.specialReservation!.fullName!,
+  //                             ),
+  //                           if (availability.specialReservation!.phoneNumber != null)
+  //                             _buildSpecialReservationInfo(
+  //                               Icons.phone,
+  //                               'رقم الهاتف',
+  //                               availability.specialReservation!.phoneNumber!,
+  //                             ),
+  //                           if (availability.specialReservation!.homeAddress != null)
+  //                             _buildSpecialReservationInfo(
+  //                               Icons.location_on,
+  //                               'العنوان',
+  //                               availability.specialReservation!.homeAddress!,
+  //                             ),
+  //                         ],
+  //                       ),
+  //                     ),
+  //                   ],
+                    
+                    
+  //                   // Validated reservations with beautiful design
+  //                   if (availability.validatedReservations.isNotEmpty) ...[
+  //                     _buildSectionHeader(
+  //                       'الحجوزات المؤكدة',
+  //                       const Color(0xFF4CAF50),
+  //                       Icons.check_circle,
+  //                     ),
+  //                     const SizedBox(height: 12),
+  //                     ...availability.validatedReservations.map((reservation) => 
+  //                       _buildBeautifulReservationTile(reservation, true),
+  //                     ),
+  //                     const SizedBox(height: 20),
+  //                   ],
+                    
+  //                   // Pending reservations with beautiful design
+  //                   if (availability.pendingReservations.isNotEmpty) ...[
+  //                     _buildSectionHeader(
+  //                       'الحجوزات في الانتظار',
+  //                       const Color(0xFFFFB74D),
+  //                       Icons.schedule,
+  //                     ),
+  //                     const SizedBox(height: 12),
+  //                     ...availability.pendingReservations.map((reservation) => 
+  //                       _buildBeautifulReservationTile(reservation, false),
+  //                     ),
+  //                   ],
+  //                 ],
+  //               ),
+  //             ),
+  //           ),
+  //         ],
+  //       ),
+  //     ),
+  //   );
+  // }
+
+void _showReservationDetails(DateTime date, DateAvailability availability) {
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: Colors.transparent,
+    isScrollControlled: true,
+    isDismissible: true,
+    enableDrag: true,
+    builder: (context) => Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.8,
+      ),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(24),
+          topRight: Radius.circular(24),
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Drag indicator
+          Container(
+            width: 50,
+            height: 5,
+            margin: const EdgeInsets.symmetric(vertical: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE0E0E0),
+              borderRadius: BorderRadius.circular(3),
+            ),
+          ),
+          
+          Flexible(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header with gradient background
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(20),
+                    margin: const EdgeInsets.only(bottom: 20),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: availability.status == DateStatus.specialReservation
+                            ? [
+                                const Color(0xFF000000),
+                                const Color(0xFF424242),
+                              ]
+                            : [
+                                const Color(0xFF6C63FF),
+                                const Color(0xFF6C63FF).withOpacity(0.8),
+                              ],
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: availability.status == DateStatus.specialReservation
+                              ? Colors.black.withOpacity(0.3)
+                              : const Color(0xFF6C63FF).withOpacity(0.3),
+                          blurRadius: 12,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            if (availability.status == DateStatus.specialReservation)
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.2),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.star,
+                                  color: Colors.white,
+                                  size: 24,
+                                ),
+                              ),
+                            if (availability.status == DateStatus.specialReservation)
+                              const SizedBox(width: 12),
+                            Flexible(
+                              child: Text(
+                                availability.status == DateStatus.specialReservation
+                                    ? 'حجز خاص من العشيرة'
+                                    : 'تفاصيل الحجوزات',
+                                style: const TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
                           ],
                         ),
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF6C63FF).withOpacity(0.3),
-                            blurRadius: 12,
-                            offset: const Offset(0, 6),
+                        const SizedBox(height: 8),
+                        Text(
+                          DateFormat('dd/MM/yyyy').format(date),
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.white.withOpacity(0.9),
+                            fontWeight: FontWeight.w500,
                           ),
-                        ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  // Special Reservation Details Section
+                  if (availability.status == DateStatus.specialReservation && 
+                      availability.specialReservation != null) ...[
+                    // Reservation Name
+                    if (availability.specialReservation!.reservName != null)
+                      _buildDetailCard(
+                        icon: Icons.event,
+                        label: 'اسم الحجز',
+                        value: availability.specialReservation!.reservName!,
+                        color: Colors.black,
                       ),
-                      child: Column(
-                        children: [
-                          Text(
-                            'تفاصيل الحجوزات',
-                            style: const TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
+                    
+                    const SizedBox(height: 12),
+                    
+                    // Description
+                    if (availability.specialReservation!.reservDescription != null)
+                      _buildDetailCard(
+                        icon: Icons.description,
+                        label: 'الوصف',
+                        value: availability.specialReservation!.reservDescription!,
+                        color: Colors.black,
+                      ),
+                    
+                    const SizedBox(height: 12),
+                    
+                    // Contact Information Section
+                    if (availability.specialReservation!.fullName != null ||
+                        availability.specialReservation!.phoneNumber != null ||
+                        availability.specialReservation!.homeAddress != null) ...[
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withOpacity(0.1),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.contact_phone,
+                                    size: 20,
+                                    color: Colors.black,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                const Text(
+                                  'معلومات الاتصال',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black,
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            DateFormat('dd/MM/yyyy').format(date),
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Colors.white.withOpacity(0.9),
-                              fontWeight: FontWeight.w500,
+                            const SizedBox(height: 16),
+                            
+                            // Full Name
+                            if (availability.specialReservation!.fullName != null)
+                              _buildContactInfo(
+                                icon: Icons.person,
+                                label: 'اسم المسؤول',
+                                value: availability.specialReservation!.fullName!,
+                              ),
+                            
+                            // Phone Number
+                            if (availability.specialReservation!.phoneNumber != null)
+                              _buildContactInfo(
+                                icon: Icons.phone,
+                                label: 'رقم الهاتف',
+                                value: availability.specialReservation!.phoneNumber!,
+                              ),
+                            
+                            // Address
+                            if (availability.specialReservation!.homeAddress != null)
+                              _buildContactInfo(
+                                icon: Icons.location_on,
+                                label: 'العنوان',
+                                value: availability.specialReservation!.homeAddress!,
+                              ),
+                          ],
+                        ),
+                      ),
+                      
+                      const SizedBox(height: 16),
+                    ],
+                    
+                    // Info message
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.orange.shade200),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.info_outline, color: Colors.orange[700], size: 24),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'هذا التاريخ محجوز لمناسبة خاصة من قبل العشيرة ولا يمكن حجزه.',
+                              style: TextStyle(
+                                color: Colors.orange[900],
+                                fontSize: 14,
+                                height: 1.4,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           ),
                         ],
                       ),
                     ),
-                    
+                  ] else ...[
+                    // Normal reservations display (existing code)
                     // Beautiful statistics cards
                     Row(
                       children: [
@@ -858,16 +1393,15 @@ Widget _buildCalendarDay(DateTime date, {BuildContext? dialogContext}) {
                             Icons.schedule,
                           ),
                         ),
-
                         const SizedBox(width: 12),
-                          Expanded(
-                            child: _buildStatCard(
-                              '${availability.currentCount}/${availability.maxCapacity}',
-                              'الإجمالي',
-                              const Color(0xFF9E9E9E),
-                              Icons.people,
-                            ),
+                        Expanded(
+                          child: _buildStatCard(
+                            '${availability.currentCount}/${availability.maxCapacity}',
+                            'الإجمالي',
+                            const Color(0xFF9E9E9E),
+                            Icons.people,
                           ),
+                        ),
                       ],
                     ),
                     
@@ -945,7 +1479,7 @@ Widget _buildCalendarDay(DateTime date, {BuildContext? dialogContext}) {
                                   const SizedBox(width: 12),
                                   const Expanded(
                                     child: Text(
-                                      'تنبيه: الحجوزات المعلقة قد تُلغى خلال 10 أيام',
+                                      'تنبيه: الحجوزات المعلقة ليست مأكدة قد تُلغى في أي وقت',
                                       style: TextStyle(
                                         fontSize: 14,
                                         fontWeight: FontWeight.w500,
@@ -990,11 +1524,156 @@ Widget _buildCalendarDay(DateTime date, {BuildContext? dialogContext}) {
                       ),
                     ],
                   ],
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+// Add these helper methods for special reservation display
+Widget _buildDetailCard({
+  required IconData icon,
+  required String label,
+  required String value,
+  required Color color,
+}) {
+  return Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: color.withOpacity(0.05),
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(
+        color: color.withOpacity(0.2),
+      ),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                size: 20,
+                color: color,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
           ],
         ),
+        const SizedBox(height: 12),
+        Padding(
+          padding: const EdgeInsets.only(right: 44),
+          child: Text(
+            value,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Colors.black87,
+              height: 1.4,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+Widget _buildContactInfo({
+  required IconData icon,
+  required String label,
+  required String value,
+}) {
+  return Padding(
+    padding: const EdgeInsets.only(bottom: 12),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 20, color: Colors.grey[600]),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[600],
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+  // ADD THIS helper method
+  Widget _buildSpecialReservationInfo(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: Colors.white, size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.white.withOpacity(0.7),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1368,23 +2047,24 @@ Widget _buildCalendarDay(DateTime date, {BuildContext? dialogContext}) {
       ),
     );
   }
-
-  String _getStatusText(DateStatus status) {
-    switch (status) {
-      case DateStatus.available:
-        return 'متاح للحجز';
-      case DateStatus.pending:
-        return 'في انتظار التأكيد';
-      case DateStatus.reserved:
-        return 'محجوز ومؤكد';
-      case DateStatus.massWeddingOpen:
-        return 'متاح للعرس الجماعي';
-      case DateStatus.mixed:
-        return 'مختلط (مؤكد ومعلق)';
-      case DateStatus.disabled:
-        return 'غير متاح';
-    }
+String _getStatusText(DateStatus status) {
+  switch (status) {
+    case DateStatus.available:
+      return 'متاح للحجز';
+    case DateStatus.pending:
+      return 'في انتظار التأكيد';
+    case DateStatus.reserved:
+      return 'محجوز ومؤكد';
+    case DateStatus.massWeddingOpen:
+      return 'متاح للعرس الجماعي';
+    case DateStatus.mixed:
+      return 'مختلط (مؤكد ومعلق)';
+    case DateStatus.specialReservation: // ADD THIS
+      return 'حجز خاص من العشيرة';
+    case DateStatus.disabled:
+      return 'غير متاح';
   }
+}
 
 List<Widget> _buildWeekDays() {
   final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -2133,6 +2813,7 @@ Widget _buildBottomSection(bool isDark) {
               _buildCompactLegend('معلق', const Color(0xFFFFB74D), isDark),
               _buildCompactLegend('محجوز', const Color(0xFFEF4444), isDark),
               _buildCompactLegend('جماعي', const Color(0xFF00BCD4), isDark),
+              _buildCompactLegend('حجز خاص', const Color(0xFF000000), isDark), // ADD THIS
               _buildCompactLegend('يوم غير قابل للحجز', const Color(0xFFBDBDBD), isDark),
             ],
           ),
@@ -2277,81 +2958,4 @@ Widget _buildActionButton(
 }
 
 
-// /////
-
-
-  Widget _buildNavigationButton(IconData icon, VoidCallback onPressed) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: onPressed,
-          child: Container(
-            padding: const EdgeInsets.all(12),
-            child: Icon(
-              icon,
-              color: const Color(0xFF6C63FF),
-              size: 24,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBeautifulLegendItem(String label, Color color, IconData icon, double screenWidth) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withOpacity(0.3)),
-        boxShadow: [
-          BoxShadow(
-            color: color.withOpacity(0.1),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.2),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              icon,
-              color: color,
-              size: 12,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: color,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }

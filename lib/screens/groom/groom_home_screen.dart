@@ -29,6 +29,8 @@ class GroomHomeScreen extends StatefulWidget {
 class _GroomHomeScreenState extends State<GroomHomeScreen> 
     with TickerProviderStateMixin {
       
+
+  
   int _currentIndex = 0;
   late List<Widget> _tabs;
   Widget? _externalScreen;
@@ -36,7 +38,6 @@ class _GroomHomeScreenState extends State<GroomHomeScreen>
   int? _clanId;
   String? _clanName;
   int selectBtn = 0;
-
   // ADD THESE CACHE VARIABLES:
   bool _isInitialLoad = true;
   final Map<int, bool> _tabLoadingStatus = {};
@@ -56,9 +57,6 @@ class _GroomHomeScreenState extends State<GroomHomeScreen>
   bool _isCheckingReservation = true;
 
 
-  // ADD THESE NEW VARIABLES:
-  bool _hasAccessPassword = false;
-  bool _isVerifyingAccess = false;
 
 // ADD THESE NEW VARIABLES FOR BOTTOM NAV VISIBILITY:
   bool _isBottomNavVisible = true;
@@ -142,6 +140,7 @@ class _GroomHomeScreenState extends State<GroomHomeScreen>
     
     // Modified: Check reservation first, then load data and start timer
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      // _checkAccessPassword(); // ✅ ADD THIS LINE to check once on init
       _checkReservationStatus().then((_) {
         if (_hasValidReservation) {
           _refreshCurrentTabInBackground(_currentIndex);
@@ -190,35 +189,21 @@ class _GroomHomeScreenState extends State<GroomHomeScreen>
   }
 
 
-// ADD THIS NEW METHOD:
-Future<void> _checkAccessPassword() async {
-  try {
-    final hasPassword = await ApiService.hasAccessPassword();
-    setState(() {
-      _hasAccessPassword = hasPassword;
-    });
-  } catch (e) {
-    print('Error checking access password: $e');
-    setState(() {
-      _hasAccessPassword = false;
-    });
-  }
-}
-  // Method to verify access before navigating to protected tabs
-Future<bool> _verifyAccessForTab() async {
+
+// // UPDATED METHOD - Uses the return value from _checkAccessPassword:
+// Future<bool> _verifyAccessForTab() async {
+//   // Get the result directly from _checkAccessPassword
+//   // final hasPassword = await _checkAccessPassword();
   
-
-  await _checkAccessPassword();
-  // Check if user has access password set
-  if (!_hasAccessPassword) {
-    _showAccessPasswordNotSetDialog();
-    return false;
-  }
-
-  // Show password verification dialog
-  return await _showAccessPasswordDialog();
-}
-
+//   // Check if user has access password set
+//   // if (!hasPassword ) {
+//   //   _showAccessPasswordNotSetDialog();
+//   //   return false;
+//   // }
+  
+//   // Show password verification dialog
+//   return await _showAccessPasswordDialog();
+// }
 
 // Dialog when user doesn't have access password
 void _showAccessPasswordNotSetDialog() {
@@ -264,7 +249,8 @@ void _showAccessPasswordNotSetDialog() {
     ),
   );
 }
-// Updated _showAccessPasswordDialog method with loading state
+
+
 
 Future<bool> _showAccessPasswordDialog() async {
   final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -299,27 +285,7 @@ Future<bool> _showAccessPasswordDialog() async {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Container(
-            //   padding: const EdgeInsets.all(12),
-            //   decoration: BoxDecoration(
-            //     color: Colors.blue.shade50,
-            //     borderRadius: BorderRadius.circular(8),
-            //     border: Border.all(color: Colors.blue.shade200),
-            //   ),
-            //   child: Row(
-            //     children: const [
-            //       Icon(Icons.info_outline, color: Colors.blue, size: 20),
-            //       SizedBox(width: 8),
-            //       Expanded(
-            //         child: Text(
-            //           'هذه الصفحة محمية. يرجى إدخال كلمة المرور.',
-            //           style: TextStyle(color: Colors.blue, fontSize: 12),
-            //         ),
-            //       ),
-            //     ],
-            //   ),
-            // ),
-            // SizedBox(height: 16),
+            
             TextField(
               controller: passwordController,
               obscureText: obscurePassword,
@@ -755,36 +721,36 @@ void _showNoReservationForNotificationsDialog() {
               height: 1.5,
             ),
           ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: isDark ? Colors.orange.shade900.withOpacity(0.3) : Colors.orange.shade50,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: isDark ? Colors.orange.shade700 : Colors.orange.shade200,
-              ),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.info_outline,
-                  color: isDark ? Colors.orange.shade300 : Colors.orange.shade700,
-                  size: 20,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'قم بإنشاء حجز وانتظر التأكيد للوصول إلى الإشعارات',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: isDark ? Colors.orange.shade200 : Colors.orange.shade900,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+          // const SizedBox(height: 16),
+          // Container(
+          //   padding: const EdgeInsets.all(12),
+          //   decoration: BoxDecoration(
+          //     color: isDark ? Colors.orange.shade900.withOpacity(0.3) : Colors.orange.shade50,
+          //     borderRadius: BorderRadius.circular(8),
+          //     border: Border.all(
+          //       color: isDark ? Colors.orange.shade700 : Colors.orange.shade200,
+          //     ),
+          //   ),
+          //   child: Row(
+          //     children: [
+          //       Icon(
+          //         Icons.info_outline,
+          //         color: isDark ? Colors.orange.shade300 : Colors.orange.shade700,
+          //         size: 20,
+          //       ),
+          //       const SizedBox(width: 8),
+          //       Expanded(
+          //         child: Text(
+          //           'قم بإنشاء حجز وانتظر التأكيد للوصول إلى الإشعارات',
+          //           style: TextStyle(
+          //             fontSize: 13,
+          //             color: isDark ? Colors.orange.shade200 : Colors.orange.shade900,
+          //           ),
+          //         ),
+          //       ),
+          //     ],
+          //   ),
+          // ),
         ],
       ),
       actions: [
@@ -995,34 +961,23 @@ void _showNoInternetDialog() {
   );
 }
 
-// UPDATE THE _changeTab METHOD TO RESET TIMER:
-  void _changeTab(int index) async {
-    // Check if trying to access Create Reservation tab (index 1)
-    if (index == 1 && !_hasValidReservation ) {
-      final hasAccess = await _verifyAccessForTab();
-      if (!hasAccess) {
-        return;
-      }
-    }
-    
-    setState(() {
-      _currentIndex = index;
-      _externalScreen = null;
-      _externalScreenTitle = null;
-    });
-    
-    // Check if data needs refresh
-    final needsRefresh = _shouldRefreshTab(index);
-    
-    if (needsRefresh) {
-      _refreshCurrentTabInBackground(index);
-    }
-    
-    // Reset hide timer when navigating
-    _startHideTimer();
+void _changeTab(int index) async {
+  setState(() {
+    _currentIndex = index;
+    _externalScreen = null;
+    _externalScreenTitle = null;
+  });
+  
+  // Check if data needs refresh
+  final needsRefresh = _shouldRefreshTab(index);
+  
+  if (needsRefresh) {
+    _refreshCurrentTabInBackground(index);
   }
-
-
+  
+  // Reset hide timer when navigating
+  _startHideTimer();
+}
 // ============================================
 // 3. ADD: Helper method to check if refresh is needed
 // ============================================
@@ -1446,18 +1401,9 @@ double _getIndicatorPosition(double itemWidth) {
     final constrainedWidth = itemWidth.clamp(50.0, 80.0);
     
     return GestureDetector(
-      onTap: () async {
+      onTap: () {
         // Reset timer immediately on tap
         _startHideTimer();
-        
-        // Check if trying to access Create Reservation tab (index 1)
-        if (index == 1 && !_hasValidReservation ) {
-          final hasAccess = await _verifyAccessForTab();
-          if (!hasAccess) {
-            return;
-          }
-        }
-        
         _changeTab(index);
       },
       behavior: HitTestBehavior.opaque,
@@ -2123,19 +2069,9 @@ Widget _buildDrawerItem(IconData icon, String title, int index, bool isDark) {
           fontSize: 15,
         ),
       ),
-      onTap: () async {
-        Navigator.pop(context); // Close drawer first
-        
-        // Check if trying to access Create Reservation tab (index 1)
-        if (index == 1 && !_hasValidReservation) {
-          final hasAccess = await _verifyAccessForTab();
-          if (!hasAccess) {
-            // User cancelled or failed verification, don't change tab
-            return;
-          }
-        }
-        
-        _changeTab(index);
+      onTap: () {
+        Navigator.pop(context); // Close drawer
+        _changeTab(index); // Navigate to tab
       },
     ),
   );

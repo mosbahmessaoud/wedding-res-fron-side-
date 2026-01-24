@@ -535,31 +535,281 @@ void _showNoInternetDialog() {
     }
   }
 
-  Future<void> _togglePaymentStatus(int reservationId, String groomName, bool currentPaymentStatus) async {
-    final action = currentPaymentStatus ? 'إلغاء تأكيد' : 'تأكيد';
-    final confirmed = await _showConfirmationDialog(
-      '$action الدفع',
-      'هل أنت متأكد من $action دفع $groomName؟',
-      currentPaymentStatus ? Colors.orange : Colors.blue,
-      currentPaymentStatus ? Icons.money_off_rounded : Icons.payment_rounded,
-    );
+  // Future<void> _togglePaymentStatus(int reservationId, String groomName, bool currentPaymentStatus) async {
+  //   final action = currentPaymentStatus ? 'إلغاء تأكيد' : 'تأكيد';
+  //   final confirmed = await _showConfirmationDialog(
+  //     '$action الدفع',
+  //     'هل أنت متأكد من $action دفع $groomName؟',
+  //     currentPaymentStatus ? Colors.orange : Colors.blue,
+  //     currentPaymentStatus ? Icons.money_off_rounded : Icons.payment_rounded,
+  //   );
 
-    if (!confirmed) return;
+  //   if (!confirmed) return;
 
-    try {
-      setState(() => _isLoading = true);
-      await ApiService.changePaymentStatus(reservationId);
-      await _loadAllReservations();
-      _showSnackBar(
-        currentPaymentStatus ? 'تم إلغاء تأكيد الدفع' : 'تم تأكيد الدفع بنجاح', 
-        currentPaymentStatus ? Colors.orange.shade400 : Colors.blue.shade400
+
+
+  //   try {
+  //     setState(() => _isLoading = true);
+  //     await ApiService.changePaymentStatus(reservationId);
+  //     await _loadAllReservations();
+  //     _showSnackBar(
+  //       currentPaymentStatus ? 'تم إلغاء تأكيد الدفع' : 'تم تأكيد الدفع بنجاح', 
+  //       currentPaymentStatus ? Colors.orange.shade400 : Colors.blue.shade400
+  //     );
+  //   } catch (e) {
+  //     _showSnackBar('خطأ في تغيير حالة الدفع: $e', Colors.red.shade400);
+  //   } finally {
+  //     setState(() => _isLoading = false);
+  //   }
+  // }
+  Future<double?> _showPaymentInputDialog(
+  String groomName,
+  double currentPayment,
+  double requiredPayment,
+  String currentStatus,
+) async {
+  final TextEditingController amountController = TextEditingController(
+    text: currentPayment > 0 ? currentPayment.toStringAsFixed(2) : '',
+  );
+
+  final requiredPayment2 = await ApiService.getRequiredPayment();
+
+  return showDialog<double>(
+    context: context,
+    builder: (BuildContext context) {
+      return AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(Icons.payment_rounded, color: Colors.blue.shade600, size: 28),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('تحديث الدفع', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                  Text(groomName, style: TextStyle(fontSize: 14, color: Colors.grey.shade600, fontWeight: FontWeight.normal)),
+                ],
+              ),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Current status badge
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: _getPaymentStatusColor(currentStatus).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: _getPaymentStatusColor(currentStatus).withOpacity(0.3)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(_getPaymentStatusIcon(currentStatus), size: 16, color: _getPaymentStatusColor(currentStatus)),
+                    const SizedBox(width: 6),
+                    Text(
+                      _getPaymentStatusText(currentStatus),
+                      style: TextStyle(color: _getPaymentStatusColor(currentStatus), fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              
+              // Payment info
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('المبلغ الحالي:', style: TextStyle(color: Colors.grey.shade700)),
+                  Text(
+                    '${currentPayment.toStringAsFixed(2)} د.ج',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('المبلغ المطلوب:', style: TextStyle(color: Colors.grey.shade700)),
+                  Text(
+                    '${requiredPayment2.toStringAsFixed(2)} د.ج',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.blue.shade700),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              
+              // Amount input field
+              TextField(
+                controller: amountController,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: InputDecoration(
+                  labelText: 'المبلغ الجديد',
+                  hintText: '0.00',
+                  suffixText: 'د.ج',
+                  prefixIcon: const Icon(Icons.attach_money),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.blue.shade400, width: 2),
+                  ),
+                ),
+              ),
+              // const SizedBox(height: 12),
+              
+              // // Quick amount buttons
+              // Wrap(
+              //   spacing: 8,
+              //   runSpacing: 8,
+              //   children: [
+              //     _buildQuickAmountButton(amountController, 0, 'بدون دفع'),
+              //     _buildQuickAmountButton(amountController, requiredPayment / 2, 'نصف المبلغ'),
+              //     _buildQuickAmountButton(amountController, requiredPayment, 'كامل المبلغ'),
+              //   ],
+              // ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text('إلغاء', style: TextStyle(color: Colors.grey.shade600)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final amount = double.tryParse(amountController.text) ?? 0.0;
+              Navigator.of(context).pop(amount);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue.shade400,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+            child: const Text('تأكيد', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
       );
-    } catch (e) {
-      _showSnackBar('خطأ في تغيير حالة الدفع: $e', Colors.red.shade400);
-    } finally {
-      setState(() => _isLoading = false);
-    }
+    },
+  );
+}
+
+Widget _buildQuickAmountButton(TextEditingController controller, double amount, String label) {
+  return InkWell(
+    onTap: () => controller.text = amount.toStringAsFixed(2),
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.blue.shade50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.blue.shade200),
+      ),
+      child: Text(label, style: TextStyle(color: Colors.blue.shade700, fontSize: 12)),
+    ),
+  );
+}
+// Helper methods for payment status display
+Color _getPaymentStatusColor(String status) {
+  switch (status) {
+    case 'paid':
+      return Colors.green;
+    case 'partially_paid':
+      return Colors.orange;
+    case 'not_paid':
+    default:
+      return Colors.red;
   }
+}
+
+IconData _getPaymentStatusIcon(String status) {
+  switch (status) {
+    case 'paid':
+      return Icons.check_circle_rounded;
+    case 'partially_paid':
+      return Icons.hourglass_bottom_rounded;
+    case 'not_paid':
+    default:
+      return Icons.cancel_rounded;
+  }
+}
+
+String _getPaymentStatusText(String status) {
+  switch (status) {
+    case 'paid':
+      return 'مدفوع بالكامل';
+    case 'partially_paid':
+      return 'مدفوع جزئياً';
+    case 'not_paid':
+    default:
+      return 'غير مدفوع';
+  }
+}
+
+  Future<void> _togglePaymentStatus(
+  int reservationId, 
+  String groomName, 
+  String currentPaymentStatus,
+  double currentPayment,
+  double requiredPayment
+) async {
+  // Show payment input dialog
+  final paymentAmount = await _showPaymentInputDialog(
+    groomName,
+    currentPayment,
+    requiredPayment,
+    currentPaymentStatus,
+  );
+
+  if (paymentAmount == null) return; // User cancelled
+
+  try {
+    setState(() => _isLoading = true);
+    final result = await ApiService.changePaymentStatus(reservationId, paymentAmount);
+    
+    await _loadAllReservations();
+    
+    final newStatus = result['reservation']['payment_status'];
+    String message;
+    Color color;
+    
+    switch (newStatus) {
+      case 'paid':
+        message = 'تم تأكيد دفع كامل المبلغ';
+        color = Colors.green.shade400;
+        break;
+      case 'partially_paid':
+        message = 'تم تأكيد دفع جزء من المبلغ';
+        color = Colors.orange.shade400;
+        break;
+      case 'not_paid':
+        message = 'تم تحديث حالة الدفع: لا يوجد دفع';
+        color = Colors.grey.shade400;
+        break;
+      default:
+        message = 'تم تحديث حالة الدفع';
+        color = Colors.blue.shade400;
+    }
+    
+    _showSnackBar(message, color);
+  } catch (e) {
+    _showSnackBar('خطأ في تغيير حالة الدفع: $e', Colors.red.shade400);
+  } finally {
+    setState(() => _isLoading = false);
+  }
+}
+
 
   Future<void> _validateReservation(int groomId, String groomName, bool paymentValid) async {
     if (!paymentValid) {
@@ -827,19 +1077,13 @@ void _showNoInternetDialog() {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('الحجوزات',
-          style: TextStyle(
-            fontWeight: FontWeight.w700,
-            fontSize: 18,
-          ),
-        ),
-        flexibleSpace: Container(
+
+PreferredSizeWidget _buildModernAppBar() {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  return AppBar(
+    elevation: 0,
+    backgroundColor: Colors.transparent,
+    flexibleSpace: Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
@@ -855,39 +1099,81 @@ void _showNoInternetDialog() {
                 ),
               ),
             ),
-        foregroundColor: Colors.white,
-        systemOverlayStyle: SystemUiOverlayStyle.light,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back),
-          onPressed: () {
-            Navigator.pushReplacementNamed(context, '/clan_admin_home');
-          },
-        ),
-        actions: [
-          const SizedBox(width: 8),
-          IconButton(
-            icon: Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: isDark ? Colors.grey[800] : Colors.grey[100],
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(
-                isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
-                size: 20,
-                color: isDark ? Colors.white : Colors.black87,
-              ),
-            ),
-            onPressed: () {
-              final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
-              themeProvider.toggleTheme();
-            },
-            tooltip: isDark ? 'الوضع الفاتح' : 'الوضع الداكن',
+    title: LayoutBuilder(
+      builder: (context, constraints) {
+        final isSmallScreen = MediaQuery.of(context).size.width < 600;
+        return Text(
+          'إدارة الحجوزات',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: isSmallScreen ? 18 : 20,
           ),
-          const SizedBox(width: 8),
-        ],
+        );
+      },
+    ),
+    foregroundColor: Colors.white,
+    leading: IconButton(
+      icon: Icon(Icons.arrow_back_ios_new, size: 20),
+      onPressed: () {
+        Navigator.pushReplacementNamed(context, '/clan_admin_home');
+      },
+    ),
+    actions: [
+      LayoutBuilder(
+        builder: (context, constraints) {
+          final screenWidth = MediaQuery.of(context).size.width;
+          final isSmallScreen = screenWidth < 600;
+          
+          return Row(
+            children: [
+              Container(
+                margin: EdgeInsets.only(right: isSmallScreen ? 4 : 8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: IconButton(
+                  onPressed: () async {
+                    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+                    themeProvider.toggleTheme();
+                  },
+                  icon: Icon(isDark ? Icons.dark_mode : Icons.light_mode , size: isSmallScreen ? 18 : 20),
+                  tooltip: isDark ? 'الوضع الفاتح' : 'الوضع الداكن',
+                  padding: EdgeInsets.all(isSmallScreen ? 8 : 12),
+                ),
+              ),
+              Container(
+                margin: EdgeInsets.only(
+                  right: isSmallScreen ? 4 : 8, 
+                  left: isSmallScreen ? 8 : 16
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: IconButton(
+                  onPressed: _checkConnectivityAndLoad,
+                  icon: Icon(Icons.refresh, size: isSmallScreen ? 18 : 20),
+                  tooltip: 'تحديث القائمة',
+                  padding: EdgeInsets.all(isSmallScreen ? 8 : 12),
+                ),
+              ),
+            ],
+          );
+        },
       ),
-      backgroundColor: isDark ? AppColors.darkBackground : Colors.grey.shade50,
+    ],
+  );
+}
+
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    return Scaffold(
+      appBar: _buildModernAppBar(),
+      backgroundColor: isDark ?  Colors.grey.shade900: Colors.grey.shade50,
       body: Column(
         children: [
           // Modern Header with Search
@@ -1003,11 +1289,194 @@ void _showNoInternetDialog() {
                     ],
                   ),
           ),
-          SizedBox(height: 80), 
+          SizedBox(height: 1), 
         ],
       ),
     );
   }
+
+
+  // @override
+  // Widget build(BuildContext context) {
+  //   final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+  //   return Scaffold(
+  //     appBar: AppBar(
+  //       title: Text('الحجوزات',
+  //         style: TextStyle(
+  //           fontWeight: FontWeight.w700,
+  //           fontSize: 18,
+  //         ),
+  //       ),
+  //       flexibleSpace: Container(
+  //             decoration: BoxDecoration(
+  //               gradient: LinearGradient(
+  //                 begin: Alignment.topLeft,
+  //                 end: Alignment.bottomRight,
+  //                 colors: [
+  //                   isDark ? AppColors.primary.withOpacity(0.4):AppColors.primary.withOpacity(0.8) ,
+  //                   AppColors.primary,
+  //                   AppColors.primary,
+  //                   isDark ? AppColors.primary.withOpacity(0.4):AppColors.primary.withOpacity(0.8) ,
+  //                   // isDark ? AppColors.primary.withOpacity(0.4):const Color.fromARGB(255, 130, 161, 112).withOpacity(0.9),
+                    
+  //                 ],
+  //               ),
+  //             ),
+  //           ),
+  //       foregroundColor: Colors.white,
+  //       systemOverlayStyle: SystemUiOverlayStyle.light,
+  //       leading: IconButton(
+  //         icon: Icon(Icons.arrow_back),
+  //         onPressed: () {
+  //           Navigator.pushReplacementNamed(context, '/clan_admin_home');
+  //         },
+  //       ),
+  //       actions: [
+  //         const SizedBox(width: 8),
+  //         IconButton(
+  //           icon: Container(
+  //             padding: const EdgeInsets.all(6),
+  //             decoration: BoxDecoration(
+  //               color: isDark ? Colors.grey[800] : Colors.grey[100],
+  //               borderRadius: BorderRadius.circular(8),
+  //             ),
+  //             child: Icon(
+  //               isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
+  //               size: 20,
+  //               color: isDark ? Colors.white : Colors.black87,
+  //             ),
+  //           ),
+  //           onPressed: () {
+  //             final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+  //             themeProvider.toggleTheme();
+  //           },
+  //           tooltip: isDark ? 'الوضع الفاتح' : 'الوضع الداكن',
+  //         ),
+  //         const SizedBox(width: 8),
+  //       ],
+  //     ),
+  //     backgroundColor: isDark ? const Color.fromARGB(255, 216, 9, 9) : Colors.grey.shade50,
+  //     body: Column(
+  //       children: [
+  //         // Modern Header with Search
+  //         Container(
+  //           padding: EdgeInsets.fromLTRB(
+  //             MediaQuery.of(context).size.width < 600 ? 16 : 20,
+  //             MediaQuery.of(context).size.width < 600 ? 16 : 20,
+  //             MediaQuery.of(context).size.width < 600 ? 16 : 20,
+  //             MediaQuery.of(context).size.width < 600 ? 12 : 16,
+  //           ),
+  //           decoration: BoxDecoration(
+  //             color: isDark ? AppColors.darkCard : Colors.white,
+  //             boxShadow: [
+  //               BoxShadow(
+  //                 color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
+  //                 blurRadius: 10,
+  //                 offset: const Offset(0, 2),
+  //               ),
+  //             ],
+  //           ),
+  //           child: Column(
+  //             children: [
+  //               // Search Bar
+  //               Container(
+  //                 decoration: BoxDecoration(
+  //                   color: isDark ? AppColors.darkInputBackground : Colors.grey.shade100,
+  //                   borderRadius: BorderRadius.circular(16),
+  //                 ),
+  //                 child: TextField(
+  //                   onChanged: (value) => setState(() => _searchQuery = value),
+  //                   style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+  //                   decoration: InputDecoration(
+  //                     hintText: 'البحث بالاسم أو رقم الهاتف...',
+  //                     hintStyle: TextStyle(color: isDark ? Colors.grey.shade600 : Colors.grey.shade500),
+  //                     prefixIcon: Icon(Icons.search_rounded, 
+  //                       color: isDark ? Colors.grey.shade500 : Colors.grey.shade400, size: 22),
+  //                     suffixIcon: _searchQuery.isNotEmpty
+  //                         ? IconButton(
+  //                             icon: Icon(Icons.clear_rounded, 
+  //                               color: isDark ? Colors.grey.shade500 : Colors.grey.shade400, size: 20),
+  //                             onPressed: () => setState(() => _searchQuery = ''),
+  //                           )
+  //                         : null,
+  //                     border: InputBorder.none,
+  //                     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+  //                   ),
+  //                 ),
+  //               ),
+                
+  //               const SizedBox(height: 20),
+                
+  //               // Statistics Cards
+  //               _buildModernStatistics(isDark),
+  //             ],
+  //           ),
+  //         ),
+                      
+  //           Container(
+  //             color: isDark ? AppColors.darkCard : Colors.white,
+  //             child: TabBar(
+  //               controller: _tabController,
+  //               isScrollable: true,
+  //               tabAlignment: TabAlignment.start, // Ensures tabs start from the right (RTL)
+  //               indicatorColor: AppColors.primary,
+  //               indicatorWeight: 3,
+  //               labelColor: AppColors.primary,
+  //               unselectedLabelColor: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+  //               labelStyle: TextStyle(
+  //                 fontWeight: FontWeight.w600, 
+  //                 fontSize: MediaQuery.of(context).size.width < 600 ? 12 : 14
+  //               ),
+  //               unselectedLabelStyle: TextStyle(
+  //                 fontWeight: FontWeight.w500,
+  //                 fontSize: MediaQuery.of(context).size.width < 600 ? 12 : 14
+  //               ),
+  //               labelPadding: EdgeInsets.symmetric(
+  //                 horizontal: MediaQuery.of(context).size.width < 600 ? 12 : 16
+  //               ),
+  //               padding: EdgeInsets.symmetric(
+  //                 horizontal: MediaQuery.of(context).size.width < 600 ? 8 : 12
+  //               ),
+  //               tabs: [
+  //                 Tab(text: 'الكل (${_allReservations.length})'),
+  //                 Tab(text: 'معلقة (${_pendingReservations.length})'),
+  //                 Tab(text: 'مؤكدة (${_validatedReservations.length})'),
+  //                 Tab(text: 'ملغاة (${_cancelledReservations.length})'),
+  //                 Tab(text: 'أرشيف (${_archivedReservations.length})'),
+  //               ],
+  //             ),
+  //           ),
+  //         // Tab Views
+  //         Expanded(
+  //           child: _isLoading
+  //               ? Center(
+  //                   child: Column(
+  //                     mainAxisAlignment: MainAxisAlignment.center,
+  //                     children: [
+  //                       CircularProgressIndicator(color: AppColors.primary),
+  //                       const SizedBox(height: 16),
+  //                       Text('جاري التحميل...', 
+  //                         style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade600)),
+  //                     ],
+  //                   ),
+  //                 )
+  //               : TabBarView(
+  //                   controller: _tabController,
+  //                   children: [
+  //                     _buildReservationsList(_getFilteredReservations(_allReservations), 'all', isDark),
+  //                     _buildReservationsList(_getFilteredReservations(_pendingReservations), 'pending', isDark),
+  //                     _buildReservationsList(_getFilteredReservations(_validatedReservations), 'validated', isDark),
+  //                     _buildReservationsList(_getFilteredReservations(_cancelledReservations), 'cancelled', isDark),
+  //                     _buildReservationsList(_getFilteredReservations(_archivedReservations), 'archived', isDark),
+  //                   ],
+  //                 ),
+  //         ),
+  //         SizedBox(height: 80), 
+  //       ],
+  //     ),
+  //   );
+  // }
   
 Widget _buildModernStatistics(bool isDark) {
   final stats = [
@@ -1281,7 +1750,7 @@ List<Widget> _buildDetailRows(Map<String, dynamic> reservation, bool isDark) {
     ['اليوم الأول:', _formatDate(reservation['date1'])],
     if (reservation['date2_bool'] == true && reservation['date2'] != null)
       ['اليوم الثاني:', _formatDate(reservation['date2'])],
-    ['حالة الدفع:', reservation['payment_valid'] == true ? '✓ مكتمل' : '✗ غير مكتمل'],
+    ['حالة الدفع:', _getPaymentStatusText(reservation['payment_status'] ?? 'not_paid')],
     ['حفل جماعي:', reservation['join_to_mass_wedding'] == true ? 'نعم' : 'لا'],
     ['يسمح للآخرين:', reservation['allow_others'] == true ? 'نعم' : 'لا'],
     ['تاريخ الإنشاء:', _formatDateTime(reservation['created_at'])],
@@ -1291,30 +1760,7 @@ List<Widget> _buildDetailRows(Map<String, dynamic> reservation, bool isDark) {
 
   return details.map((detail) => Padding(
     padding: const EdgeInsets.only(bottom: 8),
-    child: screenWidth < 600 
-      ? Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(detail[0], 
-              style: TextStyle(
-                fontWeight: FontWeight.w500, 
-                fontSize: 12,
-                color: isDark ? Colors.grey.shade400 : Colors.grey.shade700
-              )
-            ),
-            SizedBox(height: 4),
-            Text(detail[1], 
-              style: TextStyle(
-                fontSize: 13,
-                color: detail[0] == 'حالة الدفع:' 
-                  ? (reservation['payment_valid'] == true ? Colors.green : Colors.red)
-                  : (isDark ? Colors.white70 : Colors.grey.shade800),
-                fontWeight: detail[0] == 'حالة الدفع:' ? FontWeight.w600 : FontWeight.normal,
-              )
-            ),
-          ],
-        )
-      : Row(
+    child:  Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             SizedBox(
@@ -1326,16 +1772,16 @@ List<Widget> _buildDetailRows(Map<String, dynamic> reservation, bool isDark) {
                 )
               ),
             ),
-            Expanded(
-              child: Text(detail[1], 
-                style: TextStyle(
-                  color: detail[0] == 'حالة الدفع:' 
-                    ? (reservation['payment_valid'] == true ? Colors.green : Colors.red)
-                    : (isDark ? Colors.white70 : Colors.grey.shade800),
-                  fontWeight: detail[0] == 'حالة الدفع:' ? FontWeight.w600 : FontWeight.normal,
-                )
-              ),
-            ),
+           Expanded(
+  child: Text(detail[1], 
+    style: TextStyle(
+      color: detail[0] == 'حالة الدفع:' 
+        ? _getPaymentStatusColor(reservation['payment_status'] ?? 'not_paid')
+        : (isDark ? Colors.white70 : Colors.grey.shade800),
+      fontWeight: detail[0] == 'حالة الدفع:' ? FontWeight.w600 : FontWeight.normal,
+    )
+  ),
+),
           ],
         ),
   )).toList();
@@ -1357,9 +1803,107 @@ List<Widget> _buildDetailRows(Map<String, dynamic> reservation, bool isDark) {
       ),
     );
   }
+
+
+// Widget _buildModernActionButtons(Map<String, dynamic> reservation, String status, int groomId, int reservationId, String groomName) {
+//   List<Widget> buttons = [];
+//   final paymentValid = reservation['payment_valid'] ?? false;
+//   final screenWidth = MediaQuery.of(context).size.width;
+
+//   // Download PDF button
+//   buttons.add(
+//     _buildActionButton(
+//       onPressed: () => _downloadPdfSimple(reservationId),
+//       icon: Icons.download_rounded,
+//       label: 'تحميل PDF',
+//       color: Colors.blue.shade400,
+//       isCompact: screenWidth < 600,
+//     ),
+//   );
+
+//   // Status-specific buttons
+//   if (status == 'pending_validation') {
+//     buttons.add(
+//       _buildActionButton(
+//         onPressed: () => _togglePaymentStatus(reservationId, groomName, paymentValid),
+//         icon: paymentValid ? Icons.money_off_rounded : Icons.payment_rounded,
+//         label: paymentValid ? 'إلغاء الدفع' : 'تأكيد الدفع',
+//         color: paymentValid ? Colors.orange.shade400 : Colors.indigo.shade400,
+//         isCompact: screenWidth < 600,
+//       ),
+//     );
+    
+//     buttons.add(
+//       _buildActionButton(
+//         onPressed: () => _validateReservation(groomId, groomName, paymentValid),
+//         icon: Icons.check_rounded,
+//         label: 'تأكيد',
+//         color: Colors.green.shade400,
+//         isCompact: screenWidth < 600,
+//       ),
+//     );
+//     buttons.add(
+//       _buildActionButton(
+//         onPressed: () => _cancelReservation(groomId, groomName),
+//         // onPressed:() async {
+//         //            // Check if tab requires access verification
+//         //   bool hasAccess = await _verifyAccessForTab();
+          
+//         //   if (!hasAccess) {
+//         //     return; // Don't navigate if access is denied
+//         //   }
+//         //   _cancelReservation(groomId, groomName);
+//         // },
+//         icon: Icons.close_rounded,
+//         label: 'إلغاء',
+//         color: Colors.red.shade400,
+//         isCompact: screenWidth < 600,
+//       ),
+//     );
+//   } else if (status == 'validated') {
+//     buttons.add(
+//       _buildActionButton(
+//         onPressed: () => _togglePaymentStatus(reservationId, groomName, paymentValid),
+//         icon: paymentValid ? Icons.money_off_rounded : Icons.payment_rounded,
+//         label: paymentValid ? 'إلغاء الدفع' : 'تأكيد الدفع',
+//         color: paymentValid ? Colors.orange.shade400 : Colors.indigo.shade400,
+//         isCompact: screenWidth < 600,
+//       ),
+//     );
+    
+//     buttons.add(
+//       _buildActionButton(
+//         // onPressed: () => _cancelReservation(groomId, groomName),
+//         onPressed:() async {
+//                    // Check if tab requires access verification
+//           bool hasAccess = await _verifyAccessForTab();
+          
+//           if (!hasAccess) {
+//             return; // Don't navigate if access is denied
+//           }
+//           _cancelReservation(groomId, groomName);
+//         },
+//         icon: Icons.close_rounded,
+//         label: 'إلغاء',
+//         color: Colors.red.shade400,
+//         isCompact: screenWidth < 600,
+//       ),
+//     );
+//   }
+
+//   return Wrap(
+//     spacing: 8,
+//     runSpacing: 8,
+//     alignment: screenWidth < 600 ? WrapAlignment.center : WrapAlignment.start,
+//     children: buttons,
+//   );
+// }
+
 Widget _buildModernActionButtons(Map<String, dynamic> reservation, String status, int groomId, int reservationId, String groomName) {
   List<Widget> buttons = [];
-  final paymentValid = reservation['payment_valid'] ?? false;
+  final paymentStatus = reservation['payment_status'] ?? 'not_paid';
+  final currentPayment = double.tryParse(reservation['payment']?.toString() ?? '0') ?? 0.0;  
+  final requiredPayment = double.tryParse(reservation['required_payment']?.toString() ?? '0') ?? 0.0; // You'll need to add this to your reservation data
   final screenWidth = MediaQuery.of(context).size.width;
 
   // Download PDF button
@@ -1377,17 +1921,17 @@ Widget _buildModernActionButtons(Map<String, dynamic> reservation, String status
   if (status == 'pending_validation') {
     buttons.add(
       _buildActionButton(
-        onPressed: () => _togglePaymentStatus(reservationId, groomName, paymentValid),
-        icon: paymentValid ? Icons.money_off_rounded : Icons.payment_rounded,
-        label: paymentValid ? 'إلغاء الدفع' : 'تأكيد الدفع',
-        color: paymentValid ? Colors.orange.shade400 : Colors.indigo.shade400,
+        onPressed: () => _togglePaymentStatus(reservationId, groomName, paymentStatus, currentPayment, requiredPayment),
+        icon: _getPaymentStatusIcon(paymentStatus),
+        label: 'تحديث الدفع',
+        color: _getPaymentStatusColor(paymentStatus),
         isCompact: screenWidth < 600,
       ),
     );
     
     buttons.add(
       _buildActionButton(
-        onPressed: () => _validateReservation(groomId, groomName, paymentValid),
+        onPressed: () => _validateReservation(groomId, groomName, paymentStatus != 'not_paid'),
         icon: Icons.check_rounded,
         label: 'تأكيد',
         color: Colors.green.shade400,
@@ -1397,15 +1941,6 @@ Widget _buildModernActionButtons(Map<String, dynamic> reservation, String status
     buttons.add(
       _buildActionButton(
         onPressed: () => _cancelReservation(groomId, groomName),
-        // onPressed:() async {
-        //            // Check if tab requires access verification
-        //   bool hasAccess = await _verifyAccessForTab();
-          
-        //   if (!hasAccess) {
-        //     return; // Don't navigate if access is denied
-        //   }
-        //   _cancelReservation(groomId, groomName);
-        // },
         icon: Icons.close_rounded,
         label: 'إلغاء',
         color: Colors.red.shade400,
@@ -1415,24 +1950,17 @@ Widget _buildModernActionButtons(Map<String, dynamic> reservation, String status
   } else if (status == 'validated') {
     buttons.add(
       _buildActionButton(
-        onPressed: () => _togglePaymentStatus(reservationId, groomName, paymentValid),
-        icon: paymentValid ? Icons.money_off_rounded : Icons.payment_rounded,
-        label: paymentValid ? 'إلغاء الدفع' : 'تأكيد الدفع',
-        color: paymentValid ? Colors.orange.shade400 : Colors.indigo.shade400,
+        onPressed: () => _togglePaymentStatus(reservationId, groomName, paymentStatus, currentPayment, requiredPayment),
+        icon: _getPaymentStatusIcon(paymentStatus),
+        label: 'تحديث الدفع',
+        color: _getPaymentStatusColor(paymentStatus),
         isCompact: screenWidth < 600,
       ),
     );
     
     buttons.add(
       _buildActionButton(
-        // onPressed: () => _cancelReservation(groomId, groomName),
-        onPressed:() async {
-                   // Check if tab requires access verification
-          bool hasAccess = await _verifyAccessForTab();
-          
-          if (!hasAccess) {
-            return; // Don't navigate if access is denied
-          }
+        onPressed: () async {
           _cancelReservation(groomId, groomName);
         },
         icon: Icons.close_rounded,
@@ -1450,6 +1978,7 @@ Widget _buildModernActionButtons(Map<String, dynamic> reservation, String status
     children: buttons,
   );
 }
+
 Widget _buildActionButton({
   required VoidCallback onPressed,
   required IconData icon,

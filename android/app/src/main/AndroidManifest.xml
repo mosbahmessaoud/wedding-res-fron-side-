@@ -13,6 +13,8 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
 
     
+ 
+
 
 
     <!-- For Android 13+ to access user-selected documents -->
@@ -62,5 +64,19 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+
+            <!-- WhatsApp -->
+        <package android:name="com.whatsapp" />
+        <!-- Email -->
+        <intent>
+            <action android:name="android.intent.action.SENDTO" />
+            <data android:scheme="mailto" />
+        </intent>
+        <!-- Phone -->
+        <intent>
+            <action android:name="android.intent.action.DIAL" />
+        </intent>
+
+
     </queries>
 </manifest>

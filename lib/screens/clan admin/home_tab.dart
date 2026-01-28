@@ -5,11 +5,16 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:wedding_reservation_app/providers/theme_provider.dart';
+import 'package:wedding_reservation_app/screens/clan%20admin/bulk_upload_grooms_screen.dart';
+import 'package:wedding_reservation_app/screens/clan%20admin/manual_register_groom_screen.dart';
 import 'package:wedding_reservation_app/utils/constants.dart';
 import 'package:wedding_reservation_app/widgets/notification_panel.dart';
 
 import '../../services/api_service.dart';
 import '../../utils/colors.dart';
+// Add these imports with your other imports
+
+
 
 class HomeTab extends StatefulWidget {
   final Function(int)? onNavigateToTab;
@@ -925,26 +930,28 @@ Widget _buildStatCard(String title, String value, IconData icon, Color color,
     ),
   );
 }
+
 Widget _buildQuickActions(BuildContext context) {
   final screenWidth = MediaQuery.of(context).size.width;
   final isCompact = screenWidth < 600;
   final crossAxisCount = screenWidth < 600 ? 2 : screenWidth < 900 ? 3 : screenWidth < 1200 ? 4 : 5;
   final isDark = Theme.of(context).brightness == Brightness.dark;
   
-final actions = [
-  (Icons.castle_outlined, 'القاعات', '${_dashboardData['halls_count']} قاعة', Color(0xFF1877F2), 1),
-  (Icons.group_outlined, 'العرسان', '${_dashboardData['grooms_count']} مسجل', Color(0xFF42B72A), 2),
-  (Icons.book_outlined, 'الحجوزات', '${_dashboardData['pending_reservations']} معلق', Color(0xFFE4405F), 3),
-  (Icons.restaurant_outlined, 'قوائم الطعام', '${_dashboardData['menus_count']} قائمة', Color(0xFFFF6F00), 4),
-  (Icons.settings_outlined, 'الإعدادات', ' إعداد النضام', Color(0xFF1565C0), 5),
-  (Icons.notifications_outlined, 'الإشعارات', ' إرسال إشعارات', Color(0xFF9C27B0), 9),
-  (Icons.rule_outlined, 'اللوازم ', ' لوازم العريس ', Color(0xFF00BCD4), 7),
-  (Icons.star_border_outlined, 'الحجوزات الخاصة', ' حجز أيام خاصة بالعشيرة', Color(0xFFF57C00), 8),
-  (Icons.lock_outline, '  كلمة المرور للوصول ', ' انشاء كلمة المرور للوصول الى الصفحات الخاصة', Color.fromARGB(255, 0, 245, 53), 10),
-  (Icons.stacked_bar_chart, '  الإحصائيات ', ' تنزيل الإحصائيات على الجهاز', Color.fromARGB(255, 0, 159, 245), 11),
-  // (Icons.person_outline, 'الملف الشخصي', ' ', Color(0xFF6A1B9A), 10),
-];  
-
+  final actions = [
+    (Icons.castle_outlined, 'القاعات', '${_dashboardData['halls_count']} قاعة', Color(0xFF1877F2), 1),
+    (Icons.group_outlined, 'العرسان', '${_dashboardData['grooms_count']} مسجل', Color(0xFF42B72A), 2),
+    (Icons.book_outlined, 'الحجوزات', '${_dashboardData['pending_reservations']} معلق', Color(0xFFE4405F), 3),
+    (Icons.restaurant_outlined, 'قوائم الطعام', '${_dashboardData['menus_count']} قائمة', Color(0xFFFF6F00), 4),
+    (Icons.settings_outlined, 'الإعدادات', ' إعداد النظام', Color(0xFF1565C0), 5),
+    (Icons.notifications_outlined, 'الإشعارات', ' إرسال إشعارات', Color(0xFF9C27B0), 9),
+    (Icons.rule_outlined, 'اللوازم ', ' لوازم العريس ', Color(0xFF00BCD4), 7),
+    (Icons.star_border_outlined, 'الحجوزات الخاصة', ' حجز أيام خاصة بالعشيرة', Color(0xFFF57C00), 8),
+    (Icons.lock_outline, '  كلمة المرور للوصول ', ' انشاء كلمة المرور للوصول الى الصفحات الخاصة', Color.fromARGB(255, 0, 245, 53), 10),
+    (Icons.stacked_bar_chart, '  الإحصائيات ', ' تنزيل الإحصائيات على الجهاز', Color.fromARGB(255, 0, 159, 245), 11),
+    // NEW ACTIONS - Add these two new items
+    (Icons.person_add_alt_outlined, 'تسجيل عريس يدوي', ' إضافة عريس جديد يدوياً', Color(0xFF00897B), -1), // -1 for manual navigation
+    (Icons.upload_file_outlined, 'تحميل عرسان جماعي', ' رفع ملف Excel للعرسان', Color(0xFF7B1FA2), -2), // -2 for manual navigation
+  ];
 
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
@@ -956,7 +963,7 @@ final actions = [
           style: TextStyle(
             fontSize: isCompact ? 20 : 24,
             fontWeight: FontWeight.w700,
-            color: Theme.of(context).textTheme.bodyLarge?.color, // Changed
+            color: Theme.of(context).textTheme.bodyLarge?.color,
             letterSpacing: -0.5,
           ),
         ),
@@ -980,13 +987,35 @@ final actions = [
               return Material(
                 color: Colors.transparent,
                 child: InkWell(
-                  onTap: () => widget.onNavigateToTab?.call(a.$5),
+                  onTap: () {
+                    // Handle navigation based on index
+                    if (a.$5 == -1) {
+                      // Navigate to Manual Register Groom Screen
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const ManualRegisterGroomScreen(),
+                        ),
+                      );
+                    } else if (a.$5 == -2) {
+                      // Navigate to Bulk Upload Grooms Screen
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const BulkUploadGroomsScreen(),
+                        ),
+                      );
+                    } else {
+                      // Use existing tab navigation
+                      widget.onNavigateToTab?.call(a.$5);
+                    }
+                  },
                   borderRadius: BorderRadius.circular(12),
                   splashColor: a.$4.withOpacity(0.1),
                   highlightColor: a.$4.withOpacity(0.05),
                   child: Container(
                     decoration: BoxDecoration(
-                      color: Theme.of(context).cardColor, // Changed
+                      color: Theme.of(context).cardColor,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: isDark 
@@ -1023,7 +1052,7 @@ final actions = [
                         Text(
                           a.$2,
                           style: TextStyle(
-                            color: Theme.of(context).textTheme.bodyLarge?.color, // Changed
+                            color: Theme.of(context).textTheme.bodyLarge?.color,
                             fontSize: isCompact ? 14 : 15,
                             fontWeight: FontWeight.w600,
                             letterSpacing: -0.2,
@@ -1036,7 +1065,7 @@ final actions = [
                           child: Text(
                             a.$3,
                             style: TextStyle(
-                              color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.7), // Changed
+                              color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.7),
                               fontSize: isCompact ? 12 : 13,
                               fontWeight: FontWeight.w400,
                             ),

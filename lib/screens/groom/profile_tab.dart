@@ -1,8 +1,10 @@
 // lib/screens/home/tabs/profile_tab.dart
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:wedding_reservation_app/models/clan.dart';
 import 'package:wedding_reservation_app/models/county.dart';
+
 import '../../../services/api_service.dart';
 import '../../../utils/colors.dart';
 
@@ -547,164 +549,598 @@ void _showNewsClan() {
 }
 
 
-  void _showAboutApp() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+// Helper functions
+Future<void> _launchWhatsApp() async {
+  final Uri whatsappUri = Uri.parse('https://wa.me/213542951750');
+  if (!await launchUrl(whatsappUri, mode: LaunchMode.externalApplication)) {
+    throw Exception('Could not launch WhatsApp');
+  }
+}
 
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('حول التطبيق'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'تطبيق حجوزات الأعراس الخاص بجميع العشائر ',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+Future<void> _launchEmail() async {
+  final Uri emailUri = Uri.parse('mailto:itridev.soft@gmail.com');
+  if (!await launchUrl(emailUri)) {
+    throw Exception('Could not launch email');
+  }
+}
+
+Future<void> _launchPhone() async {
+  final Uri phoneUri = Uri.parse('tel:+213542951750');
+  if (!await launchUrl(phoneUri)) {
+    throw Exception('Could not launch phone');
+  }
+}
+void _showAboutApp() {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(2),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(Icons.info, color: AppColors.primary, size: 24),
+          ),
+          const SizedBox(width: 12),
+          const Text('حول التطبيق', style: TextStyle(fontSize: 20)),
+        ],
+      ),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'تطبيق حجوزات الأعراس الخاص بجميع العشائر',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: isDark ? Colors.grey[800] : Colors.grey[100],
+                borderRadius: BorderRadius.circular(8),
               ),
-              const SizedBox(height: 8),
-              const Text('الإصدار: 1.0.1'),
-              const SizedBox(height: 16),
-              const Text(
-                'يسرّنا أن نرحب بكم في تطبيق الأعراس،\nونضع بين أيديكم وسيلة ميسرة لتنظيم و حجز العرس الخاص بكم',
+              child: const Text('الإصدار: 1.0.5', style: TextStyle(fontSize: 14)),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'يسرّنا أن نرحب بكم في تطبيق الأعراس، ونضع بين أيديكم وسيلة ميسرة لتنظيم وحجز العرس الخاص بكم',
+              style: TextStyle(
+                fontSize: 14,
+                color: isDark ? Colors.grey[300] : Colors.grey[700],
+                height: 1.5,
               ),
-              const SizedBox(height: 16),
-              const Divider(),
-              const SizedBox(height: 8),
-              const Text(
-                'برعاية:',
-                style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 20),
+            const Divider(),
+            const SizedBox(height: 16),
+            const Text(
+              'برعاية:',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    AppColors.primary.withOpacity(0.1),
+                    AppColors.primary.withOpacity(0.05),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(12),
               ),
-              const SizedBox(height: 4),
-              const Text('عشيرة آت الشيخ الحاج مسعود'),
-              const SizedBox(height: 16),
-              const Divider(),
-              const SizedBox(height: 8),
-              const Text(
-                ' معلومات فريق التطوير:',
-                style: TextStyle(fontWeight: FontWeight.bold),
+              child: const Text(
+                'عشيرة آت الشيخ الحاج مسعود',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
               ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  const Icon(Icons.email, size: 18),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: Text('itridev.soft@gmail.com'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  const Icon(Icons.phone, size: 18),
-                  const SizedBox(width: 8),
-                  const Text('0658890501'),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Container(
+            ),
+            const SizedBox(height: 20),
+            const Divider(),
+            const SizedBox(height: 16),
+            const Text(
+              'فريق التطوير',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+            ),
+            const SizedBox(height: 12),
+            
+            // Email Button
+            InkWell(
+              onTap: _launchEmail,
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: isDark ?Colors.green.shade300 : Colors.green.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: isDark ?Colors.green.shade500 : Colors.green.shade200),
+                  color: isDark ? Colors.blue[900]?.withOpacity(0.3) : Colors.blue[50],
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Colors.blue.withOpacity(0.3),
+                  ),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.message, color: Colors.green.shade700, size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.blue,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.email, size: 18, color: Colors.white),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
                       child: Text(
-                        '   لأي ملاحظات أو استفسارات عن التطبيق، \n يرجى التواصل عبر الواتساب (0658890501)'   ,
-                        style: TextStyle(fontSize: 13, color: isDark ?AppColors.darkTextPrimary : AppColors.darkBorder),
+                        'itridev.soft@gmail.com',
+                        style: TextStyle(
+                          color: Colors.blue,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
+                    const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.blue),
                   ],
                 ),
               ),
-            ],
-          ),
+            ),
+            
+            const SizedBox(height: 12),
+            
+            // WhatsApp Button
+            InkWell(
+              onTap: _launchWhatsApp,
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.green[900]?.withOpacity(0.3) : Colors.green[50],
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Colors.green.withOpacity(0.3),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.green[700],
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.phone, size: 18, color: Colors.white),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'واتساب',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
+                          Text(
+                            '0542951750',
+                            style: TextStyle(
+                              color: Colors.green,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.green),
+                  ],
+                ),
+              ),
+            ),
+            
+            const SizedBox(height: 16),
+            
+            // Info Box
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isDark ? Colors.green[900]?.withOpacity(0.2) : Colors.green[50],
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isDark ? Colors.green[700]! : Colors.green[200]!,
+                ),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.info_outline, color: Colors.green[700], size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'لأي استفسارات أو ملاحظات، نسعد بتواصلكم معنا',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: isDark ? Colors.green[100] : Colors.green[900],
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('موافق'),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          style: TextButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
           ),
+          child: const Text('إغلاق', style: TextStyle(fontSize: 15)),
+        ),
+      ],
+    ),
+  );
+}
+
+void _showHelpSupport() {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      title: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(2),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(Icons.support_agent, color: AppColors.primary, size: 24),
+          ),
+          const SizedBox(width: 12),
+          const Text('الدعم والمساعدة', style: TextStyle(fontSize: 20)),
         ],
       ),
-    );
-  }
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'نحن هنا لمساعدتك! تواصل معنا عبر:',
+              style: TextStyle(
+                fontSize: 14,
+                color: isDark ? Colors.grey[300] : Colors.grey[700],
+              ),
+            ),
+            const SizedBox(height: 20),
+            
+            // Email Button
+            InkWell(
+              onTap: _launchEmail,
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.blue[900]?.withOpacity(0.3) : Colors.blue[50],
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Colors.blue.withOpacity(0.3),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.blue,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.email_outlined, size: 24, color: Colors.white),
+                    ),
+                    const SizedBox(width: 16),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'البريد الإلكتروني',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            'itridev.soft@gmail.com',
+                            style: TextStyle(
+                              color: Colors.blue,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.blue),
+                  ],
+                ),
+              ),
+            ),
+            
+            const SizedBox(height: 16),
+            
+            // WhatsApp Button
+            InkWell(
+              onTap: _launchWhatsApp,
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      isDark ? Colors.green[900]!.withOpacity(0.4) : Colors.green[50]!,
+                      isDark ? Colors.green[800]!.withOpacity(0.3) : Colors.green[100]!,
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Colors.green.withOpacity(0.4),
+                    width: 1.5,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.green[700],
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.chat, size: 24, color: Colors.white),
+                    ),
+                    const SizedBox(width: 16),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'واتساب',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            '0542951750',
+                            style: TextStyle(
+                              color: Colors.green,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.green),
+                  ],
+                ),
+              ),
+            ),
+            
+            const SizedBox(height: 20),
+            
+            // Help Info
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: isDark ? Colors.orange[900]?.withOpacity(0.2) : Colors.orange[50],
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.schedule, color: Colors.orange[700], size: 22),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'نستجيب لاستفساراتكم في أقرب وقت ممكن',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: isDark ? Colors.orange[100] : Colors.orange[900],
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          style: TextButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          ),
+          child: const Text('إغلاق', style: TextStyle(fontSize: 15)),
+        ),
+      ],
+    ),
+  );
+}
+  // void _showAboutApp() {
+  //   final isDark = Theme.of(context).brightness == Brightness.dark;
 
-  void _showHelpSupport() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+  //   showDialog(
+  //     context: context,
+  //     builder: (context) => AlertDialog(
+  //       title: const Text('حول التطبيق'),
+  //       content: SingleChildScrollView(
+  //         child: Column(
+  //           mainAxisSize: MainAxisSize.min,
+  //           crossAxisAlignment: CrossAxisAlignment.start,
+  //           children: [
+  //             const Text(
+  //               'تطبيق حجوزات الأعراس الخاص بجميع العشائر ',
+  //               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+  //             ),
+  //             const SizedBox(height: 8),
+  //             const Text('الإصدار: 1.0.1'),
+  //             const SizedBox(height: 16),
+  //             const Text(
+  //               'يسرّنا أن نرحب بكم في تطبيق الأعراس،\nونضع بين أيديكم وسيلة ميسرة لتنظيم و حجز العرس الخاص بكم',
+  //             ),
+  //             const SizedBox(height: 16),
+  //             const Divider(),
+  //             const SizedBox(height: 8),
+  //             const Text(
+  //               'برعاية:',
+  //               style: TextStyle(fontWeight: FontWeight.bold),
+  //             ),
+  //             const SizedBox(height: 4),
+  //             const Text('عشيرة آت الشيخ الحاج مسعود'),
+  //             const SizedBox(height: 16),
+  //             const Divider(),
+  //             const SizedBox(height: 8),
+  //             const Text(
+  //               ' معلومات فريق التطوير:',
+  //               style: TextStyle(fontWeight: FontWeight.bold),
+  //             ),
+  //             const SizedBox(height: 8),
+  //             Row(
+  //               children: [
+  //                 const Icon(Icons.email, size: 18),
+  //                 const SizedBox(width: 8),
+  //                 const Expanded(
+  //                   child: Text('itridev.soft@gmail.com'),
+  //                 ),
+  //               ],
+  //             ),
+  //             const SizedBox(height: 8),
+  //             Row(
+  //               children: [
+  //                 const Icon(Icons.phone, size: 18),
+  //                 const SizedBox(width: 8),
+  //                 const Text('0542951750'),
+  //               ],
+  //             ),
+  //             const SizedBox(height: 16),
+  //             Container(
+  //               padding: const EdgeInsets.all(12),
+  //               decoration: BoxDecoration(
+  //                 color: isDark ?Colors.green.shade300 : Colors.green.shade50,
+  //                 borderRadius: BorderRadius.circular(8),
+  //                 border: Border.all(color: isDark ?Colors.green.shade500 : Colors.green.shade200),
+  //               ),
+  //               child: Row(
+  //                 children: [
+  //                   Icon(Icons.message, color: Colors.green.shade700, size: 20),
+  //                   const SizedBox(width: 8),
+  //                   Expanded(
+  //                     child: Text(
+  //                       '   لأي ملاحظات أو استفسارات عن التطبيق، \n يرجى التواصل عبر الواتساب (0542951750)'   ,
+  //                       style: TextStyle(fontSize: 13, color: isDark ?AppColors.darkTextPrimary : AppColors.darkBorder),
+  //                     ),
+  //                   ),
+  //                 ],
+  //               ),
+  //             ),
+  //           ],
+  //         ),
+  //       ),
+  //       actions: [
+  //         TextButton(
+  //           onPressed: () => Navigator.pop(context),
+  //           child: const Text('موافق'),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
 
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('لدعم والمساعدة'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+  // void _showHelpSupport() {
+  //   final isDark = Theme.of(context).brightness == Brightness.dark;
+
+  //   showDialog(
+  //     context: context,
+  //     builder: (context) => AlertDialog(
+  //       title: const Text('لدعم والمساعدة'),
+  //       content: SingleChildScrollView(
+  //         child: Column(
+  //           mainAxisSize: MainAxisSize.min,
+  //           crossAxisAlignment: CrossAxisAlignment.start,
+  //           children: [
               
-              // const Text(
-              //   'معلومات فريق  التطوير:',
-              //   style: TextStyle(fontWeight: FontWeight.bold),
-              // ),
-              // const SizedBox(height: 8),
-              Row(
-                children: [
-                  const Icon(Icons.email, size: 18),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: Text('itridev.soft@gmail.com'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  const Icon(Icons.phone, size: 18),
-                  const SizedBox(width: 8),
-                  const Text('0658890501'),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: isDark ?Colors.green.shade300 : Colors.green.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: isDark ?Colors.green.shade500 : Colors.green.shade200),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.message, color: Colors.green.shade700, size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        '   لأي ملاحظات أو استفسارات عن التطبيق، \n يرجى التواصل عبر الواتساب (0658890501)'   ,
-                        style: TextStyle(fontSize: 13, color: isDark ?AppColors.darkTextPrimary : AppColors.darkBorder),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('موافق'),
-          ),
-        ],
-      ),
-    );
-  }
+  //             // const Text(
+  //             //   'معلومات فريق  التطوير:',
+  //             //   style: TextStyle(fontWeight: FontWeight.bold),
+  //             // ),
+  //             // const SizedBox(height: 8),
+  //             Row(
+  //               children: [
+  //                 const Icon(Icons.email, size: 18),
+  //                 const SizedBox(width: 8),
+  //                 const Expanded(
+  //                   child: Text('itridev.soft@gmail.com'),
+  //                 ),
+  //               ],
+  //             ),
+  //             const SizedBox(height: 8),
+  //             Row(
+  //               children: [
+  //                 const Icon(Icons.phone, size: 18),
+  //                 const SizedBox(width: 8),
+  //                 const Text('0542951750'),
+  //               ],
+  //             ),
+  //             const SizedBox(height: 16),
+  //             Container(
+  //               padding: const EdgeInsets.all(12),
+  //               decoration: BoxDecoration(
+  //                 color: isDark ?Colors.green.shade300 : Colors.green.shade50,
+  //                 borderRadius: BorderRadius.circular(8),
+  //                 border: Border.all(color: isDark ?Colors.green.shade500 : Colors.green.shade200),
+  //               ),
+  //               child: Row(
+  //                 children: [
+  //                   Icon(Icons.message, color: Colors.green.shade700, size: 20),
+  //                   const SizedBox(width: 8),
+  //                   Expanded(
+  //                     child: Text(
+  //                       '   لأي ملاحظات أو استفسارات عن التطبيق، \n يرجى التواصل عبر الواتساب (0542951750)'   ,
+  //                       style: TextStyle(fontSize: 13, color: isDark ?AppColors.darkTextPrimary : AppColors.darkBorder),
+  //                     ),
+  //                   ),
+  //                 ],
+  //               ),
+  //             ),
+  //           ],
+  //         ),
+  //       ),
+  //       actions: [
+  //         TextButton(
+  //           onPressed: () => Navigator.pop(context),
+  //           child: const Text('موافق'),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
 
   void _showLogoutDialog() {
     showDialog(

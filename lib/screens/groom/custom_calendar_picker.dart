@@ -225,7 +225,7 @@ Future<void> _loadMonthData() async {
 
   try {
     // ADD THIS - Fetch special reservations
-    final specialReservations = await ApiService.getSpecialReservations();
+    final specialReservations = await ApiService.getSpecialReservations(widget.clanId);
     Set<String> specialDates = {};
     Map<String, ReservationSpecial> specialMap = {}; // ADD THIS
 

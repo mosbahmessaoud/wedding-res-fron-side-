@@ -1777,40 +1777,70 @@ Map<String, dynamic>? _getReservationById(int id) {
     return null;
   }
 }
-
-Future<void> _downloadPdf(int reservationId) async {
-    final connectivityResult = await Connectivity().checkConnectivity();
-    
-    if (connectivityResult.contains(ConnectivityResult.none)) {
-      _showNoInternetDialog();
-      return;
-    }
-
-    try {
-      _showSnackBar('جاري التحقق من الملف...', Colors.blue.shade400);
-      
-      final status = await ApiService.checkPdfStatus(reservationId);
-      
-      if (status['pdf_exists'] != true) {
-        _showSnackBar('جاري إنشاء الملف...', Colors.blue.shade400);
-        await ApiService.generatePdf(reservationId);
-        await Future.delayed(const Duration(seconds: 2));
-      }
-      
-      _showSnackBar('جاري تحميل الملف...', Colors.blue.shade400);
-      
-      final pdfBytes = await ApiService.downloadPdf(reservationId);
-      final savedFile = await _savePdfFile(pdfBytes, reservationId, reservation: _getReservationById(reservationId));
-
-      if (savedFile != null) {
-        _showSnackBar('تم تحميل الملف بنجاح', Colors.green.shade400);
-        _showPdfActionsDialog(savedFile.path, reservationId, pdfBytes);
-      }
-    } catch (e) {
-      print('Download error: $e');
-      _showSnackBar('خطأ في تحميل الملف: $e', Colors.red.shade400);
-    }
-  }
+// 4. NEW - Add this function (permission explanation dialog)
+void _showPermissionExplanationDialog() {
+  if (!mounted) return;
+  
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      title: Row(
+        children: [
+          Icon(Icons.error_outline, color: Colors.orange, size: 24),
+          SizedBox(width: 8),
+          Expanded(child: Text('تنبيه الصلاحيات')),
+        ],
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('فشل حفظ الملف على جهازك.'),
+          SizedBox(height: 12),
+          Text(
+            'الحلول الممكنة:',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          SizedBox(height: 8),
+          Text('1. امنح التطبيق صلاحية الوصول للتخزين من إعدادات الجهاز'),
+          SizedBox(height: 4),
+          Text('2. استخدم زر "مشاركة" لحفظ الملف في تطبيق آخر'),
+          SizedBox(height: 4),
+          Text('3. تأكد من وجود مساحة كافية على الجهاز'),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text('إغلاق'),
+        ),
+        ElevatedButton(
+          onPressed: () async {
+            Navigator.pop(context);
+            // Try to download and share directly
+            try {
+              final pdfBytes = await ApiService.downloadPdf(
+                _pendingReservation?['id'] ?? _validatedReservation?['id'] ?? 0
+              );
+              await _sharePdf(
+                _pendingReservation?['id'] ?? _validatedReservation?['id'] ?? 0, 
+                pdfBytes
+              );
+            } catch (e) {
+              _showSnackBar('حاول مرة أخرى', Colors.orange);
+            }
+          },
+          child: Text('مشاركة الملف'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.blue,
+            foregroundColor: Colors.white,
+          ),
+        ),
+      ],
+    ),
+  );
+}
 
 Future<void> _sharePdf(int reservationId, Uint8List pdfBytes) async {
 
@@ -1866,271 +1896,160 @@ Future<void> _sharePdf(int reservationId, Uint8List pdfBytes) async {
     return await ApiService.downloadPdf(reservationId);
   }
 
-// // Add this new method to show PDF action options
-// void _showPdfActionsDialog(String filePath, int reservationId, Uint8List pdfBytes) {
-//   if (!mounted) return;
-  
-//   showDialog(
-//     context: context,
-//     builder: (context) => AlertDialog(
-//       title: const Text('تم تحميل الملف'),
-//       content: Column(
-//         mainAxisSize: MainAxisSize.min,
-//         crossAxisAlignment: CrossAxisAlignment.start,
-//         children: [
-//           const Text('تم حفظ ملف PDF بنجاح. '),
-//           const SizedBox(height: 16),
-//           Row(
-//             children: [
-//               Icon(Icons.info, color: Colors.blue, size: 16),
-//               SizedBox(width: 8),
-//               Expanded(
-//                 child: Text(
-//                   'الملف محفوظ في مجلد التحميلات',
-//                   style: TextStyle(fontSize: 12, color: Colors.blue.shade700),
-//                 ),
-//               ),
-//             ],
-//           ),
-//         ],
-//       ),
-//       actions: [
-//         TextButton(
-//           onPressed: () => Navigator.pop(context),
-//           child: const Text('إغلاق'),
-//         ),
-//         ElevatedButton.icon(
-//           onPressed: () async {
-//             Navigator.pop(context);
-//             await _sharePdf(reservationId, pdfBytes);
-//           },
-//           icon: const Icon(Icons.share),
-//           label: const Text('مشاركة'),
-//           style: ElevatedButton.styleFrom(
-//             backgroundColor: Colors.blue,
-//             foregroundColor: Colors.white,
-//           ),
-//         ),
-//         ElevatedButton.icon(
-//           onPressed: () async {
-//             Navigator.pop(context);
-//             try {
-//               await OpenFile.open(filePath);
-//             } catch (e) {
-//               _showSnackBar('لا يمكن فتح الملف تلقائياً', Colors.orange);
-//             }
-//           },
-//           icon: const Icon(Icons.open_in_new),
-//           label: const Text('فتح'),
-//           style: ElevatedButton.styleFrom(
-//             backgroundColor: Colors.green,
-//             foregroundColor: Colors.white,
-//           ),
-//         ),
-//       ],
-//     ),
-//   );
-// }
-// Replace the _showPdfActionsDialog method with this updated version:
+  // Replace these 3 functions in your code:
 
-
- 
-
-// void _showPdfActionsDialog(String filePath, int reservationId, Uint8List pdfBytes) {
-//   if (!mounted) return;
+// 1. Updated _downloadPdf function
+Future<void> _downloadPdf(int reservationId) async {
+  final connectivityResult = await Connectivity().checkConnectivity();
   
-//   final isDesktop = Platform.isWindows || Platform.isLinux || Platform.isMacOS;
-//   final isDark = Theme.of(context).brightness == Brightness.dark;
-  
-//   showDialog(
-//     context: context,
-//     builder: (context) => AlertDialog(
-//       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-//       title: Row(
-//         children: [
-//           Icon(Icons.check_circle, color: Colors.green, size: 28),
-//           SizedBox(width: 8),
-//           Text('تم التحميل بنجاح'),
-//         ],
-//       ),
-//       content: Column(
-//         mainAxisSize: MainAxisSize.min,
-//         crossAxisAlignment: CrossAxisAlignment.start,
-//         children: [
-//           Text('تم حفظ الملف في:', style: TextStyle(color: _getTextColor(context))),
-//           SizedBox(height: 8),
-//           Container(
-//             padding: EdgeInsets.all(12),
-//             decoration: BoxDecoration(
-//               color: isDark ? Colors.grey[800] : Colors.grey[200],
-//               borderRadius: BorderRadius.circular(8),
-//               border: Border.all(
-//                 color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
-//               ),
-//             ),
-//             child: SelectableText(
-//               filePath,
-//               style: TextStyle(
-//                 fontSize: 12,
-//                 fontFamily: 'monospace',
-//                 color: _getTextColor(context),
-//               ),
-//             ),
-//           ),
-//           SizedBox(height: 16),
-//           Row(
-//             children: [
-//               Icon(Icons.folder, color: Colors.blue, size: 18),
-//               SizedBox(width: 8),
-//               Expanded(
-//                 child: Text(
-//                   isDesktop 
-//                       ? 'الملف محفوظ في مجلد التحميلات'
-//                       : 'الملف محفوظ في مجلد التحميلات',
-//                   style: TextStyle(fontSize: 12, color: Colors.blue[700]),
-//                 ),
-//               ),
-//             ],
-//           ),
-//         ],
-//       ),
-//       actions: [
-//         TextButton(
-//           onPressed: () => Navigator.pop(context),
-//           child: const Text('إغلاق'),
-//         ),
-//         if (!isDesktop)
-//           ElevatedButton.icon(
-//             onPressed: () async {
-//               Navigator.pop(context);
-//               await _sharePdf(reservationId, pdfBytes);
-//             },
-//             icon: const Icon(Icons.share, size: 18),
-//             label: const Text('مشاركة'),
-//             style: ElevatedButton.styleFrom(
-//               backgroundColor: Colors.blue,
-//               foregroundColor: Colors.white,
-//               shape: RoundedRectangleBorder(
-//                 borderRadius: BorderRadius.circular(8),
-//               ),
-//             ),
-//           ),
-//         ElevatedButton.icon(
-//           onPressed: () async {
-//             Navigator.pop(context);
-//             await _openPdfFile(filePath);
-//           },
-//           icon: const Icon(Icons.open_in_new, size: 18),
-//           label: const Text('فتح الملف'),
-//           style: ElevatedButton.styleFrom(
-//             backgroundColor: Colors.green,
-//             foregroundColor: Colors.white,
-//             shape: RoundedRectangleBorder(
-//               borderRadius: BorderRadius.circular(8),
-//             ),
-//           ),
-//         ),
-//       ],
-//     ),
-//   );
-// }
+  if (connectivityResult.contains(ConnectivityResult.none)) {
+    _showNoInternetDialog();
+    return;
+  }
+
+  try {
+    _showSnackBar('جاري التحقق من الملف...', Colors.blue.shade400);
+    
+    final status = await ApiService.checkPdfStatus(reservationId);
+    
+    if (status['pdf_exists'] != true) {
+      _showSnackBar('جاري إنشاء الملف...', Colors.blue.shade400);
+      await ApiService.generatePdf(reservationId);
+      await Future.delayed(const Duration(seconds: 2));
+    }
+    
+    _showSnackBar('جاري تحميل الملف...', Colors.blue.shade400);
+    
+    final pdfBytes = await ApiService.downloadPdf(reservationId);
+    print('PDF bytes downloaded: ${pdfBytes.length} bytes');
+    
+    // Clear snackbars before saving
+    if (mounted) {
+      ScaffoldMessenger.of(context).clearSnackBars();
+    }
+    
+    _showSnackBar('جاري حفظ الملف...', Colors.blue.shade400);
+    
+    final savedFile = await _savePdfFile(pdfBytes, reservationId, reservation: _getReservationById(reservationId));
+    print('File saved result: ${savedFile?.path ?? "NULL"}');
+
+    if (savedFile != null) {
+      print('Mounted status before dialog: $mounted');
+      
+      if (mounted) {
+        // Clear any existing snackbars
+        ScaffoldMessenger.of(context).clearSnackBars();
+        
+        _showSnackBar('تم تحميل الملف بنجاح ✓', Colors.green.shade400);
+        
+        // Use post frame callback to ensure UI is ready
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          print('Post frame callback - showing dialog');
+          if (mounted) {
+            _showPdfActionsDialog(savedFile.path, reservationId, pdfBytes);
+          } else {
+            print('Widget unmounted in post frame callback');
+          }
+        });
+      } else {
+        print('Widget not mounted after file save');
+      }
+    } else {
+      print('Failed to save file - savedFile is null');
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        _showSnackBar('فشل حفظ الملف. تحقق من صلاحيات التطبيق', Colors.red);
+        
+        // Show a dialog explaining the issue
+        Future.delayed(Duration(milliseconds: 500), () {
+          if (mounted) {
+            _showPermissionExplanationDialog();
+          }
+        });
+      }
+    }
+  } catch (e, stackTrace) {
+    print('Download error: $e');
+    print('Stack trace: $stackTrace');
+    if (mounted) {
+      ScaffoldMessenger.of(context).clearSnackBars();
+      _showSnackBar('خطأ في تحميل الملف: $e', Colors.red.shade400);
+    }
+  }
+}
+
 void _showPdfActionsDialog(String filePath, int reservationId, Uint8List pdfBytes) {
   if (!mounted) return;
   
   final isDesktop = Platform.isWindows || Platform.isLinux || Platform.isMacOS;
-  final isDark = Theme.of(context).brightness == Brightness.dark;
   
   showDialog(
     context: context,
-    builder: (context) => AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      title: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.check_circle, color: Colors.green, size: 22),
-          SizedBox(width: 6),
-          Text('تم التحميل', style: TextStyle(fontSize: 16)),
-        ],
-      ),
+    builder: (ctx) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      contentPadding: EdgeInsets.all(20),
       content: Column(
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'الملف:',
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-          ),
-          SizedBox(height: 6),
           Container(
-            padding: EdgeInsets.all(8),
+            padding: EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: isDark ? Colors.grey[800] : Colors.grey[100],
-              borderRadius: BorderRadius.circular(6),
+              color: Colors.green.withOpacity(0.1),
+              shape: BoxShape.circle,
             ),
-            child: Text(
-              filePath.split('/').last,
-              style: TextStyle(fontSize: 11),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
+            child: Icon(Icons.check_circle, color: Colors.green, size: 40),
+          ),
+          SizedBox(height: 16),
+          Text(
+            'تم التحميل بنجاح',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           SizedBox(height: 8),
-          Row(
-            children: [
-              Icon(Icons.folder, color: Colors.blue, size: 14),
-              SizedBox(width: 4),
-              Expanded(
-                child: Text(
-                  'مجلد التحميلات',
-                  style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-                ),
-              ),
-            ],
+          Text(
+            filePath.split('/').last,
+            style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text('إغلاق', style: TextStyle(fontSize: 13)),
+          onPressed: () => Navigator.pop(ctx),
+          child: Text('إغلاق'),
         ),
         if (!isDesktop)
-          TextButton.icon(
-            onPressed: () async {
-              Navigator.pop(context);
-              await _sharePdf(reservationId, pdfBytes);
+          FilledButton.icon(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _sharePdf(reservationId, pdfBytes);
             },
-            icon: Icon(Icons.share, size: 16),
-            label: Text('مشاركة', style: TextStyle(fontSize: 13)),
+            icon: Icon(Icons.share, size: 18),
+            label: Text('مشاركة'),
           ),
-        ElevatedButton.icon(
-          onPressed: () async {
-            Navigator.pop(context);
-            await _openPdfFile(filePath);
+        FilledButton.icon(
+          onPressed: () {
+            Navigator.pop(ctx);
+            _openPdfFile(filePath);
           },
-          icon: Icon(Icons.open_in_new, size: 16),
-          label: Text('فتح', style: TextStyle(fontSize: 13)),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.green,
-            foregroundColor: Colors.white,
-            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(6),
-            ),
-          ),
+          icon: Icon(Icons.open_in_new, size: 18),
+          label: Text('فتح'),
+          style: FilledButton.styleFrom(backgroundColor: Colors.green),
         ),
       ],
     ),
   );
 }
 
-// Add this helper method for opening PDF files
 Future<void> _openPdfFile(String filePath) async {
   try {
     // Check if file exists
     final file = File(filePath);
     if (!await file.exists()) {
-      _showSnackBar('الملف غير موجود', Colors.red);
+      if (mounted) {
+        _showSnackBar('الملف غير موجود', Colors.red);
+      }
       return;
     }
 
@@ -2138,98 +2057,281 @@ Future<void> _openPdfFile(String filePath) async {
     final result = await OpenFile.open(filePath);
     
     // Handle different result types
-    switch (result.type) {
-      case ResultType.done:
-        // File opened successfully
-        break;
-      case ResultType.fileNotFound:
-        _showSnackBar('الملف غير موجود', Colors.red);
-        break;
-      case ResultType.noAppToOpen:
-        _showSnackBar('لا يوجد تطبيق لفتح ملفات PDF. يرجى تثبيت قارئ PDF', Colors.orange);
-        break;
-      case ResultType.permissionDenied:
-        _showSnackBar('تم رفض الصلاحية لفتح الملف', Colors.red);
-        break;
-      case ResultType.error:
-        _showSnackBar('خطأ في فتح الملف: ${result.message}', Colors.red);
-        break;
+    if (mounted) {
+      switch (result.type) {
+        case ResultType.done:
+          // File opened successfully - no need to show message
+          print('PDF opened successfully');
+          break;
+        case ResultType.fileNotFound:
+          _showSnackBar('الملف غير موجود', Colors.red);
+          break;
+        case ResultType.noAppToOpen:
+          _showSnackBar('لا يوجد تطبيق لفتح ملفات PDF. يرجى تثبيت قارئ PDF', Colors.orange);
+          // Optionally, show a dialog with options to install a PDF reader
+          _showInstallPdfReaderDialog(filePath);
+          break;
+        case ResultType.permissionDenied:
+          _showSnackBar('تم رفض الصلاحية لفتح الملف', Colors.red);
+          break;
+        case ResultType.error:
+          _showSnackBar('خطأ في فتح الملف: ${result.message}', Colors.red);
+          _showFileLocationDialog(filePath);
+          break;
+      }
     }
   } catch (e) {
     print('Error opening PDF: $e');
-    _showSnackBar('خطأ في فتح الملف', Colors.red);
+    if (mounted) {
+      _showSnackBar('خطأ في فتح الملف', Colors.red);
+      _showFileLocationDialog(filePath);
+    }
   }
 }
-  // Save PDF file to device
+
+// New helper method to suggest PDF reader installation
+void _showInstallPdfReaderDialog(String filePath) {
+  if (!mounted) return;
+  
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      title: Row(
+        children: [
+          Icon(Icons.warning_amber_rounded, color: Colors.orange),
+          SizedBox(width: 8),
+          Expanded(child: Text('تطبيق قارئ PDF مطلوب')),
+        ],
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('لا يوجد تطبيق لفتح ملفات PDF على جهازك.'),
+          SizedBox(height: 12),
+          Text(
+            'يمكنك:',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          SizedBox(height: 8),
+          Text('• تثبيت قارئ PDF من متجر التطبيقات'),
+          Text('• استخدام متصفح الإنترنت لفتح الملف'),
+          Text('• مشاركة الملف مع تطبيق آخر'),
+          SizedBox(height: 12),
+          Container(
+            padding: EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.folder, size: 16, color: Colors.blue),
+                SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'الملف: ${filePath.split('/').last}',
+                    style: TextStyle(fontSize: 11),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text('إغلاق'),
+        ),
+        ElevatedButton.icon(
+          onPressed: () async {
+            Navigator.pop(context);
+            // Get the PDF bytes and share
+            try {
+              final file = File(filePath);
+              final bytes = await file.readAsBytes();
+              final reservationId = int.tryParse(
+                filePath.split('_').last.split('.').first
+              ) ?? 0;
+              await _sharePdf(reservationId, bytes);
+            } catch (e) {
+              _showSnackBar('خطأ في المشاركة', Colors.red);
+            }
+          },
+          icon: Icon(Icons.share, size: 16),
+          label: Text('مشاركة'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.blue,
+            foregroundColor: Colors.white,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+// 2. Updated _savePdfFile function
 Future<File?> _savePdfFile(Uint8List pdfBytes, int reservationId, {Map<String, dynamic>? reservation}) async {
   try {
+    print('=== Starting _savePdfFile ===');
+    print('PDF bytes length: ${pdfBytes.length}');
+    print('Platform: ${Platform.operatingSystem}');
+    
     Directory? directory;
     
     if (Platform.isAndroid) {
-      // Request storage permission first
+      print('Android detected - checking permissions');
+      
+      // For Android 13+ (API 33+), we don't need storage permission for app-specific directories
+      // But we'll request it anyway for broader compatibility
       var status = await Permission.storage.status;
+      print('Storage permission status: $status');
+      
       if (!status.isGranted) {
+        print('Requesting storage permission...');
         status = await Permission.storage.request();
+        print('Storage permission after request: $status');
+        
         if (!status.isGranted) {
-          // Try with manage external storage permission for Android 11+
-          status = await Permission.manageExternalStorage.request();
-          if (!status.isGranted) {
-            throw Exception('يجب منح صلاحية الوصول للتخزين لحفظ الملف');
+          // Try manageExternalStorage for Android 11+
+          print('Trying manageExternalStorage permission...');
+          var manageStatus = await Permission.manageExternalStorage.request();
+          print('ManageExternalStorage permission: $manageStatus');
+          
+          if (!manageStatus.isGranted) {
+            print('Permissions denied - using app directory instead');
+            // Use app-specific directory which doesn't need permissions
+            directory = await getExternalStorageDirectory();
+            
+            if (directory != null) {
+              // Create a "Downloads" subfolder in app directory
+              final downloadsDir = Directory('${directory.path}/Downloads');
+              if (!await downloadsDir.exists()) {
+                await downloadsDir.create(recursive: true);
+              }
+              directory = downloadsDir;
+              print('Using app directory: ${directory.path}');
+            }
           }
         }
       }
       
-      // Try to save to Downloads folder (public directory)
-      try {
-        final downloadsPath = '/storage/emulated/0/Download';
-        directory = Directory(downloadsPath);
+      // If we have permission or it's granted, try to use public Downloads
+      if (directory == null) {
+        print('Attempting to use public Downloads directory');
         
-        if (!await directory.exists()) {
-          // Fallback to external storage directory
-          directory = await getExternalStorageDirectory();
-          if (directory != null) {
-            // Try to create a public-like path
-            final publicPath = Directory('/storage/emulated/0/Android/data/${directory.path.split('/').last}/files/Download');
-            await publicPath.create(recursive: true);
-            directory = publicPath;
+        // Try multiple possible Downloads paths
+        final possiblePaths = [
+          '/storage/emulated/0/Download',
+          '/storage/emulated/0/Downloads',
+          '/sdcard/Download',
+          '/sdcard/Downloads',
+        ];
+        
+        for (final path in possiblePaths) {
+          final dir = Directory(path);
+          print('Checking path: $path');
+          
+          if (await dir.exists()) {
+            directory = dir;
+            print('Found valid Downloads directory: $path');
+            break;
           }
         }
-      } catch (e) {
-        // Final fallback to app directory
-        directory = await getExternalStorageDirectory();
+        
+        // If still no directory found, fall back to app directory
+        if (directory == null) {
+          print('No public Downloads found - using app external storage');
+          directory = await getExternalStorageDirectory();
+          
+          if (directory != null) {
+            // Create Downloads subfolder
+            final downloadsDir = Directory('${directory.path}/Downloads');
+            if (!await downloadsDir.exists()) {
+              await downloadsDir.create(recursive: true);
+            }
+            directory = downloadsDir;
+            print('Using fallback directory: ${directory.path}');
+          }
+        }
       }
-    } else {
+    } else if (Platform.isIOS) {
       // iOS - use documents directory
+      print('iOS detected - using documents directory');
       directory = await getApplicationDocumentsDirectory();
+    } else {
+      // Desktop platforms
+      print('Desktop platform - using downloads directory');
+      directory = await getDownloadsDirectory();
+      directory ??= await getApplicationDocumentsDirectory();
     }
     
     if (directory == null) {
+      print('ERROR: Could not determine storage directory');
       throw Exception('لا يمكن الوصول إلى مجلد التخزين');
     }
     
+    print('Final directory path: ${directory.path}');
+    
     // Ensure directory exists
     if (!await directory.exists()) {
+      print('Creating directory: ${directory.path}');
       await directory.create(recursive: true);
     }
     
-    // // Create file with descriptive name
-    // final timestamp = DateTime.now().millisecondsSinceEpoch;
-    // final fileName = 'حجز_زفاف_${reservationId}_$timestamp.pdf';
-    // final file = File('${directory.path}/$fileName');
-
-    // Create file with custom name
+    // Generate filename
     final fileName = _generatePdfFileName(reservationId, reservation);
-    final file = File('${directory.path}/$fileName');
-
-    // Write bytes to file
-    await file.writeAsBytes(pdfBytes);
+    print('Generated filename: $fileName');
     
-    return file;
-  } catch (e) {
-    print('Error saving file: $e');
+    // Create full file path
+    final filePath = '${directory.path}/$fileName';
+    print('Full file path: $filePath');
+    
+    final file = File(filePath);
+    
+    // Write bytes to file
+    print('Writing ${pdfBytes.length} bytes to file...');
+    await file.writeAsBytes(pdfBytes, flush: true);
+    
+    // Verify file was written
+    if (await file.exists()) {
+      final fileSize = await file.length();
+      print('SUCCESS: File created with size: $fileSize bytes');
+      print('File path: ${file.path}');
+      return file;
+    } else {
+      print('ERROR: File was not created');
+      throw Exception('فشل في إنشاء الملف');
+    }
+    
+  } catch (e, stackTrace) {
+    print('ERROR in _savePdfFile: $e');
+    print('Stack trace: $stackTrace');
+    
+    // Last resort: try app-specific directory without any permissions
+    try {
+      print('Attempting last resort - app directory...');
+      final appDir = await getApplicationDocumentsDirectory();
+      final fileName = _generatePdfFileName(reservationId, reservation);
+      final file = File('${appDir.path}/$fileName');
+      
+      await file.writeAsBytes(pdfBytes, flush: true);
+      
+      if (await file.exists()) {
+        print('Last resort SUCCESS: ${file.path}');
+        return file;
+      }
+    } catch (e2) {
+      print('Last resort also failed: $e2');
+    }
+    
     return null;
   }
 }
+
 
   // Helper method to show snack bar
   void _showSnackBar(String message, Color backgroundColor) {
@@ -2244,65 +2346,79 @@ Future<File?> _savePdfFile(Uint8List pdfBytes, int reservationId, {Map<String, d
     }
   }
 
-  // Show dialog with file location when auto-open fails
   void _showFileLocationDialog(String filePath) {
-    if (!mounted) return;
-    
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('تم حفظ الملف'),
-        content: Column(
+  if (!mounted) return;
+  
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      title: Row(
+        children: [
+          Icon(Icons.check_circle, color: Colors.green, size: 22),
+          SizedBox(width: 8),
+          Expanded(child: Text('تم حفظ الملف')),
+        ],
+      ),
+      content: SingleChildScrollView(
+        child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('تم حفظ ملف PDF بنجاح في:'),
-            const SizedBox(height: 8),
+            Text('تم حفظ ملف PDF بنجاح في:'),
+            SizedBox(height: 8),
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(12),
+              padding: EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: Colors.grey.shade100,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: Colors.grey.shade300),
               ),
-              child: Text(
+              child: SelectableText(
                 filePath,
-                style: const TextStyle(
-                  fontSize: 12,
+                style: TextStyle(
+                  fontSize: 11,
                   fontFamily: 'monospace',
                 ),
               ),
             ),
-            const SizedBox(height: 12),
-            const Text(
-              'يمكنك العثور على الملف في مجلد التحميلات أو في مدير الملفات.',
-              style: TextStyle(fontSize: 14),
+            SizedBox(height: 12),
+            Text(
+              Platform.isAndroid
+                  ? 'يمكنك العثور على الملف في مجلد التحميلات (Downloads) أو في مدير الملفات.'
+                  : 'يمكنك العثور على الملف في مجلد المستندات.',
+              style: TextStyle(fontSize: 13),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('موافق'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              // Try to open file again
-              try {
-                await OpenFile.open(filePath);
-              } catch (e) {
-                _showSnackBar('لا يمكن فتح الملف تلقائياً', Colors.orange);
-              }
-            },
-            child: const Text('فتح الملف'),
-          ),
-        ],
       ),
-    );
-  }
-
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text('موافق'),
+        ),
+        ElevatedButton.icon(
+          onPressed: () async {
+            Navigator.pop(context);
+            // Try to open file again
+            try {
+              await OpenFile.open(filePath);
+            } catch (e) {
+              _showSnackBar('لا يمكن فتح الملف تلقائياً', Colors.orange);
+            }
+          },
+          icon: Icon(Icons.open_in_new, size: 16),
+          label: Text('محاولة الفتح'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.green,
+            foregroundColor: Colors.white,
+          ),
+        ),
+      ],
+    ),
+  );
+}
 void _navigateToNewReservation() {
   if (!mounted) return;
   

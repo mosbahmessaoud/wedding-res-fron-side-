@@ -1,6 +1,6 @@
 // lib/screens/auth/forgot_password_screen.dart
 import 'package:flutter/material.dart';
-import '../../utils/colors.dart' hide AppColors;
+
 import '../../services/api_service.dart';
 import '../../widgets/common/custom_text_field.dart' hide LoadingButton;
 import '../../widgets/common/loading_button.dart';

@@ -443,17 +443,14 @@ void _handleSpecialReservationDate(DateTime selectedDate, DateAvailability avail
   );
 }
 
-
 Future<void> _refreshData() async {
   setState(() => _isLoading = true);
   
-  // Show loading for 2 seconds
-  // await Future.delayed(Duration(seconds: 2));
   final connectivityResult = await Connectivity().checkConnectivity();
   
   if (connectivityResult.contains(ConnectivityResult.none)) {
     _showNoInternetDialog();
-    setState(() => _isLoading = false); // Add this
+    setState(() => _isLoading = false);
     return;
   }
   
@@ -479,19 +476,22 @@ Future<void> _refreshData() async {
     _allowOthers = false;
     _joinToMassWedding = false;
     
-    // Go back to first step - FIXED VERSION
+    // Clear custom inputs
+    _customMadaehCommitteeController.clear();
+    _selectedTilawaType = null;
+    _showCustomTilawaInput = false;
+    _customTilawaNameController.clear();
+    _showCustomMadaehInput = false;
+    
+    // Reset to first step BEFORE loading data
+    _currentStep = 0;
     if (mounted && _pageController.hasClients) {
-      _currentStep = 0;
       await _pageController.animateToPage(
         0,
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
       );
     }
-    _customMadaehCommitteeController.clear();
-    _selectedTilawaType = null;
-    _showCustomTilawaInput = false;
-    _customTilawaNameController.clear();
         
     await _loadData();
     
@@ -518,7 +518,6 @@ Future<void> _refreshData() async {
     }
   }
 }
-
 Future<void> _loadInstructionClanSettings() async {
   if (_instructionSettingsLoaded) return;
   
@@ -785,7 +784,7 @@ Widget _buildReservationInstructionWidget() {
   );
 }  
 
-   Future<void> _submitReservation() async {
+Future<void> _submitReservation() async {
   setState(() => _isSubmitting = true);
   
   Map<String, dynamic>? response;
@@ -1464,54 +1463,7 @@ Future<void> _selectDate(TextEditingController controller, String title) async {
                   break;
               }
             }
-            // if (availability != null) {
-            //   switch (availability.status) {
-            //     case DateStatus.available:
-            //       _handleAvailableDate(selectedDate, controller);
-            //       break;
-            //     case DateStatus.massWeddingOpen:
-            //       _handleMassWeddingDate(selectedDate, availability, controller);
-            //       break;
-            //     case DateStatus.mixed:
-            //       _handleMixedStatusDate(selectedDate, availability, controller);
-            //       break;
-            //     case DateStatus.pending:
-            //       if (availability.allowMassWedding) {
-            //         _handlePendingMassWeddingDate(selectedDate, availability, controller);
-            //       } else {
-            //         _showMessageDialog(
-            //           title: 'التاريخ غير متاح',
-            //           message: 'هذا التاريخ في انتظار التأكيد ولا يسمح بالانضمام.\n\nيرجى اختيار تاريخ آخر.',
-            //           icon: Icons.pending,
-            //           titleColor: Colors.orange,
-            //         );
-            //       }
-            //       break;
-            //     case DateStatus.reserved:
-            //       _showMessageDialog(
-            //         title: 'التاريخ محجوز',
-            //         message: 'هذا التاريخ محجوز بالكامل.\n\nيرجى اختيار تاريخ آخر.',
-            //         icon: Icons.event_busy,
-            //         isError: true,
-            //       );
-            //       break;
-            //     case DateStatus.disabled:
-            //       _showMessageDialog(
-            //         title: 'التاريخ غير متاح',
-            //         message: 'هذا التاريخ غير متاح للحجز.\n\nيرجى اختيار تاريخ آخر.',
-            //         icon: Icons.block,
-            //         isError: true,
-            //       );
-            //       break;
-            //   }
-            // } else {
-            //   _showMessageDialog(
-            //     title: 'خطأ في التحميل',
-            //     message: 'خطأ في تحميل معلومات التاريخ.\n\nيرجى المحاولة مرة أخرى.',
-            //     icon: Icons.error,
-            //     isError: true,
-            //   );
-            // }
+            
           },
           onCancel: () {
             Navigator.of(context).pop();
@@ -2032,6 +1984,8 @@ if (_selectedClan != null) ...[
     ),
   );
 }
+
+
 Widget _buildReservationDetailsStep() {
   final isDark = Theme.of(context).brightness == Brightness.dark;
   
@@ -2295,57 +2249,14 @@ Widget _buildReservationDetailsStep() {
               helperText: 'أدخل اسم القارئ إذا كنت تريد تحديده',
               helperMaxLines: 2,
             ),
-            maxLength: 100,
-            // Optional: Add validation if you want to make it required
-            // validator: (value) {
-            //   if (_showCustomTilawaInput && (value == null || value.trim().isEmpty)) {
-            //     return 'يرجى إدخال اسم القارئ';
-            //   }
-            //   return null;
-            // },
+            maxLength: 300,
+ 
           ),
           const SizedBox(height: 16),
         ],
         
         const SizedBox(height: 16),
         
-        // // Madaeh Committee Selection
-        // DropdownButtonFormField<Map<String, dynamic>>(
-        //   value: _selectedMadaehCommittee,
-        //   decoration: InputDecoration(
-        //     labelText: ' اللجنة *',
-        //     prefixIcon: const Icon(Icons.group_outlined),
-        //     border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-        //     helperText: 'اختر لجنة المدائح و الانشاد ',
-        //   ),
-        //   items: _madaehCommittees.map((committee) {
-        //     return DropdownMenuItem<Map<String, dynamic>>(
-        //       value: committee,
-        //       child: Column(
-        //         crossAxisAlignment: CrossAxisAlignment.start,
-        //         mainAxisSize: MainAxisSize.min,
-        //         children: [
-        //           Text(
-        //             committee['name']?.toString() ?? 'لجنة غير مسماة',
-        //             style: const TextStyle(fontWeight: FontWeight.bold),
-        //           ),
-        //           if (committee['description'] != null)
-        //             Text(
-        //               committee['description'].toString(),
-        //               style: TextStyle(
-        //                 fontSize: 12,
-        //                 color: AppColors.textSecondary,
-        //               ),
-        //               maxLines: 1,
-        //               overflow: TextOverflow.ellipsis,
-        //             ),
-        //         ],
-        //       ),
-        //     );
-        //   }).toList(),
-        //   onChanged: (value) => setState(() => _selectedMadaehCommittee = value),
-        //   validator: (value) => value == null ? 'لجنة المدائح و الانشاد مطلوبة' : null,
-        // ),
 
         // Madaeh Committee Selection
         DropdownButtonFormField<Map<String, dynamic>>(

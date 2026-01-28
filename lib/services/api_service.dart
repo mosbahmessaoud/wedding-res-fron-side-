@@ -1573,6 +1573,84 @@ static Future<Map<String, dynamic>> createReservation(Map<String, dynamic> reser
     rethrow;
   }
 }
+/// POST /reservations
+static Future<Map<String, dynamic>> createReservationbyAdmin(Map<String, dynamic> reservationData , int groom_id) async {
+  try {
+    print('Sending reservation data: $reservationData');
+    
+    final response = await http.post(
+      Uri.parse('$baseUrl/reservations/$groom_id'),
+      headers: await _headers,
+      body: json.encode(reservationData),
+    );
+
+    print('Response status code: ${response.statusCode}');
+    print('Response body: ${response.body}');
+    print('Response headers: ${response.headers}');
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      // Check if response body is not empty
+      if (response.body.isEmpty) {
+        throw Exception('Server returned empty response');
+      }
+      
+      try {
+        final responseData = json.decode(response.body) as Map<String, dynamic>;
+        
+        // ✅ AUTOMATICALLY NOTIFY CLAN ADMIN
+        if (responseData.containsKey('id')) {
+          final reservationId = responseData['id'] as int;
+          
+          print('🔔 Reservation created successfully with ID: $reservationId');
+          print('📨 Fetching and notifying clan admin...');
+          
+          // Notify clan admin in background (don't block the UI)
+          notifyClanAdminOfNewReservation(reservationId).then((success) {
+            if (success) {
+              print('✅ Clan admin notification sent successfully');
+            } else {
+              print('⚠️ Failed to send notification to clan admin');
+            }
+          }).catchError((error) {
+            print('❌ Error sending notification: $error');
+          });
+        }
+        
+        return responseData;
+      } catch (jsonError) {
+        print('JSON parsing error: $jsonError');
+        print('Raw response body: "${response.body}"');
+        throw FormatException('Invalid JSON response from server: $jsonError');
+      }
+    } else {
+      // Handle HTTP errors
+      String errorMessage = 'Server error (${response.statusCode})';
+      
+      if (response.body.isNotEmpty) {
+        try {
+          final errorData = json.decode(response.body);
+          errorMessage = errorData['detail'] ?? errorData['message'] ?? errorMessage;
+        } catch (e) {
+          // If error response is not JSON, use the raw body
+          errorMessage = response.body.length > 200 
+              ? response.body.substring(0, 200) + '...'
+              : response.body;
+        }
+      }
+      
+      throw Exception(errorMessage);
+    }
+  } catch (e) {
+    print('Error in createReservation: $e');
+    
+    // Re-throw with more context if it's a FormatException
+    if (e is FormatException) {
+      throw FormatException('Failed to parse server response: ${e.message}');
+    }
+    
+    rethrow;
+  }
+}
 
 // ==================== ALTERNATIVE: SYNCHRONOUS VERSION ====================
 // If you want to WAIT for the notification to be sent before returning
@@ -4428,10 +4506,10 @@ static Map<String, String> validateSpecialReservationData({
 //   }
 // }
 // In api_service.dart - Update the method return type
-static Future<List<ReservationSpecial>> getSpecialReservations() async {
+static Future<List<ReservationSpecial>> getSpecialReservations(int clanId) async {
   try {
     final response = await http.get(
-      Uri.parse('$baseUrl/clan-admin/special_reservations'),
+      Uri.parse('$baseUrl/clan-admin/special_reservations/$clanId'),
       headers: await _headers,
     );
     
@@ -6678,6 +6756,173 @@ static Future<bool> isPhoneAssociatedWithGroom(String phone) async {
     return false;
   }
 }
+
+
+
+// ==================== BULK GROOM REGISTRATION ENDPOINTS ====================
+
+/// Manual registration of a single groom by clan admin
+/// POST /auth/Register/GgoomsbyAdmin
+static Future<Map<String, dynamic>> registerGroomByAdmin({
+  required String phoneNumber,
+  required String firstName,
+  required String lastName,
+  required String fatherName,
+  required String grandfatherName,
+  required int clanId,
+  required int countyId,
+  String? birthDate,
+  String? birthAddress,
+  String? homeAddress,
+  String? guardianName,
+  String? guardianPhone,
+  String? guardianHomeAddress,
+  String? guardianBirthAddress,
+  String? guardianBirthDate,
+  String? guardianRelation,
+}) async {
+  try {
+    final userData = {
+      'phone_number': phoneNumber,
+      'first_name': firstName,
+      'last_name': lastName,
+      'father_name': fatherName,
+      'grandfather_name': grandfatherName,
+      'clan_id': clanId,
+      'county_id': countyId,
+      'role': 'groom',
+    };
+
+    // Add optional fields if provided
+    if (birthDate != null && birthDate.isNotEmpty) {
+      userData['birth_date'] = birthDate;
+    }
+    if (birthAddress != null && birthAddress.isNotEmpty) {
+      userData['birth_address'] = birthAddress;
+    }
+    if (homeAddress != null && homeAddress.isNotEmpty) {
+      userData['home_address'] = homeAddress;
+    }
+    if (guardianName != null && guardianName.isNotEmpty) {
+      userData['guardian_name'] = guardianName;
+    }
+    if (guardianPhone != null && guardianPhone.isNotEmpty) {
+      userData['guardian_phone'] = guardianPhone;
+    }
+    if (guardianHomeAddress != null && guardianHomeAddress.isNotEmpty) {
+      userData['guardian_home_address'] = guardianHomeAddress;
+    }
+    if (guardianBirthAddress != null && guardianBirthAddress.isNotEmpty) {
+      userData['guardian_birth_address'] = guardianBirthAddress;
+    }
+    if (guardianBirthDate != null && guardianBirthDate.isNotEmpty) {
+      userData['guardian_birth_date'] = guardianBirthDate;
+    }
+    if (guardianRelation != null && guardianRelation.isNotEmpty) {
+      userData['guardian_relation'] = guardianRelation;
+    }
+
+    final response = await http.post(
+      Uri.parse('$baseUrl/auth/Register/GgoomsbyAdmin'),
+      headers: await _headers,
+      body: json.encode(userData),
+    );
+
+    print('Register groom by admin response: ${response.statusCode}');
+    print('Register groom by admin body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل في تسجيل العريس');
+    }
+  } catch (e) {
+    throw Exception('خطأ في تسجيل العريس: $e');
+  }
+}
+
+/// Bulk register grooms from Excel file
+/// POST /auth/RegisterBulk/GroomsFromExcel
+static Future<Map<String, dynamic>> uploadGroomsExcel(File file) async {
+  try {
+    final fileName = path.basename(file.path);
+    final fileSize = await file.length();
+
+    print('=== Excel Upload Debug ===');
+    print('File: $fileName');
+    print('Size: $fileSize bytes');
+
+    // Create multipart request
+    var uri = Uri.parse('$baseUrl/auth/RegisterBulk/GroomsFromExcel');
+    var request = http.MultipartRequest('POST', uri);
+
+    // Add auth header
+    if (_token != null) {
+      request.headers['Authorization'] = 'Bearer $_token';
+    }
+
+    // Add file
+    request.files.add(await http.MultipartFile.fromPath(
+      'file',
+      file.path,
+      filename: fileName,
+    ));
+
+    print('Sending request to: ${request.url}');
+
+    // Send request with timeout
+    var streamedResponse = await request.send().timeout(
+      const Duration(seconds: 120), // Longer timeout for bulk upload
+    );
+
+    var response = await http.Response.fromStream(streamedResponse);
+
+    print('Response status: ${response.statusCode}');
+    print('Response body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل في رفع الملف');
+    }
+  } catch (e) {
+    print('❌ Upload error: $e');
+    rethrow;
+  }
+}
+
+/// Validate Excel file before upload
+static Map<String, String> validateExcelFile(File file) {
+  final errors = <String, String>{};
+  
+  // Check if file exists
+  if (!file.existsSync()) {
+    errors['file'] = 'الملف غير موجود';
+    return errors;
+  }
+  
+  // Check file extension
+  final extension = path.extension(file.path).toLowerCase();
+  if (extension != '.xlsx' && extension != '.xls') {
+    errors['file'] = 'يجب أن يكون الملف بصيغة Excel (.xlsx أو .xls)';
+  }
+  
+  // Check file size (50MB max)
+  final fileSize = file.lengthSync();
+  const maxSize = 50 * 1024 * 1024; // 50MB
+  if (fileSize > maxSize) {
+    errors['file'] = 'حجم الملف كبير جداً (الحد الأقصى 50 ميجابايت)';
+  }
+  
+  if (fileSize == 0) {
+    errors['file'] = 'الملف فارغ';
+  }
+  
+  return errors;
+}
+
 
 
 }

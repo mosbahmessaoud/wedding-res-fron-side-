@@ -3,18 +3,19 @@ import 'dart:async';
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:wedding_reservation_app/models/reservation_special.dart';
 import 'package:wedding_reservation_app/providers/theme_provider.dart';
 import 'package:wedding_reservation_app/screens/clan%20admin/bulk_upload_grooms_screen.dart';
+import 'package:wedding_reservation_app/screens/clan%20admin/custom_calendar_picker_view.dart';
+import 'package:wedding_reservation_app/screens/clan%20admin/expiring_reservations_page.dart';
 import 'package:wedding_reservation_app/screens/clan%20admin/manual_register_groom_screen.dart';
 import 'package:wedding_reservation_app/utils/constants.dart';
 import 'package:wedding_reservation_app/widgets/notification_panel.dart';
 
 import '../../services/api_service.dart';
 import '../../utils/colors.dart';
-// Add these imports with your other imports
-
-
 
 class HomeTab extends StatefulWidget {
   final Function(int)? onNavigateToTab;
@@ -72,6 +73,14 @@ bool _isCountyChartExpanded = false;
 String _clanSelectedPeriod = 'year';
 String _countySelectedPeriod = 'year';
 
+// Add after existing state variables (around line 50)
+Map<String, DateAvailability> _calendarDateAvailabilities = {};
+bool _calendarLoading = false;
+DateTime _displayMonth = DateTime.now();
+int _clanId = 0;
+// Add after _displayMonth = DateTime.now();
+bool _showYearPicker = false;
+
   @override
   void initState() {
     super.initState();
@@ -94,7 +103,169 @@ String _countySelectedPeriod = 'year';
     _animationController.forward();
     _loadDashboardData();
     _startNotificationPolling();
+      _loadCalendarData(); // ADD THIS LINE
+
   }
+// Add this helper method to fetch clan info
+Future<Map<String, dynamic>?> _getClanInfo(int clanId) async {
+  try {
+    // Use the getAllClans API and filter by clan_id
+    final clans = await ApiService.getAllClans();
+    final clan = clans.firstWhere(
+      (c) => c.id == clanId,
+      orElse: () => throw Exception('Clan not found'),
+    );
+    
+    return {
+      'clan_id': clan.id,
+      'clan_name': clan.name,
+      'county_id': clan.countyId,
+    };
+  } catch (e) {
+    print('Error fetching clan info: $e');
+    return null;
+  }
+}
+Future<void> _loadCalendarData() async {
+  setState(() => _calendarLoading = true);
+
+  try {
+    final userInfo = await ApiService.getCurrentUserInfo();
+    final clanId = userInfo['clan_id'];
+    
+    if (clanId == null) {
+      print('Error: No clan_id found for user');
+      setState(() => _calendarLoading = false);
+      return;
+    }
+
+    setState(() => _clanId = clanId);
+
+    // Fetch reservations (existing + not-belong)
+    final validatedReservations = await ApiService.getGroomsWithValidatedReservations(clanId);
+    final pendingReservations = await ApiService.getGroomsWithPendingReservations(clanId);
+    final specialReservations = await ApiService.getSpecialReservations(clanId);
+    final validatedNotBelong = await ApiService.getGroomsWithValidatedReservationsNotBelong(clanId);
+    final pendingNotBelong = await ApiService.getGroomsWithPendingReservationsNotBelong(clanId);
+
+    // Helper to enrich reservation
+    Map<String, dynamic> enrichReservation(dynamic reservation, bool notBelong) {
+      final enriched = Map<String, dynamic>.from(reservation);
+      enriched['reservation_clan_id'] = reservation['clan_id'];
+      enriched['not_belong_to_clan'] = notBelong; // Mark as not belonging
+      if (reservation['groom'] != null) {
+        enriched['first_name'] = reservation['groom']['first_name'];
+        enriched['last_name'] = reservation['groom']['last_name'];
+        enriched['father_name'] = reservation['groom']['father_name'];
+        enriched['phone_number'] = reservation['groom']['phone_number'];
+        enriched['guardian_name'] = reservation['groom']['guardian_name'];
+        enriched['guardian_phone'] = reservation['groom']['guardian_phone'];
+      }
+      return enriched;
+    }
+
+    // Group validated reservations by date
+    Map<String, List<Map<String, dynamic>>> validatedByDate = {};
+    for (var reservation in validatedReservations) {
+      final enriched = enrichReservation(reservation, false);
+      for (var dateKey in ['date1', 'date2']) {
+        final date = reservation[dateKey];
+        if (date != null) validatedByDate.putIfAbsent(date, () => []).add(enriched);
+      }
+    }
+    for (var reservation in validatedNotBelong) {
+      final enriched = enrichReservation(reservation, true);
+      for (var dateKey in ['date1', 'date2']) {
+        final date = reservation[dateKey];
+        if (date != null) validatedByDate.putIfAbsent(date, () => []).add(enriched);
+      }
+    }
+
+    // Group pending reservations by date
+    Map<String, List<Map<String, dynamic>>> pendingByDate = {};
+    for (var reservation in pendingReservations) {
+      final enriched = enrichReservation(reservation, false);
+      for (var dateKey in ['date1', 'date2']) {
+        final date = reservation[dateKey];
+        if (date != null) pendingByDate.putIfAbsent(date, () => []).add(enriched);
+      }
+    }
+    for (var reservation in pendingNotBelong) {
+      final enriched = enrichReservation(reservation, true);
+      for (var dateKey in ['date1', 'date2']) {
+        final date = reservation[dateKey];
+        if (date != null) pendingByDate.putIfAbsent(date, () => []).add(enriched);
+      }
+    }
+
+    // Process special reservations
+    Set<String> specialDates = {};
+    Map<String, ReservationSpecial> specialMap = {};
+    for (var reservation in specialReservations) {
+      specialDates.add(reservation.date);
+      specialMap[reservation.date] = reservation;
+    }
+
+    // Create DateAvailability map
+    Map<String, DateAvailability> newAvailabilities = {};
+    Set<String> allDates = {...validatedByDate.keys, ...pendingByDate.keys, ...specialDates};
+
+    for (String dateStr in allDates) {
+      final date = DateTime.parse(dateStr);
+      final validated = validatedByDate[dateStr] ?? [];
+      final pending = pendingByDate[dateStr] ?? [];
+      final allRes = [...validated, ...pending];
+
+      final validatedCount = validated.length;
+      final pendingCount = pending.length;
+      final totalCount = validatedCount + pendingCount;
+
+      DateStatus status;
+      String note;
+
+      if (specialDates.contains(dateStr)) {
+        status = DateStatus.specialReservation;
+        note = 'حجز خاص من العشيرة';
+      } else if (validatedCount > 0 && pendingCount > 0) {
+        status = DateStatus.mixed;
+        note = '$validatedCount مؤكد + $pendingCount في الانتظار';
+      } else if (validatedCount > 0) {
+        status = DateStatus.reserved;
+        note = '$validatedCount حجز مؤكد';
+      } else if (pendingCount > 0) {
+        status = DateStatus.pending;
+        note = '$pendingCount في الانتظار';
+      } else {
+        status = DateStatus.available;
+        note = 'متاح';
+      }
+
+      newAvailabilities[dateStr] = DateAvailability(
+        date: date,
+        status: status,
+        currentCount: totalCount,
+        validatedCount: validatedCount,
+        pendingCount: pendingCount,
+        maxCapacity: 3,
+        reservations: allRes,
+        validatedReservations: validated,
+        pendingReservations: pending,
+        note: note,
+        specialReservation: specialMap[dateStr],
+      );
+    }
+
+    setState(() {
+      _calendarDateAvailabilities = newAvailabilities;
+      _calendarLoading = false;
+    });
+
+  } catch (e) {
+    print('Error loading calendar data: $e');
+    setState(() => _calendarLoading = false);
+  }
+}
+
 void _debugStatisticsData() {
   print('═════════════════════════════════════════');
   print('🔍 STATISTICS DEBUG INFORMATION');
@@ -430,6 +601,10 @@ Widget build(BuildContext context) {
                   children: [
                     _buildWelcomeCard(isMobile, isTablet),
                     SizedBox(height: isMobile ? 24 : 32),
+                    _buildExpiringReservationsBanner(isMobile),
+                    SizedBox(height: isMobile ? 16 : 20),
+                    _buildCalendarOverview(isMobile, isTablet),
+                    SizedBox(height: isMobile ? 24 : 32),
                     _buildStatsCards(isMobile, isTablet),
                     SizedBox(height: isMobile ? 24 : 32),
                     _buildQuickActions(context),
@@ -452,6 +627,93 @@ Widget build(BuildContext context) {
   );
 }
 
+Widget _buildExpiringReservationsBanner(bool isMobile) {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+
+  return GestureDetector(
+    onTap: () => Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const ExpiringReservationsPage(),
+      ),
+    ),
+    child: Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(isMobile ? 14 : 18),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isDark
+              ? [Color(0xFF7F0000), Color(0xFFB71C1C)]
+              : [Color(0xFFFFCDD2), Color(0xFFEF9A9A)],
+        ),
+        borderRadius: BorderRadius.circular(isMobile ? 12 : 16),
+        border: Border.all(
+          color: isDark
+              ? Colors.red.shade700
+              : Colors.red.shade300,
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.red.withOpacity(0.15),
+            blurRadius: 12,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: EdgeInsets.all(isMobile ? 10 : 12),
+            decoration: BoxDecoration(
+              color: Colors.red.withOpacity(0.2),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.warning_amber_rounded,
+              color: isDark ? Colors.red.shade200 : Colors.red.shade700,
+              size: isMobile ? 24 : 28,
+            ),
+          ),
+          SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'حجوزات قريبة الانتهاء',
+                  style: TextStyle(
+                    fontSize: isMobile ? 15 : 17,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? Colors.red.shade100 : Colors.red.shade800,
+                  ),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'اضغط لعرض الحجوزات التي تقترب من تاريخ انتهائها',
+                  style: TextStyle(
+                    fontSize: isMobile ? 12 : 13,
+                    color: isDark
+                        ? Colors.red.shade200.withOpacity(0.85)
+                        : Colors.red.shade700.withOpacity(0.85),
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Icon(
+            Icons.chevron_left,
+            color: isDark ? Colors.red.shade200 : Colors.red.shade600,
+            size: isMobile ? 20 : 24,
+          ),
+        ],
+      ),
+    ),
+  );
+}
 PreferredSizeWidget _buildSliverAppBar(bool isMobile) {
   final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -946,10 +1208,11 @@ Widget _buildQuickActions(BuildContext context) {
     (Icons.notifications_outlined, 'الإشعارات', ' إرسال إشعارات', Color(0xFF9C27B0), 9),
     (Icons.rule_outlined, 'اللوازم ', ' لوازم العريس ', Color(0xFF00BCD4), 7),
     (Icons.star_border_outlined, 'الحجوزات الخاصة', ' حجز أيام خاصة بالعشيرة', Color(0xFFF57C00), 8),
-    (Icons.lock_outline, '  كلمة المرور للوصول ', ' انشاء كلمة المرور للوصول الى الصفحات الخاصة', Color.fromARGB(255, 0, 245, 53), 10),
+    // (Icons.lock_outline, '  كلمة المرور للوصول ', ' انشاء كلمة المرور للوصول الى الصفحات الخاصة', Color.fromARGB(255, 0, 245, 53), 10),
     (Icons.stacked_bar_chart, '  الإحصائيات ', ' تنزيل الإحصائيات على الجهاز', Color.fromARGB(255, 0, 159, 245), 11),
+    (Icons.warning_amber_rounded, 'حجوزات قريبة الانتهاء', 'عرض الحجوزات قريبة الانتهاء', Color(0xFFD32F2F), -3),
     // NEW ACTIONS - Add these two new items
-    (Icons.person_add_alt_outlined, 'تسجيل عريس يدوي', ' إضافة عريس جديد يدوياً', Color(0xFF00897B), -1), // -1 for manual navigation
+    (Icons.person_add_alt_outlined, 'تسجيل عريس يدوي', ' إضافة عريس جديد ي  دوياً', Color(0xFF00897B), -1), // -1 for manual navigation
     (Icons.upload_file_outlined, 'تحميل عرسان جماعي', ' رفع ملف Excel للعرسان', Color(0xFF7B1FA2), -2), // -2 for manual navigation
   ];
 
@@ -1003,6 +1266,13 @@ Widget _buildQuickActions(BuildContext context) {
                         context,
                         MaterialPageRoute(
                           builder: (context) => const BulkUploadGroomsScreen(),
+                        ),
+                      );
+                    } else if (a.$5 == -3) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const ExpiringReservationsPage(),
                         ),
                       );
                     } else {
@@ -2153,6 +2423,1089 @@ Widget _buildActivityItem({
   );
 }
 
+
+// calundary 
+// Replace _buildCalendarOverview() method with this:
+Widget _buildCalendarOverview(bool isMobile, bool isTablet) {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  
+  return Center( // ADD Center widget
+    child: Container(
+      constraints: BoxConstraints(maxWidth: 700), // ADD max width constraint
+      padding: EdgeInsets.all(isMobile ? 16 : 20),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(isMobile ? 12 : 16),
+        boxShadow: [
+          BoxShadow(
+            color: isDark
+              ? Colors.black.withOpacity(0.3)
+              : Colors.black.withOpacity(0.04),
+            spreadRadius: 0,
+            blurRadius: 12,
+            offset: Offset(0, 4),
+          ),
+        ],
+        border: Border.all(
+          color: isDark
+            ? Colors.white.withOpacity(0.1)
+            : Colors.grey.withOpacity(0.1)
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header with month/year navigation
+          Wrap(
+  spacing: 8,
+  runSpacing: 12,
+  alignment: WrapAlignment.spaceBetween,
+  crossAxisAlignment: WrapCrossAlignment.center,
+  children: [
+    // Left: icon + title + month picker
+    Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: EdgeInsets.all(isMobile ? 8 : 10),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(isMobile ? 8 : 10),
+          ),
+          child: Icon(
+            Icons.calendar_month,
+            color: AppColors.primary,
+            size: isMobile ? 20 : 24,
+          ),
+        ),
+        SizedBox(width: 12),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'نظرة عامة على الحجوزات',
+              style: TextStyle(
+                fontSize: isMobile ? 16 : 18,
+                fontWeight: FontWeight.w700,
+                color: Theme.of(context).textTheme.bodyLarge?.color,
+              ),
+            ),
+            InkWell(
+              onTap: () {
+                setState(() {
+                  _showYearPicker = !_showYearPicker;
+                });
+              },
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    DateFormat('MMMM yyyy', 'ar_DZ').format(_displayMonth),
+                    style: TextStyle(
+                      fontSize: isMobile ? 12 : 13,
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Icon(
+                    _showYearPicker ? Icons.expand_less : Icons.expand_more,
+                    size: 16,
+                    color: AppColors.primary,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ],
+    ),
+
+    // Right: navigation arrows
+    Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          icon: Icon(Icons.chevron_left, size: isMobile ? 20 : 24),
+          onPressed: () {
+            setState(() {
+              _displayMonth = DateTime(
+                _displayMonth.year,
+                _displayMonth.month - 1,
+              );
+            });
+            _loadCalendarData();
+          },
+          color: isDark ? Colors.green.shade300 : AppColors.primary,
+        ),
+        IconButton(
+          icon: Icon(Icons.chevron_right, size: isMobile ? 20 : 24),
+          onPressed: () {
+            setState(() {
+              _displayMonth = DateTime(
+                _displayMonth.year,
+                _displayMonth.month + 1,
+              );
+            });
+            _loadCalendarData();
+          },
+          color: isDark ? Colors.green.shade300 : AppColors.primary,
+        ),
+      ],
+    ),
+  ],
+),
+          
+          // ADD Year Picker
+          if (_showYearPicker) ...[
+            SizedBox(height: 12),
+            _buildYearPickerForCalendar(isDark),
+          ],
+          
+          SizedBox(height: isMobile ? 16 : 20),
+          
+          // Legend (rest remains same)
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _buildCalendarLegendItem('متاح', const Color(0xFF4CAF50), isDark, isMobile),
+              _buildCalendarLegendItem('معلق', const Color(0xFFFFB74D), isDark, isMobile),
+              _buildCalendarLegendItem('مؤكد', const Color(0xFFEF4444), isDark, isMobile),
+              _buildCalendarLegendItem('مختلط', const Color.fromARGB(255, 5, 150, 247), isDark, isMobile),
+              _buildCalendarLegendItem('خاص', const Color(0xFF000000), isDark, isMobile),
+            ],
+          ),
+          
+          SizedBox(height: isMobile ? 16 : 20),
+          
+          // Calendar grid
+          if (_calendarLoading)
+            Center(
+              child: Padding(
+                padding: EdgeInsets.all(40),
+                child: CircularProgressIndicator(color: AppColors.primary),
+              ),
+            )
+          else
+            _buildMiniCalendarGrid(isMobile, isDark),
+        ],
+      ),
+    ),
+  );
+}
+// Add this new method after _buildCalendarOverview()
+Widget _buildYearPickerForCalendar(bool isDark) {
+  final currentYear = DateTime.now().year;
+  final years = List.generate(6, (index) => currentYear -2 + index); // 5 years back, 5 years forward
+  
+  return Container(
+    height: 80,
+    padding: EdgeInsets.symmetric(vertical: 8),
+    decoration: BoxDecoration(
+      color: isDark 
+        ? Colors.black.withOpacity(0.3)
+        : Colors.grey.shade50,
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: ListView.builder(
+      scrollDirection: Axis.horizontal,
+      padding: EdgeInsets.symmetric(horizontal: 16),
+      itemCount: years.length,
+      itemBuilder: (context, index) {
+        final year = years[index];
+        final isSelected = year == _displayMonth.year;
+        
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: InkWell(
+            onTap: () {
+              setState(() {
+                _displayMonth = DateTime(year, _displayMonth.month);
+                _showYearPicker = false;
+              });
+              _loadCalendarData();
+            },
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              width: 80,
+              decoration: BoxDecoration(
+                gradient: isSelected
+                    ? LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Colors.green.shade600,
+                          Colors.green.shade800,
+                        ],
+                      )
+                    : null,
+                color: isSelected 
+                    ? null
+                    : (isDark 
+                        ? Colors.green.shade900.withOpacity(0.3)
+                        : Colors.white),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isSelected
+                      ? Colors.transparent
+                      : (isDark 
+                          ? Colors.green.shade600.withOpacity(0.5)
+                          : Colors.green.shade300.withOpacity(0.5)),
+                  width: 1.5,
+                ),
+                boxShadow: isSelected
+                    ? [
+                        BoxShadow(
+                          color: Colors.green.shade300.withOpacity(0.4),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                      ]
+                    : null,
+              ),
+              child: Center(
+                child: Text(
+                  year.toString(),
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                    color: isSelected 
+                        ? Colors.white
+                        : (isDark ? Colors.green.shade300 : Colors.green.shade700),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    ),
+  );
+}
+Widget _buildCalendarLegendItem(String label, Color color, bool isDark, bool isMobile) {
+  return Container(
+    padding: EdgeInsets.symmetric(
+      horizontal: isMobile ? 8 : 10,
+      vertical: isMobile ? 4 : 6,
+    ),
+    decoration: BoxDecoration(
+      color: color.withOpacity(isDark ? 0.2 : 0.1),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(
+        color: color.withOpacity(isDark ? 0.5 : 0.3),
+        width: 1,
+      ),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: isMobile ? 8 : 10,
+          height: isMobile ? 8 : 10,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+          ),
+        ),
+        SizedBox(width: 6),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: isMobile ? 11 : 12,
+            fontWeight: FontWeight.w600,
+            color: color,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+Widget _buildMiniCalendarGrid(bool isMobile, bool isDark) {
+  final daysInMonth = DateTime(_displayMonth.year, _displayMonth.month + 1, 0).day;
+  final firstDayOfMonth = DateTime(_displayMonth.year, _displayMonth.month, 1);
+  final firstWeekday = firstDayOfMonth.weekday % 7;
+  
+  // Week day headers
+  const weekDays = ['ح', 'ن', 'ث', 'ر', 'خ', 'ج', 'س'];
+  
+  return Column(
+    children: [
+      // Week headers
+      Row(
+        children: weekDays.map((day) => Expanded(
+          child: Center(
+            child: Text(
+              day,
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: isDark 
+                  ? Colors.green.shade300.withOpacity(0.7)
+                  : const Color(0xFF757575),
+                fontSize: isMobile ? 12 : 13,
+              ),
+            ),
+          ),
+        )).toList(),
+      ),
+      
+      SizedBox(height: 8),
+      
+      // Calendar days
+      GridView.builder(
+        shrinkWrap: true,
+        physics: NeverScrollableScrollPhysics(),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 7,
+          mainAxisSpacing: 4,
+          crossAxisSpacing: 4,
+          childAspectRatio: 1,
+        ),
+        itemCount: firstWeekday + daysInMonth,
+        itemBuilder: (context, index) {
+          if (index < firstWeekday) {
+            return SizedBox.shrink();
+          }
+          
+          final day = index - firstWeekday + 1;
+          final date = DateTime(_displayMonth.year, _displayMonth.month, day);
+          final dateStr = DateFormat('yyyy-MM-dd').format(date);
+          final availability = _calendarDateAvailabilities[dateStr];
+          
+          return _buildMiniCalendarDay(date, availability, isMobile, isDark);
+        },
+      ),
+    ],
+  );
+}
+// Replace _buildMiniCalendarDay() method:
+Widget _buildMiniCalendarDay(DateTime date, DateAvailability? availability, bool isMobile, bool isDark) {
+  final isToday = DateFormat('yyyy-MM-dd').format(date) == 
+                  DateFormat('yyyy-MM-dd').format(DateTime.now());
+  
+  Color backgroundColor = availability != null
+      ? _getMiniCalendarDayColor(availability.status)
+      : (isDark ? Colors.grey.shade800 : Colors.grey.shade100);
+      
+  return InkWell(
+    onTap: availability != null && (availability.reservations.isNotEmpty || availability.status == DateStatus.specialReservation)
+        ? () => _showMiniCalendarDetails(date, availability)
+        : null,
+    borderRadius: BorderRadius.circular(8),
+    child: Container(
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(8),
+        border: isToday
+            ? Border.all(color: AppColors.primary, width: 2)
+            : null,
+      ),
+      child: Stack(
+        children: [
+          Center(
+            child: Text(
+              date.day.toString(),
+              style: TextStyle(
+                color: availability != null
+                    ? Colors.white
+                    : (isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+                fontWeight: isToday ? FontWeight.w700 : FontWeight.w500,
+                fontSize: isMobile ? 12 : 13,
+              ),
+            ),
+          ),
+          // ADD special reservation star icon
+          if (availability != null && availability.status == DateStatus.specialReservation)
+            Positioned(
+              top: 2,
+              right: 2,
+              child: Container(
+                padding: EdgeInsets.all(2),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.star,
+                  size: 10,
+                  color: Colors.black,
+                ),
+              ),
+            ),
+          // Show count badge for non-special reservations
+          if (availability != null && 
+              availability.currentCount > 0 && 
+              availability.status != DateStatus.specialReservation)
+            Positioned(
+              top: 2,
+              right: 2,
+              child: Container(
+                constraints: BoxConstraints(minWidth: 14),
+                padding: EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  '${availability.currentCount}',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 8,
+                    fontWeight: FontWeight.bold,
+                    color: backgroundColor,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    ),
+  );
+}
+
+Color _getMiniCalendarDayColor(DateStatus status) {
+  switch (status) {
+    case DateStatus.available:
+      return const Color(0xFF4CAF50);
+    case DateStatus.pending:
+      return const Color(0xFFFFB74D);
+    case DateStatus.reserved:
+      return const Color(0xFFEF4444);
+    case DateStatus.mixed:
+      return const Color.fromARGB(255, 5, 150, 247);
+    case DateStatus.specialReservation:
+      return const Color(0xFF000000);
+    default:
+      return Colors.grey;
+  }
+}
+void _showMiniCalendarDetails(DateTime date, DateAvailability availability) {
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: Colors.transparent,
+    isScrollControlled: true,
+    builder: (context) => Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.7,
+      ),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(24),
+          topRight: Radius.circular(24),
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Drag indicator
+          Container(
+            width: 50,
+            height: 5,
+            margin: EdgeInsets.symmetric(vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade300,
+              borderRadius: BorderRadius.circular(3),
+            ),
+          ),
+          
+          // Header
+          Padding(
+            padding: EdgeInsets.fromLTRB(20, 0, 20, 16),
+            child: Text(
+              'تفاصيل ${DateFormat('dd/MM/yyyy').format(date)}',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          
+          // Scrollable content
+          Flexible(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.fromLTRB(20, 0, 20, 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Special reservation section
+                  if (availability.status == DateStatus.specialReservation && 
+                      availability.specialReservation != null) ...[
+                    _buildSpecialReservationCard(availability.specialReservation!),
+                  ] else ...[
+                    // Stats
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildDetailStatCard(
+                            'مؤكد',
+                            availability.validatedCount.toString(),
+                            Colors.green,
+                          ),
+                        ),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: _buildDetailStatCard(
+                            'معلق',
+                            availability.pendingCount.toString(),
+                            Colors.orange,
+                          ),
+                        ),
+                      ],
+                    ),
+                    
+                    SizedBox(height: 16),
+                    
+                    Text(
+                      availability.note ?? '',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                    
+                    // Reservations list with clan info
+                    if (availability.reservations.isNotEmpty) ...[
+                      SizedBox(height: 20),
+                      Text(
+                        'الحجوزات',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      SizedBox(height: 12),
+                      ...availability.reservations.map((res) => _buildReservationCard(res, availability)),
+                    ],
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+// Build special reservation card
+Widget _buildSpecialReservationCard(ReservationSpecial specialReservation) {
+  return Column(
+    children: [
+      Container(
+        width: double.infinity,
+        padding: EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF000000), Color(0xFF424242)],
+          ),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Row(
+              children: [
+                Container(
+                  padding: EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.star,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'حجز خاص من العشيرة',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            
+            SizedBox(height: 16),
+            Divider(color: Colors.white.withOpacity(0.3), height: 1),
+            SizedBox(height: 16),
+            
+            // Reservation Name
+            if (specialReservation.reservName != null) ...[
+              _buildSpecialReservationInfoRow(
+                icon: Icons.event,
+                label: 'اسم الحجز',
+                value: specialReservation.reservName!,
+              ),
+              SizedBox(height: 12),
+            ],
+            
+            // Reservation Description
+            if (specialReservation.reservDescription != null) ...[
+              _buildSpecialReservationInfoRow(
+                icon: Icons.description,
+                label: 'الوصف',
+                value: specialReservation.reservDescription!,
+              ),
+              SizedBox(height: 12),
+            ],
+            
+            // Contact Information Section (if any exists)
+            if (specialReservation.fullName != null ||
+                specialReservation.phoneNumber != null ||
+                specialReservation.homeAddress != null) ...[
+              Divider(color: Colors.white.withOpacity(0.3), height: 1),
+              SizedBox(height: 16),
+              
+              Row(
+                children: [
+                  Icon(
+                    Icons.contact_phone,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                  SizedBox(width: 8),
+                  Text(
+                    'معلومات الاتصال',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 12),
+              
+              // Full Name
+              if (specialReservation.fullName != null) ...[
+                _buildSpecialReservationInfoRow(
+                  icon: Icons.person,
+                  label: 'الاسم الكامل',
+                  value: specialReservation.fullName!,
+                ),
+                SizedBox(height: 12),
+              ],
+              
+              // Phone Number
+              if (specialReservation.phoneNumber != null) ...[
+                _buildSpecialReservationInfoRow(
+                  icon: Icons.phone,
+                  label: 'رقم الهاتف',
+                  value: specialReservation.phoneNumber!,
+                ),
+                SizedBox(height: 12),
+              ],
+              
+              // Home Address
+              if (specialReservation.homeAddress != null) ...[
+                _buildSpecialReservationInfoRow(
+                  icon: Icons.location_on,
+                  label: 'العنوان',
+                  value: specialReservation.homeAddress!,
+                ),
+              ],
+            ],
+          ],
+        ),
+      ),
+      
+      SizedBox(height: 16),
+      
+      // Info message
+      Container(
+        padding: EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.orange.shade50,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.orange.shade200),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.info_outline, color: Colors.orange[700], size: 24),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'هذا التاريخ محجوز لمناسبة خاصة من قبل العشيرة .',
+                style: TextStyle(
+                  color: Colors.orange[900],
+                  fontSize: 14,
+                  height: 1.4,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ],
+  );
+}
+
+// Helper method for special reservation info rows
+Widget _buildSpecialReservationInfoRow({
+  required IconData icon,
+  required String label,
+  required String value,
+}) {
+  return Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Icon(icon, color: Colors.white, size: 18),
+      SizedBox(width: 10),
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                color: Colors.white.withOpacity(0.7),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            SizedBox(height: 4),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 15,
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                height: 1.4,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ],
+  );
+}
+Widget _buildReservationCard(Map<String, dynamic> res, DateAvailability availability) {
+  final groomName = '${res['first_name'] ?? ''} ${res['last_name'] ?? ''}'.trim();
+  final guardianName = res['guardian_name'] ?? '';
+  final groomPhone = res['phone_number'] ?? '';
+  final guardianPhone = res['guardian_phone'] ?? '';
+  final reservationClanId = res['reservation_clan_id'];
+  final bool notBelongToClan = res['not_belong_to_clan'] == true;
+
+  return Container(
+    margin: EdgeInsets.only(bottom: 12),
+    padding: EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: notBelongToClan
+          ? Colors.purple.shade50
+          : Colors.grey.shade100,
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(
+        color: notBelongToClan
+            ? Colors.purple.shade300
+            : Colors.grey.shade300,
+        width: notBelongToClan ? 1.5 : 1,
+      ),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Not-belong badge
+        if (notBelongToClan) ...[
+          Container(
+            margin: EdgeInsets.only(bottom: 10),
+            padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: Colors.purple.shade100,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.purple.shade300),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.swap_horiz, size: 14, color: Colors.purple.shade700),
+                SizedBox(width: 6),
+                Text(
+                  'عريس من عشيرة أخرى',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.purple.shade700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+
+        // Groom section
+        Row(
+          children: [
+            Container(
+              padding: EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: (notBelongToClan ? Colors.purple : AppColors.primary).withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.person,
+                size: 20,
+                color: notBelongToClan ? Colors.purple : AppColors.primary,
+              ),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'العريس',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey.shade600,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    groomName.isNotEmpty ? groomName : 'غير محدد',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  if (groomPhone.isNotEmpty) ...[
+                    SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(Icons.phone, size: 12, color: Colors.grey.shade600),
+                        SizedBox(width: 4),
+                        Text(
+                          groomPhone,
+                          style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+
+        // Clan info
+        if (reservationClanId != null) ...[
+          Divider(height: 24, color: Colors.grey.shade300),
+          FutureBuilder<Map<String, dynamic>?>(
+            future: _getClanInfo(reservationClanId),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return Row(
+                  children: [
+                    SizedBox(
+                      width: 16, height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.purple),
+                    ),
+                    SizedBox(width: 12),
+                    Text('جاري تحميل معلومات العشيرة...', style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+                  ],
+                );
+              }
+              if (snapshot.hasError || !snapshot.hasData) return SizedBox.shrink();
+
+              final clanInfo = snapshot.data!;
+              return Row(
+                children: [
+                  Container(
+                    padding: EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.purple.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.groups, size: 20, color: Colors.purple),
+                  ),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          notBelongToClan ? 'عشيرة العريس (خارجية)' : 'العشيرة',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: notBelongToClan ? Colors.purple.shade600 : Colors.grey.shade600,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          clanInfo['clan_name'] ?? 'غير محدد',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: notBelongToClan ? Colors.purple.shade800 : Colors.black87,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
+
+        // Guardian section
+        if (guardianName.isNotEmpty || guardianPhone.isNotEmpty) ...[
+          Divider(height: 24, color: Colors.grey.shade300),
+          Row(
+            children: [
+              Container(
+                padding: EdgeInsets.all(8),
+                decoration: BoxDecoration(color: Colors.blue.withOpacity(0.1), shape: BoxShape.circle),
+                child: Icon(Icons.supervisor_account, size: 20, color: Colors.blue),
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('ولي الأمر', style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontWeight: FontWeight.w500)),
+                    SizedBox(height: 2),
+                    if (guardianName.isNotEmpty)
+                      Text(guardianName, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.black87)),
+                    if (guardianPhone.isNotEmpty) ...[
+                      SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(Icons.phone, size: 12, color: Colors.grey.shade600),
+                          SizedBox(width: 4),
+                          Text(guardianPhone, style: TextStyle(fontSize: 13, color: Colors.grey.shade700)),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+
+        // Status badge
+        SizedBox(height: 12),
+        Container(
+          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: availability.validatedReservations.contains(res)
+                ? Colors.green.withOpacity(0.1)
+                : Colors.orange.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(
+              color: availability.validatedReservations.contains(res)
+                  ? Colors.green.withOpacity(0.3)
+                  : Colors.orange.withOpacity(0.3),
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                availability.validatedReservations.contains(res) ? Icons.check_circle : Icons.schedule,
+                size: 14,
+                color: availability.validatedReservations.contains(res) ? Colors.green : Colors.orange,
+              ),
+              SizedBox(width: 4),
+              Text(
+                availability.validatedReservations.contains(res) ? 'مؤكد' : 'في الانتظار',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: availability.validatedReservations.contains(res) ? Colors.green : Colors.orange,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+// // Add this helper method for special reservation info rows
+// Widget _buildSpecialReservationInfoRow({
+//   required IconData icon,
+//   required String label,
+//   required String value,
+// }) {
+//   return Row(
+//     crossAxisAlignment: CrossAxisAlignment.start,
+//     children: [
+//       Icon(icon, color: Colors.white, size: 18),
+//       SizedBox(width: 10),
+//       Expanded(
+//         child: Column(
+//           crossAxisAlignment: CrossAxisAlignment.start,
+//           children: [
+//             Text(
+//               label,
+//               style: TextStyle(
+//                 fontSize: 11,
+//                 color: Colors.white.withOpacity(0.7),
+//                 fontWeight: FontWeight.w500,
+//               ),
+//             ),
+//             SizedBox(height: 4),
+//             Text(
+//               value,
+//               style: TextStyle(
+//                 fontSize: 15,
+//                 color: Colors.white,
+//                 fontWeight: FontWeight.w600,
+//                 height: 1.4,
+//               ),
+//             ),
+//           ],
+//         ),
+//       ),
+//     ],
+//   );
+// }
+
+Widget _buildDetailStatCard(String label, String value, Color color) {
+  return Container(
+    padding: EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: color.withOpacity(0.1),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: color.withOpacity(0.3)),
+    ),
+    child: Column(
+      children: [
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+        SizedBox(height: 4),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: color,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    ),
+  );
+}
 
 
 }

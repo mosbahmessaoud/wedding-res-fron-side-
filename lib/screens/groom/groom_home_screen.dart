@@ -100,60 +100,58 @@ class _GroomHomeScreenState extends State<GroomHomeScreen>
   
 // }
 
-
-
 @override
-  void initState() {
-    super.initState();
-      _currentIndex = widget.initialTabIndex;
-        
-        _tabs = [
-          HomeTab(onTabChanged: _changeTab),
-          CreateReservationScreen(
-            key: _creatResTabKey,
-            onReservationCreated: () {
-              _changeTab(2);
-            },
-          ),
-          ReservationsTab(key: _reservationsTabKey),
-          FoodMenuTabG(key: _foodMenuTabKey),
-          ProfileTab(key: _profileTabKey),
-          GroomClanRulesPage(key: _rulesTabKey),
-        ];
-        
-            
-    // ADD THIS INITIALIZATION FOR NAV ANIMATION:
-    _navAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 400),
-      vsync: this,
-    );
-    
-    _navSlideAnimation = Tween<Offset>(
-      begin: const Offset(0, 1), // Hidden below screen
-      end: Offset.zero, // Visible
-    ).animate(CurvedAnimation(
-      parent: _navAnimationController,
-      curve: Curves.easeInOut,
-    ));
-    
-    // Show nav initially and start hide timer
-    _navAnimationController.forward();
-    
-    // Modified: Check reservation first, then load data and start timer
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      // _checkAccessPassword(); // ✅ ADD THIS LINE to check once on init
-      _checkReservationStatus().then((_) {
-        if (_hasValidReservation) {
-          _refreshCurrentTabInBackground(_currentIndex);
-          _loadUnreadNotificationCount();
-          _startNotificationPolling();
-          _startHideTimer(); // Start timer after loading
-        } else {
-          _startHideTimer(); // Start timer even without reservation
-        }
-      });
+void initState() {
+  super.initState();
+  _currentIndex = widget.initialTabIndex;
+  
+  _tabs = [
+    HomeTab(onTabChanged: _changeTab),
+    CreateReservationScreen(
+      key: _creatResTabKey,
+      onReservationCreated: () {
+        _changeTab(2);
+      },
+    ),
+    ReservationsTab(key: _reservationsTabKey),
+    FoodMenuTabG(key: _foodMenuTabKey),
+    ProfileTab(key: _profileTabKey),
+    GroomClanRulesPage(key: _rulesTabKey),
+  ];
+  
+  // ADD THIS INITIALIZATION FOR NAV ANIMATION:
+  _navAnimationController = AnimationController(
+    duration: const Duration(milliseconds: 400),
+    vsync: this,
+  );
+  
+  _navSlideAnimation = Tween<Offset>(
+    begin: const Offset(0, 1),
+    end: Offset.zero,
+  ).animate(CurvedAnimation(
+    parent: _navAnimationController,
+    curve: Curves.easeInOut,
+  ));
+  
+  _navAnimationController.forward();
+  
+  // Modified: Check reservation first, then check profile completion
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    _checkReservationStatus().then((_) {
+      // Check profile completion after user is authenticated
+      _checkGroomProfileCompletion();
+      
+      if (_hasValidReservation) {
+        _refreshCurrentTabInBackground(_currentIndex);
+        _loadUnreadNotificationCount();
+        _startNotificationPolling();
+        _startHideTimer();
+      } else {
+        _startHideTimer();
+      }
     });
-  }
+  });
+}
 
   @override
   void dispose() {
@@ -189,7 +187,172 @@ class _GroomHomeScreenState extends State<GroomHomeScreen>
     _startHideTimer();
   }
 
+/// Check if groom's profile information is complete
+Future<void> _checkGroomProfileCompletion() async {
+  try {
+    final validationMessage = await ApiService.validateGroomInfoForReservation();
+    
+    if (validationMessage != null && mounted) {
+      // Profile is incomplete, show dialog after a short delay
+      Future.delayed(const Duration(milliseconds: 800), () {
+        if (mounted) {
+          _showProfileIncompleteDialog(validationMessage);
+        }
+      });
+    }
+  } catch (e) {
+    print('Error checking profile completion: $e');
+  }
+}
 
+/// Show dialog when profile is incomplete
+void _showProfileIncompleteDialog(String message) {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) => WillPopScope(
+      onWillPop: () async => false, // Prevent dismissing with back button
+      child: AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(
+              Icons.warning_amber_rounded,
+              color: Colors.orange,
+              size: 28,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'الملف الشخصي غير مكتمل',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 18,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Text(
+            //   message,
+            //   style: TextStyle(
+            //     color: isDark ? Colors.white70 : Colors.black87,
+            //     height: 1.5,
+            //     fontSize: 15,
+            //   ),
+            // ),
+            // const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isDark 
+                    ? Colors.orange.shade900.withOpacity(0.3) 
+                    : Colors.orange.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: isDark 
+                      ? Colors.orange.shade700 
+                      : Colors.orange.shade200,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    color: isDark 
+                        ? Colors.orange.shade300 
+                        : Colors.orange.shade700,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'يرجى إكمال معلومات ملفك الشخصي قبل تنزيل ورقة الحجز',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: isDark 
+                            ? Colors.orange.shade200 
+                            : Colors.orange.shade900,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+            },
+            child: Text(
+              'لاحقاً',
+              style: TextStyle(
+                color: isDark ? Colors.grey[400] : Colors.grey[700],
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context); // Close dialog
+              // Navigate to Profile tab
+              setState(() {
+                _currentIndex = 4; // Profile tab index
+                _externalScreen = null;
+                _externalScreenTitle = null;
+              });
+              
+              // Optional: Show a snackbar to guide the user
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: const Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Colors.white),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Text('يرجى إكمال المعلومات الناقصة في ملفك الشخصي'),
+                      ),
+                    ],
+                  ),
+                  backgroundColor: AppColors.primary,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  margin: const EdgeInsets.all(16),
+                  duration: const Duration(seconds: 5),
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+            ),
+            child: const Text(
+              'إكمال الملف الشخصي',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
 
 // // UPDATED METHOD - Uses the return value from _checkAccessPassword:
 // Future<bool> _verifyAccessForTab() async {
@@ -699,12 +862,12 @@ void _showNoReservationForNotificationsDialog() {
             color: Colors.orange,
             size: 28,
           ),
-          const SizedBox(width: 12),
+          // const SizedBox(width: 12),
           Expanded(
             child: Text(
               'حجز مؤكد مطلوب',
               style: TextStyle(
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w500,
                 color: isDark ? Colors.white : Colors.black87,
               ),
             ),
@@ -764,20 +927,20 @@ void _showNoReservationForNotificationsDialog() {
             ),
           ),
         ),
-        ElevatedButton(
-          onPressed: () {
-            Navigator.pop(context);
-            _changeTab(1); // Navigate to Create Reservation tab
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-          ),
-          child: const Text('إنشاء حجز'),
-        ),
+        // ElevatedButton(
+        //   onPressed: () {
+        //     Navigator.pop(context);
+        //     _changeTab(1); // Navigate to Create Reservation tab
+        //   },
+        //   style: ElevatedButton.styleFrom(
+        //     backgroundColor: AppColors.primary,
+        //     shape: RoundedRectangleBorder(
+        //       borderRadius: BorderRadius.circular(20),
+        //     ),
+        //     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+        //   ),
+        //   child: const Text('إنشاء حجز'),
+        // ),
       ],
     ),
   );

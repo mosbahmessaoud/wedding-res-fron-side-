@@ -1022,8 +1022,8 @@ void _showNoInternetDialog() {
                       final date = await showDatePicker(
                         context: context,
                         initialDate: DateTime.now(),
-                        firstDate: DateTime.now(),
-                        lastDate: DateTime.now().add(const Duration(days: 365)),
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime(2100),
                         locale: const Locale('ar', 'DZ'),
                         builder: (context, child) {
                           return Theme(

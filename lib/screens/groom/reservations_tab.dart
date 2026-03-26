@@ -38,11 +38,6 @@ class ReservationsTabState extends State<ReservationsTab> with SingleTickerProvi
   List<dynamic> _cachedAllReservations = [];
   bool _hasLoadedOnce = false;
 
-  // Settings data
-  Map<String, dynamic> _userClanSettings = {};
-  bool _isLoadingClanSettings = false;
-  bool _clanSettingsLoaded = false;
-  int? _currentReservationId;
 
   Map<String, dynamic>? _originClanSettings;
   Map<String, dynamic>? _selectedClanSettings; 
@@ -51,19 +46,35 @@ class ReservationsTabState extends State<ReservationsTab> with SingleTickerProvi
   bool _isLoadingInstructionSettings = false;
   bool _instructionSettingsLoaded = false;
 
+  bool _isInitialLoading = true;
+  String _connectionStatus = 'checking'; // 'checking', 'loading', 'offline', 'loaded'
+
+// @override
+// void initState() {
+//   super.initState();
+//   _tabController = TabController(length: 4, vsync: this);
+  
+//   // Always show cached data first (even if empty on first launch)
+//   _loadCachedData();
+  
+//   // Try to load fresh data in background
+//   WidgetsBinding.instance.addPostFrameCallback((_) {
+//     _checkConnectivityAndLoad();
+//   });
+// }
+
 @override
 void initState() {
   super.initState();
   _tabController = TabController(length: 4, vsync: this);
   
-  // Always show cached data first (even if empty on first launch)
   _loadCachedData();
   
-  // Try to load fresh data in background
   WidgetsBinding.instance.addPostFrameCallback((_) {
     _checkConnectivityAndLoad();
   });
 }
+
 
 
   @override
@@ -89,22 +100,16 @@ void _loadCachedData() {
 // ============================================
 // 4. ADD: Background loading method (non-blocking)
 // ============================================
-
-
 Future<void> _loadReservationsInBackground() async {
   if (_isRefreshing) return;
   
-  // Don't check connectivity here - assume it was checked before calling
-  
   try {
-    // Load all reservations
     final allReservationsRaw = await ApiService.getMyAllReservations();
     final filteredReservations = allReservationsRaw
         .where((reservation) => reservation['status']?.toLowerCase() != 'cancelled')
         .toList();
     _sortReservationsByDateProximity(filteredReservations);
     
-    // Load pending reservation
     Map<String, dynamic>? pending;
     try {
       pending = await ApiService.getMyPendingReservation();
@@ -112,7 +117,6 @@ Future<void> _loadReservationsInBackground() async {
       pending = null;
     }
     
-    // Load validated reservation
     Map<String, dynamic>? validated;
     try {
       validated = await ApiService.getMyValidatedReservation();
@@ -120,91 +124,246 @@ Future<void> _loadReservationsInBackground() async {
       validated = null;
     }
     
-    // Load cancelled reservations
     final cancelled = await ApiService.getMyCancelledReservations();
     
-    // Update state and cache together
     if (mounted) {
       setState(() {
-        // Update displayed data
         _allReservations = filteredReservations;
         _pendingReservation = pending;
         _validatedReservation = validated;
         _cancelledReservations = cancelled;
         
-        // Update cache (save for offline use)
         _cachedAllReservations = List.from(filteredReservations);
         _cachedPendingReservation = pending != null ? Map<String, dynamic>.from(pending) : null;
         _cachedValidatedReservation = validated != null ? Map<String, dynamic>.from(validated) : null;
         _cachedCancelledReservations = List.from(cancelled);
         
         _hasLoadedOnce = true;
+        _connectionStatus = 'loaded';
       });
     }
   } catch (e) {
-    // On error, keep cached data and show subtle notification
     print('Error loading reservations: $e');
     if (mounted) {
+      setState(() {
+        _connectionStatus = 'offline';
+      });
       _showSnackBar('خطأ في التحميل - عرض البيانات المحفوظة', Colors.orange);
     }
   }
 }
 
-
 Future<void> _checkConnectivityAndLoad() async {
+  if (mounted) {
+    setState(() {
+      _connectionStatus = 'checking';
+    });
+  }
+  
   final connectivityResult = await Connectivity().checkConnectivity();
   
   if (connectivityResult.contains(ConnectivityResult.none)) {
-    // No internet - keep showing cached data, just notify user
-    if (mounted && _cachedAllReservations.isEmpty && !_hasLoadedOnce) {
-      // Only show dialog if there's no cached data at all
-      _showNoInternetDialog();
-    } else {
-      // Has cached data - show subtle notification
-      _showSnackBar('لا يوجد اتصال - عرض البيانات المحفوظة', Colors.orange);
+    if (mounted) {
+      setState(() {
+        _connectionStatus = 'offline';
+        _isInitialLoading = false;
+      });
+      
+      if (_cachedAllReservations.isEmpty && !_hasLoadedOnce) {
+        _showNoInternetDialog();
+      } else {
+        _showSnackBar('لا يوجد اتصال - عرض البيانات المحفوظة', Colors.orange);
+      }
     }
     return;
   }
   
-  // Has internet - load fresh data
+  if (mounted) {
+    setState(() {
+      _connectionStatus = 'loading';
+    });
+  }
+  
   await _loadReservationsInBackground();
+  
+  if (mounted) {
+    setState(() {
+      _connectionStatus = 'loaded';
+      _isInitialLoading = false;
+    });
+  }
 }
 
+
+// void _showNoInternetDialog() {
+//   showDialog(
+//     context: context,
+//     barrierDismissible: true, // Allow dismissing
+//     builder: (context) => AlertDialog(
+//       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+//       title: Row(
+//         children: [
+//           Icon(Icons.wifi_off, color: Colors.orange),
+//           SizedBox(width: 10),
+//           Text('لا يوجد اتصال'),
+//         ],
+//       ),
+//       content: Text(
+//         _hasLoadedOnce 
+//           ? 'يتم عرض آخر البيانات المحفوظة\nللتحديث، تحقق من اتصالك بالإنترنت'
+//           : 'يرجى التحقق من اتصالك بالإنترنت لتحميل البيانات'
+//       ),
+//       actions: [
+//         TextButton(
+//           onPressed: () => Navigator.pop(context),
+//           child: Text('موافق'),
+//         ),
+//         ElevatedButton(
+//           onPressed: () {
+//             Navigator.pop(context);
+//             _checkConnectivityAndLoad();
+//           },
+//           style: ElevatedButton.styleFrom(
+//             backgroundColor: Colors.blue,
+//             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+//           ),
+//           child: Text('إعادة المحاولة', style: TextStyle(color: Colors.white)),
+//         ),
+//       ],
+//     ),
+//   );
+// }
+
 void _showNoInternetDialog() {
+  if (!mounted) return;
+  
   showDialog(
     context: context,
-    barrierDismissible: true, // Allow dismissing
-    builder: (context) => AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: Row(
-        children: [
-          Icon(Icons.wifi_off, color: Colors.orange),
-          SizedBox(width: 10),
-          Text('لا يوجد اتصال'),
-        ],
-      ),
-      content: Text(
-        _hasLoadedOnce 
-          ? 'يتم عرض آخر البيانات المحفوظة\nللتحديث، تحقق من اتصالك بالإنترنت'
-          : 'يرجى التحقق من اتصالك بالإنترنت لتحميل البيانات'
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text('موافق'),
+    barrierDismissible: true,
+    builder: (context) => Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      elevation: 0,
+      backgroundColor: Colors.transparent,
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: _getCardColor(context),
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
+            ),
+          ],
         ),
-        ElevatedButton(
-          onPressed: () {
-            Navigator.pop(context);
-            _checkConnectivityAndLoad();
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.blue,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-          child: Text('إعادة المحاولة', style: TextStyle(color: Colors.white)),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Animated Icon Container
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.wifi_off_rounded,
+                color: Colors.orange,
+                size: 40,
+              ),
+            ),
+            const SizedBox(height: 20),
+            
+            // Title
+            Text(
+              'لا يوجد اتصال بالإنترنت',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: _getTextColor(context),
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            
+            // Description
+            Text(
+              _hasLoadedOnce 
+                ? 'يتم عرض آخر البيانات المحفوظة\nللتحديث، تحقق من اتصالك بالإنترنت'
+                : 'يرجى التحقق من اتصالك بالإنترنت\nلتحميل البيانات',
+              style: TextStyle(
+                fontSize: 14,
+                color: _getSecondaryTextColor(context),
+                height: 1.5,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 28),
+            
+            // Action Buttons
+            Row(
+              children: [
+                Expanded(
+                  child: TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(
+                          color: _getSecondaryTextColor(context).withOpacity(0.2),
+                        ),
+                      ),
+                    ),
+                    child: Text(
+                      'إغلاق',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: _getSecondaryTextColor(context),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _checkConnectivityAndLoad();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.refresh_rounded, size: 18),
+                        SizedBox(width: 6),
+                        Text(
+                          'إعادة المحاولة',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
-      ],
+      ),
     ),
   );
 }
@@ -213,9 +372,6 @@ void _showNoInternetDialog() {
   return Theme.of(context).cardColor;
 }
 
-Color _getBackgroundColor(BuildContext context) {
-  return Theme.of(context).scaffoldBackgroundColor;
-}
 
 Color _getTextColor(BuildContext context) {
   return Theme.of(context).textTheme.bodyLarge?.color ?? AppColors.textPrimary;
@@ -225,9 +381,7 @@ Color _getSecondaryTextColor(BuildContext context) {
   return Theme.of(context).textTheme.bodyMedium?.color ?? AppColors.textSecondary;
 }
 
-  Future<void> _loadReservations() async {
-    await _loadReservationsInBackground();
-  }
+
 
 Future<void> _refreshReservations() async {
   if (_isRefreshing) return;
@@ -330,6 +484,7 @@ Future<void> _loadInstructionClanSettings(Map<String, dynamic> reservation) asyn
       'name': reservation['clan_name'] ?? 
               'العشيرة المختارة',
     };
+
 
     print("DEBUG: Loaded selected clan from reservation: $_selectedClan");
     print("DEBUG: Selected clan data: $_selectedClan");
@@ -522,7 +677,6 @@ Widget _buildReservationInstructionWidget() {
   final originClanName = _getOriginClanName();
   final formattedSchedule = _formatDayTimeSchedule(originClanTime['day'] ?? '', originClanTime['time'] ?? '');
   final daysMax = _getValidationDeadlineDays();
-  final isDark = Theme.of(context).brightness == Brightness.dark;
 
   return Center(
     child: SingleChildScrollView(
@@ -629,7 +783,7 @@ Widget _buildReservationInstructionWidget() {
             ),
             SizedBox(height: 12),
             Text(
-              'يجب استكمال هذه الإجراءات خلال $daysMax أيام كحد أقصى',
+              'يجب استكمال هذه الإجراءات خلال $daysMax يوم كحد أقصى',
               textAlign: TextAlign.center,
               style: TextStyle(color: _getTextColor(context)),
             ),
@@ -699,18 +853,6 @@ String _formatDayTimeSchedule(String days, String times) {
   return schedules.join(' و ');
 }
 
-String _getDayName(int dayNum) {
-  switch (dayNum) {
-    case 1: return 'الاثنين';
-    case 2: return 'الثلاثاء';
-    case 3: return 'الأربعاء';
-    case 4: return 'الخميس';
-    case 5: return 'الجمعة';
-    case 6: return 'السبت';
-    case 7: return 'الأحد';
-    default: return 'غير محدد';
-  }
-}
 
 
 
@@ -768,7 +910,7 @@ Widget build(BuildContext context) {
             child: _buildEmptyState(
               icon: Icons.calendar_today,
               title: 'لا توجد حجوزات',
-              subtitle: 'لم تقم بأي حجوزات حتى الآن\nاسحب لأسفل للتحديث',
+              subtitle: 'تأكد بإتصالك بالأنترنت \nاسحب لأسفل للتحديث',
             ),
           ),
         ),
@@ -804,7 +946,7 @@ Widget build(BuildContext context) {
             child: _buildEmptyState(
               icon: Icons.pending_actions,
               title: 'لا توجد حجوزات معلقة',
-              subtitle: 'جميع حجوزاتك تم التعامل معها\nاسحب لأسفل للتحديث',
+              subtitle: 'تأكد بإتصالك بالأنترنت\nاسحب لأسفل للتحديث',
               actionButton: ElevatedButton(
                 onPressed: _navigateToNewReservation,
                 child: const Text('حجز جديد'),
@@ -856,7 +998,7 @@ Widget build(BuildContext context) {
             child: _buildEmptyState(
               icon: Icons.check_circle,
               title: 'لا توجد حجوزات مؤكدة',
-              subtitle: 'لم يتم تأكيد أي حجوزات حتى الآن\nاسحب لأسفل للتحديث',
+              subtitle: ' تأكد بإتصالك بالأنترنت\nاسحب لأسفل للتحديث',
             ),
           ),
         ),
@@ -903,7 +1045,7 @@ Widget build(BuildContext context) {
             child: _buildEmptyState(
               icon: Icons.cancel,
               title: 'لا توجد حجوزات ملغاة',
-              subtitle: 'لم تقم بإلغاء أي حجوزات\nاسحب لأسفل للتحديث',
+              subtitle: 'تأكد بإتصالك بالأنترنت\nاسحب لأسفل للتحديث',
             ),
           ),
         ),
@@ -999,43 +1141,16 @@ Widget build(BuildContext context) {
                       child: ElevatedButton.icon(
                         onPressed: () => _downloadPdf(reservation['id']),
                         icon: const Icon(Icons.download, size: 16),
-                        label: const Text('تحميل', style: TextStyle(fontSize: 12)),
+                        label: const Text('تحميل ورقة الحجز', style: TextStyle(fontSize: 12)),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                          padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 20),
                           minimumSize: const Size(0, 28),
                         ),
                       ),
                     ),
-                    Container(
-                      margin: const EdgeInsets.only(left: 4),
-                      child: ElevatedButton.icon(
-                        onPressed: () async {
-                          final connectivityResult = await Connectivity().checkConnectivity();
-                          
-                          if (connectivityResult.contains(ConnectivityResult.none)) {
-                            _showNoInternetDialog();
-                            return;
-                          }
-
-                          try {
-                            final pdfBytes = await _ensurePdfAndDownload(reservation['id']);
-                            await _sharePdf(reservation['id'], pdfBytes);
-                          } catch (e) {
-                            _showSnackBar('خطأ في مشاركة الملف: $e', Colors.red);
-                          }
-                        },
-                        icon: const Icon(Icons.share, size: 16),
-                        label: const Text('مشاركة', style: TextStyle(fontSize: 12)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                          minimumSize: const Size(0, 28),
-                        ),
-                      ),
-                    ),
+                   
                   ],
                 ),
             ],
@@ -1272,40 +1387,18 @@ Widget build(BuildContext context) {
                             child: ElevatedButton.icon(
                               onPressed: () => _downloadPdf(reservation['id']),
                               icon: const Icon(Icons.download, size: 16),
-                              label: const Text('تحميل', style: TextStyle(fontSize: 13)),
+                              label: const Text('تحميل ورقة الحجز', style: TextStyle(fontSize: 13)),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.green,
                                 foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                               ),
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: () async {
-                                try {
-                                  final pdfBytes = await _ensurePdfAndDownload(reservation['id']);
-                                  await _sharePdf(reservation['id'], pdfBytes);
-                                } catch (e) {
-                                  _showSnackBar('خطأ في المشاركة', Colors.red);
-                                }
-                              },
-                              icon: const Icon(Icons.share, size: 16),
-                              label: const Text('مشاركة', style: TextStyle(fontSize: 13)),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.blue,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 10),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                            ),
-                          ),
+                          
                         ],
                       ),
                     ],
@@ -1313,91 +1406,7 @@ Widget build(BuildContext context) {
                 ),
               ]),
             ],
-            // // Enhanced PDF Download Section (only show if not cancelled)
-            // if (!isCancelled) ...[
-            //   const SizedBox(height: 16),
-            //   _buildDetailSection('تحميل ومشاركة الملفات', [
-            //     Container(
-            //       width: double.infinity,
-            //       padding: const EdgeInsets.all(16),
-            //       decoration: BoxDecoration(
-            //         color: Theme.of(context).brightness == Brightness.dark
-            //             ? Colors.green.withOpacity(0.15)
-            //             : Colors.green.withOpacity(0.1),
-            //         borderRadius: BorderRadius.circular(12),
-            //         border: Border.all(
-            //           color: Theme.of(context).brightness == Brightness.dark
-            //               ? Colors.green.withOpacity(0.4)
-            //               : Colors.green.withOpacity(0.3),
-            //         ),
-            //       ),
-            //       child: Column(
-            //         children: [
-            //           Icon(
-            //             Icons.picture_as_pdf,
-            //             size: 48,
-            //             color: Colors.green,
-            //           ),
-            //           const SizedBox(height: 12),
-            //           Text(
-            //             'ملف الحجز جاهز للتحميل والمشاركة',
-            //             style: TextStyle(
-            //               fontSize: 16,
-            //               fontWeight: FontWeight.bold,
-            //               color: Colors.green,
-            //             ),
-            //           ),
-            //           const SizedBox(height: 8),
-            //           Text(
-            //             'يمكنك تحميل ملف PDF أو مشاركته مباشرة',
-            //             style: TextStyle(
-            //               fontSize: 14,
-            //               color: _getTextColor(context),
-            //             ),
-            //           ),
-            //           const SizedBox(height: 16),
-            //           Row(
-            //             children: [
-            //               Expanded(
-            //                 child: ElevatedButton.icon(
-            //                   onPressed: () => _downloadPdf(reservation['id']),
-            //                   icon: const Icon(Icons.download),
-            //                   label: const Text('تحميل ملف PDF'),
-            //                   style: ElevatedButton.styleFrom(
-            //                     backgroundColor: Colors.green,
-            //                     foregroundColor: Colors.white,
-            //                     padding: const EdgeInsets.symmetric(vertical: 12),
-            //                   ),
-            //                 ),
-            //               ),
-            //               const SizedBox(width: 12),
-                          
-            //               Expanded(
-            //                 child: ElevatedButton.icon(
-            //                   onPressed: () async {
-            //                     try {
-            //                       final pdfBytes = await _ensurePdfAndDownload(reservation['id']);
-            //                       await _sharePdf(reservation['id'], pdfBytes);
-            //                     } catch (e) {
-            //                       _showSnackBar('خطأ في مشاركة الملف: $e', Colors.red);
-            //                     }
-            //                   },
-            //                   icon: const Icon(Icons.share),
-            //                   label: const Text('مشاركة الملف'),
-            //                   style: ElevatedButton.styleFrom(
-            //                     backgroundColor: Colors.blue,
-            //                     foregroundColor: Colors.white,
-            //                     padding: const EdgeInsets.symmetric(vertical: 12),
-            //                   ),
-            //                 ),
-            //               ),
-            //             ],
-            //           ),
-            //         ],
-            //       ),
-            //     ),
-            //   ]),
-            // ],
+            
             
             if (showActions && actions.isNotEmpty) ...[
               const SizedBox(height: 20),
@@ -1513,8 +1522,7 @@ Widget build(BuildContext context) {
     );
   }
 
-  
-Widget _buildEmptyState({
+  Widget _buildEmptyState({
   required IconData icon,
   required String title,
   required String subtitle,
@@ -1547,33 +1555,78 @@ Widget _buildEmptyState({
           ),
           textAlign: TextAlign.center,
         ),
-        // Show offline indicator if no data and not loaded once
-        if (!_hasLoadedOnce) ...[
+        // Show connection status indicator during initial load
+        if (_isInitialLoading) ...[
           const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.orange.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.orange.withOpacity(0.3)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.cloud_off, size: 16, color: Colors.orange),
-                SizedBox(width: 8),
-                Text(
-                  'غير متصل',
-                  style: TextStyle(color: Colors.orange, fontSize: 12),
-                ),
-              ],
-            ),
-          ),
+          _buildConnectionStatusIndicator(),
         ],
         if (actionButton != null) ...[
           const SizedBox(height: 24),
           actionButton,
         ],
+      ],
+    ),
+  );
+}
+
+Widget _buildConnectionStatusIndicator() {
+  IconData icon;
+  Color color;
+  String text;
+  
+  switch (_connectionStatus) {
+    case 'checking':
+      icon = Icons.sync;
+      color = Colors.blue;
+      text = 'جاري الفحص...';
+      break;
+    case 'loading':
+      icon = Icons.cloud_download;
+      color = Colors.green;
+      text = 'جاري التحميل...';
+      break;
+    case 'offline':
+      icon = Icons.cloud_off;
+      color = Colors.orange;
+      text = 'غير متصل';
+      break;
+    case 'loaded':
+      icon = Icons.cloud_done;
+      color = Colors.green;
+      text = 'تم التحديث';
+      break;
+    default:
+      icon = Icons.sync;
+      color = Colors.grey;
+      text = 'جاري التحقق...';
+  }
+  
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    decoration: BoxDecoration(
+      color: color.withOpacity(0.1),
+      borderRadius: BorderRadius.circular(20),
+      border: Border.all(color: color.withOpacity(0.3)),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (_connectionStatus == 'checking' || _connectionStatus == 'loading')
+          SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation<Color>(color),
+            ),
+          )
+        else
+          Icon(icon, size: 16, color: color),
+        SizedBox(width: 8),
+        Text(
+          text,
+          style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w500),
+        ),
       ],
     ),
   );
@@ -1631,58 +1684,6 @@ Widget _buildEmptyState({
   }
 
   
-  // Future<void> _cancelReservation(int reservationId) async {
-  //   final confirmed = await showDialog<bool>(
-  //     context: context,
-  //     builder: (context) => AlertDialog(
-  //       title: const Text('تأكيد الإلغاء'),
-  //       content: const Text('هل أنت متأكد من رغبتك في إلغاء هذا الحجز؟\nلا يمكن التراجع عن هذا الإجراء.'),
-  //       actions: [
-  //         TextButton(
-  //           onPressed: () => Navigator.pop(context, false),
-  //           child: const Text('إلغاء'),
-  //         ),
-  //         ElevatedButton(
-  //           onPressed: () => Navigator.pop(context, true),
-  //           style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-  //           child: const Text('تأكيد الإلغاء'),
-  //         ),
-  //       ],
-  //     ),
-  //   );
-
-  //   if (confirmed == true) {
-  //     try {
-  //       final connectivityResult = await Connectivity().checkConnectivity();
-        
-  //       if (connectivityResult.contains(ConnectivityResult.none)) {
-  //         _showNoInternetDialog();
-  //         return;
-  //       }
-        
-  //       await ApiService.cancelMyReservation(reservationId);
-        
-  //       if (mounted) {
-  //         ScaffoldMessenger.of(context).showSnackBar(
-  //           const SnackBar(
-  //             content: Text('تم إلغاء الحجز بنجاح'),
-  //             backgroundColor: Colors.green,
-  //           ),
-  //         );
-  //         _refreshReservations();
-  //       }
-  //     } catch (e) {
-  //       if (mounted) {
-  //         ScaffoldMessenger.of(context).showSnackBar(
-  //           SnackBar(
-  //             content: Text('خطأ في إلغاء الحجز: ${e.toString()}'),
-  //             backgroundColor: Colors.red,
-  //           ),
-  //         );
-  //       }
-  //     }
-  //   }
-  // }
 // Replace the existing _cancelReservation method with this updated version:
 
 Future<void> _cancelReservation(int reservationId) async {
@@ -1872,30 +1873,6 @@ Future<void> _sharePdf(int reservationId, Uint8List pdfBytes) async {
 }
 
 
-  Future<Uint8List> _ensurePdfAndDownload(int reservationId) async {
-    final connectivityResult = await Connectivity().checkConnectivity();
-    
-    if (connectivityResult.contains(ConnectivityResult.none)) {
-      _showNoInternetDialog();
-      throw Exception('لا يوجد اتصال بالإنترنت');
-    }
-    
-    final status = await ApiService.checkPdfStatus(reservationId);
-    
-    if (status['pdf_exists'] != true) {
-      _showSnackBar('جاري إنشاء الملف...', Colors.blue.shade400);
-      await ApiService.generatePdf(reservationId);
-      
-      bool generated = await ApiService.waitForPdfGeneration(reservationId);
-      
-      if (!generated) {
-        throw Exception('فشل في إنشاء ملف PDF. يرجى المحاولة مرة أخرى.');
-      }
-    }
-    
-    return await ApiService.downloadPdf(reservationId);
-  }
-
   // Replace these 3 functions in your code:
 
 // 1. Updated _downloadPdf function
@@ -1910,13 +1887,13 @@ Future<void> _downloadPdf(int reservationId) async {
   try {
     _showSnackBar('جاري التحقق من الملف...', Colors.blue.shade400);
     
-    final status = await ApiService.checkPdfStatus(reservationId);
+    // final status = await ApiService.checkPdfStatus(reservationId);
     
-    if (status['pdf_exists'] != true) {
+    // if (status['pdf_exists'] != true) {
       _showSnackBar('جاري إنشاء الملف...', Colors.blue.shade400);
       await ApiService.generatePdf(reservationId);
-      await Future.delayed(const Duration(seconds: 2));
-    }
+      await Future.delayed(const Duration(seconds: 1));
+    // }
     
     _showSnackBar('جاري تحميل الملف...', Colors.blue.shade400);
     

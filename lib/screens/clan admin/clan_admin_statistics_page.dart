@@ -17,7 +17,7 @@ class ClanAdminStatisticsPage extends StatefulWidget {
 }
 
 class ClanAdminStatisticsPageState extends State<ClanAdminStatisticsPage> {
-  String _exportType = 'grooms';
+  String _exportType = 'reservations';
   String _reservationFilter = 'all';
   DateTime? _startDate;
   DateTime? _endDate;
@@ -102,13 +102,22 @@ class ClanAdminStatisticsPageState extends State<ClanAdminStatisticsPage> {
       return response.map((g) {
         final groom = g as Map<String, dynamic>;
         return {
-          'اسم العريس': groom['first_name'] ?? '', 'اسم الأب': groom['father_name'] ?? '', 'اسم الجد': groom['grandfather_name'] ?? '',
-          'اللقب': groom['last_name'] ?? '', 'رقم الهاتف': groom['phone_number'] ?? '', 'تاريخ الميلاد': groom['birth_date'] ?? '',
-          'مكان الميلاد': groom['birth_address'] ?? '', 'العنوان': groom['home_address'] ?? '', 'اسم ولي الأمر': groom['guardian_name'] ?? '',
-          'هاتف ولي الأمر': groom['guardian_phone'] ?? '', 'صلة القرابة': groom['guardian_relation'] ?? '',
-          'تاريخ ميلاد ولي الأمر': groom['guardian_birth_date'] ?? '', 'مكان ميلاد ولي الأمر': groom['guardian_birth_address'] ?? '',
-          'عنوان ولي الأمر': groom['guardian_home_address'] ?? '', 'الحالة': groom['status'] ?? 'نشط',
-          'تاريخ التسجيل': groom['created_at']?.toString().split('T')[0] ?? '',
+          'اسم العريس': groom['first_name'] ?? '',
+           'اسم الأب': groom['father_name'] ?? '',
+           'اسم الجد': groom['grandfather_name'] ?? '',
+          // 'اللقب': groom['last_name'] ?? '',
+           'رقم الهاتف': groom['phone_number'] ?? '',
+           'تاريخ الميلاد': groom['birth_date'] ?? '',
+          'مكان الميلاد': groom['birth_address'] ?? '',
+           'العنوان': groom['home_address'] ?? '',
+           'اسم ولي الأمر': groom['guardian_name'] ?? '',
+          'هاتف ولي الأمر': groom['guardian_phone'] ?? '',
+           'صلة القرابة': groom['guardian_relation'] ?? '',
+          'تاريخ ميلاد ولي الأمر': groom['guardian_birth_date'] ?? '',
+           'مكان ميلاد ولي الأمر': groom['guardian_birth_address'] ?? '',
+          'عنوان ولي الأمر': groom['guardian_home_address'] ?? '',
+          //  'الحالة': groom['status'] ?? 'نشط',
+          // 'تاريخ التسجيل': groom['created_at']?.toString().split('T')[0] ?? '',
         };
       }).toList();
     } else {
@@ -122,17 +131,19 @@ class ClanAdminStatisticsPageState extends State<ClanAdminStatisticsPage> {
           if (_reservationFilter == 'past' && date1 != null && date1.isAfter(now)) return false;
           return true;
         }).map((r) => {
-          'الاسم الكامل للعريس': '${r['first_name']} ${r['father_name']} ${r['grandfather_name']} ${r['last_name']}',
+          'تاريخ اقامة العرس': r['date1'] ?? '','الاسم الكامل للعريس': '${r['first_name']} ${r['father_name']} ${r['grandfather_name']} ${r['last_name']}',
           'اسم العريس': r['first_name'] ?? '', 'اسم الأب': r['father_name'] ?? '', 'اسم الجد': r['grandfather_name'] ?? '',
-          'اللقب': r['last_name'] ?? '', 'رقم الهاتف': r['phone_number'] ?? '', 'تاريخ الميلاد': r['birth_date'] ?? '',
+          // 'اللقب': r['last_name'] ?? '', 
+          'رقم الهاتف': r['phone_number'] ?? '', 'تاريخ الميلاد': r['birth_date'] ?? '',
           'مكان الميلاد': r['birth_address'] ?? '', 'العنوان': r['home_address'] ?? '', 'اسم ولي الأمر': r['guardian_name'] ?? '',
           'هاتف ولي الأمر': r['guardian_phone'] ?? '', 'عنوان ولي الأمر': r['guardian_home_address'] ?? '',
           'مكان ميلاد ولي الأمر': r['guardian_birth_address'] ?? '', 'تاريخ ميلاد ولي الأمر': r['guardian_birth_date'] ?? '',
-          'تاريخ اقامة العرس': r['date1'] ?? '', 'يومين': r['date2_bool'] == true ? 'نعم' : 'لا',
+          //  'يومين': r['date2_bool'] == true ? 'نعم' : 'لا',
           'القاعة': r['hall_name'] ?? '', ' الهيئة': r['haia_committee_name'] ?? '', 'لجنة المداح': r['madaeh_committee_name'] ?? '',
-          'الحالة': r['status'] ?? '', 
-          ' يقبل عرس جماعي': r['join_to_mass_wedding'] == true ? 'نعم' : 'لا', 'الدفع': r['payment_valid'] == true ? 'مدفوع' : 'غير مدفوع',
-          'تاريخ إنشاء الحجز': r['created_at']?.toString().split('T')[0] ?? '',
+          // 'الحالة': r['status'] ?? '', 
+          // ' يقبل عرس جماعي': r['join_to_mass_wedding'] == true ? 'نعم' : 'لا',
+           'الدفع': r['payment_valid'] == true ? 'مدفوع' : 'غير مدفوع',
+          // 'تاريخ إنشاء الحجز': r['created_at']?.toString().split('T')[0] ?? '',
         }).toList();
       } catch (e) {
         _showSnackBar('خطأ في جلب البيانات: $e', isError: true);
@@ -288,11 +299,11 @@ void _showFileOptionsDialog(String filePath) {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       _buildCard(isDark, 'نوع البيانات', Column(children: [
-                        RadioListTile<String>(
-                          title: const Text('العرسان', style: TextStyle(fontFamily: 'Cairo')),
-                          subtitle: const Text('تشمل كافة المعلومات الشخصية ومعلومات ولي الأمر', style: TextStyle(fontFamily: 'Cairo', fontSize: 12)),
-                          value: 'grooms', groupValue: _exportType, onChanged: (v) => setState(() => _exportType = v!),
-                        ),
+                        // RadioListTile<String>(
+                        //   title: const Text('العرسان', style: TextStyle(fontFamily: 'Cairo')),
+                        //   subtitle: const Text('تشمل كافة المعلومات الشخصية ومعلومات ولي الأمر', style: TextStyle(fontFamily: 'Cairo', fontSize: 12)),
+                        //   value: 'grooms', groupValue: _exportType, onChanged: (v) => setState(() => _exportType = v!),
+                        // ),
                         RadioListTile<String>(
                           title: const Text('الحجوزات', style: TextStyle(fontFamily: 'Cairo')),
                           subtitle: const Text('تشمل تفاصيل الحجز ومعلومات العريس وولي الأمر', style: TextStyle(fontFamily: 'Cairo', fontSize: 12)),

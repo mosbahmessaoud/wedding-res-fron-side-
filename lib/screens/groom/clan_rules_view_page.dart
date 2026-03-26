@@ -122,40 +122,97 @@ String? _clanRulesPdfPath;  // NEW: Store the database path
     }
   }
 
-  void _showNoInternetDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            Icon(Icons.wifi_off, color: Colors.orange),
-            SizedBox(width: 10),
-            Text('لا يوجد اتصال'),
-          ],
-        ),
-        content: Text('يرجى التحقق من اتصالك بالإنترنت'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('إلغاء'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _checkConnectivityAndLoad();
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Theme.of(context).primaryColor,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+
+void _showNoInternetDialog() {
+  if (!mounted) return;
+  
+  showDialog(
+    context: context,
+    barrierDismissible: true,
+    builder: (context) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      contentPadding: const EdgeInsets.all(24),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Icon Container
+          Container(
+            width: 70,
+            height: 70,
+            decoration: BoxDecoration(
+              color: Colors.orange.withOpacity(0.1),
+              shape: BoxShape.circle,
             ),
-            child: Text('إعادة المحاولة', style: TextStyle(color: Colors.white)),
+            child: const Icon(
+              Icons.wifi_off_rounded,
+              color: Colors.orange,
+              size: 36,
+            ),
+          ),
+          const SizedBox(height: 20),
+          
+          // Title
+          const Text(
+            'لا يوجد اتصال بالإنترنت',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 10),
+          
+          // Description
+          Text(
+            'يرجى التحقق من اتصالك بالإنترنت',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[600],
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 24),
+          
+          // Buttons
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text('إغلاق'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _checkConnectivityAndLoad();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text('إعادة المحاولة'),
+                ),
+              ),
+            ],
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   Future<void> _fetchUserClanId() async {
     setState(() {

@@ -77,47 +77,137 @@ class FoodMenuTabGState extends State<FoodMenuTabG> {
     }
   }
 
+  // void _showNoInternetDialog() {
+  //   final isDark = Theme.of(context).brightness == Brightness.dark;
+  //   showDialog(
+  //     context: context,
+  //     barrierDismissible: true,
+  //     builder: (context) => AlertDialog(
+  //       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+  //       backgroundColor: isDark ? Colors.grey[900] : Colors.white,
+  //       title: Row(
+  //         children: [
+  //           Icon(Icons.wifi_off, color: Colors.orange),
+  //           SizedBox(width: 10),
+  //           Text('لا يوجد اتصال', style: TextStyle(color: isDark ? Colors.white : Colors.black)),
+  //         ],
+  //       ),
+  //       content: Text(
+  //         _hasLoadedOnce 
+  //           ? 'يتم عرض آخر البيانات المحفوظة\nللتحديث، تحقق من اتصالك بالإنترنت'
+  //           : 'يرجى التحقق من اتصالك بالإنترنت لتحميل البيانات',
+  //         style: TextStyle(color: isDark ? Colors.white70 : Colors.black87),
+  //       ),
+  //       actions: [
+  //         TextButton(
+  //           onPressed: () => Navigator.pop(context),
+  //           child: Text('موافق'),
+  //         ),
+  //         ElevatedButton(
+  //           onPressed: () {
+  //             Navigator.pop(context);
+  //             _checkConnectivityAndLoad();
+  //           },
+  //           style: ElevatedButton.styleFrom(
+  //             backgroundColor: Colors.blue,
+  //             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+  //           ),
+  //           child: Text('إعادة المحاولة', style: TextStyle(color: Colors.white)),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
   void _showNoInternetDialog() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        backgroundColor: isDark ? Colors.grey[900] : Colors.white,
-        title: Row(
-          children: [
-            Icon(Icons.wifi_off, color: Colors.orange),
-            SizedBox(width: 10),
-            Text('لا يوجد اتصال', style: TextStyle(color: isDark ? Colors.white : Colors.black)),
-          ],
-        ),
-        content: Text(
-          _hasLoadedOnce 
-            ? 'يتم عرض آخر البيانات المحفوظة\nللتحديث، تحقق من اتصالك بالإنترنت'
-            : 'يرجى التحقق من اتصالك بالإنترنت لتحميل البيانات',
-          style: TextStyle(color: isDark ? Colors.white70 : Colors.black87),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('موافق'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _checkConnectivityAndLoad();
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+  if (!mounted) return;
+  
+  showDialog(
+    context: context,
+    barrierDismissible: true,
+    builder: (context) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      contentPadding: const EdgeInsets.all(24),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Icon Container
+          Container(
+            width: 70,
+            height: 70,
+            decoration: BoxDecoration(
+              color: Colors.orange.withOpacity(0.1),
+              shape: BoxShape.circle,
             ),
-            child: Text('إعادة المحاولة', style: TextStyle(color: Colors.white)),
+            child: const Icon(
+              Icons.wifi_off_rounded,
+              color: Colors.orange,
+              size: 36,
+            ),
+          ),
+          const SizedBox(height: 20),
+          
+          // Title
+          const Text(
+            'لا يوجد اتصال بالإنترنت',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 10),
+          
+          // Description
+          Text(
+            'يرجى التحقق من اتصالك بالإنترنت',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[600],
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 24),
+          
+          // Buttons
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text('إغلاق'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _checkConnectivityAndLoad();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text('إعادة المحاولة'),
+                ),
+              ),
+            ],
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   List<String> get _uniqueFoodTypes {
     final Set<String> foodTypes = {'الكل'};

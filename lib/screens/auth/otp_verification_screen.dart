@@ -10,10 +10,12 @@ import '../../services/api_service.dart';
 
 class OTPVerificationScreen extends StatefulWidget {
   final String phoneNumber;
+  final String originPhone;
 
   const OTPVerificationScreen({
     super.key,
     required this.phoneNumber,
+    required this.originPhone,
   });
 
   @override
@@ -101,8 +103,8 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen>
 
     Future<void> _DeletUser() async {
     try {
-      print("---------  widget.phoneNumber = ${widget.phoneNumber}");
-      await ApiService.deleteUser(widget.phoneNumber);
+      print("---------  widget.originPhone = ${widget.originPhone}");
+      await ApiService.deleteUser(widget.originPhone);
     } catch (e) {
       // Handle error if needed
       print('$e');
@@ -122,8 +124,10 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen>
       _errorMessage = '';
     });
 
+
+
     try {
-      await ApiService.verifyPhone(widget.phoneNumber, _otpCode);
+      await ApiService.verifyPhone(widget.originPhone, _otpCode);
       
       _showSuccessSnackBar('تم التحقق بنجاح!');
 
@@ -154,7 +158,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen>
     });
 
     try {
-      await ApiService.resendOTP(widget.phoneNumber);
+      await ApiService.resendOTP_register(widget.originPhone ,widget.phoneNumber );
       
       _showSuccessSnackBar('تم إرسال الرمز مرة أخرى');
 

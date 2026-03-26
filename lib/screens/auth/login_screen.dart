@@ -9,6 +9,7 @@ import 'package:wedding_reservation_app/screens/clan%20admin/home_screen.dart';
 import 'package:wedding_reservation_app/screens/groom/groom_home_screen.dart';
 import 'package:wedding_reservation_app/screens/super%20admin/home_screen.dart';
 import 'package:wedding_reservation_app/services/notification_manager.dart';
+import 'package:wedding_reservation_app/services/token_manager.dart';
 
 import '../../services/api_service.dart';
 import '../../widgets/common/custom_text_field.dart';
@@ -21,26 +22,74 @@ class LoginScreen extends StatefulWidget {
   _LoginScreenState createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStateMixin  {
   final _formKey = GlobalKey<FormState>();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   
+    // ADD THESE:
+  late AnimationController _animationController;
+  late Animation<double> slideAnimation;
+  late Animation<double> fadeAnimation;
+
   bool _isLoading = false;
   bool _obscurePassword = true;
 
   static const String _keyLastPhone = 'last_login_phone';
 
-  @override
-  void initState() {
-    super.initState();
-    _loadLastPhone();
-  }
+  // @override
+  // void initState() {
+  //   super.initState();
+  //   _loadLastPhone();
+  // }
+// @override
+// void initState() {
+//   super.initState();
+//   _loadLastPhone();
+  
+//   _animationController = AnimationController(
+//     duration: const Duration(milliseconds: 400), // Very fast
+//     vsync: this,
+//   );
 
+//   slideAnimation = Tween<double>(begin: 10.0, end: 0.0).animate( // Minimal slide
+//     CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
+//   );
+
+//   fadeAnimation = Tween<double>(begin: 0.7, end: 1.0).animate( // Start at 70% opacity instead of 0%
+//     CurvedAnimation(parent: _animationController, curve: Curves.easeIn),
+//   );
+
+//   _animationController.forward(); // Start immediately
+// }
+
+@override
+void initState() {
+  super.initState();
+  _loadLastPhone();
+  _checkExistingAuth(); // ADD THIS
+  
+  _animationController = AnimationController(
+    duration: const Duration(milliseconds: 400),
+    vsync: this,
+  );
+
+  slideAnimation = Tween<double>(begin: 10.0, end: 0.0).animate(
+    CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
+  );
+
+  fadeAnimation = Tween<double>(begin: 0.7, end: 1.0).animate(
+    CurvedAnimation(parent: _animationController, curve: Curves.easeIn),
+  );
+
+  _animationController.forward();
+}
   @override
   void dispose() {
     _phoneController.dispose();
     _passwordController.dispose();
+    _animationController.dispose(); // ADD THIS LINE
+
     super.dispose();
   }
 
@@ -54,7 +103,7 @@ class _LoginScreenState extends State<LoginScreen> {
         _phoneController.text = lastPhone;
       }
     } catch (e) {
-      print('Error loading last phone: $e');
+      print('Error loading last phone');
     }
   }
 
@@ -64,7 +113,7 @@ class _LoginScreenState extends State<LoginScreen> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_keyLastPhone, phone);
     } catch (e) {
-      print('Error saving phone: $e');
+      print('Error saving phone number');
     }
   }
 
@@ -95,7 +144,7 @@ void _showSnack(String msg, bool isError) {
     ..hideCurrentSnackBar() // optional: prevents stacking
     ..showSnackBar(
       SnackBar(
-        duration: const Duration(seconds: 10), 
+        duration: const Duration(seconds: 4), 
         content: Row(
           children: [
             Icon(
@@ -117,6 +166,57 @@ void _showSnack(String msg, bool isError) {
     );
 }
 
+
+
+// added new 
+
+Future<void> _checkExistingAuth() async {
+  try {
+    final hasValid = await TokenManager.hasValidToken();
+    if (!hasValid) return;
+
+    final token = await TokenManager.getToken();
+    if (token == null) return;
+
+    final role = TokenManager.getRoleFromToken(token);
+    if (role == null) return;
+
+    if (!mounted) return;
+
+    // Start notifications silently
+    NotificationManager().startMonitoring().catchError((e) => print('Notification error: $e'));
+
+    Widget destination;
+    switch (role) {
+      case 'groom':
+        destination = GroomHomeScreen(initialTabIndex: 0);
+        break;
+      case 'super_admin':
+        destination = SuperAdminHomeScreen();
+        break;
+      case 'clan_admin':
+        destination = ClanAdminHomeScreen();
+        break;
+      default:
+        return; // Unknown role, stay on login
+    }
+
+    Navigator.of(context).pushReplacement(
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) => destination,
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return FadeTransition(opacity: animation, child: child);
+        },
+        transitionDuration: const Duration(milliseconds: 200),
+      ),
+    );
+  } catch (e) {
+    print('Auto-login check failed: $e');
+    // Stay on login screen silently
+  }
+}
+
+
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -125,14 +225,14 @@ void _showSnack(String msg, bool isError) {
     try {
       // Get groom's actual phone
       String actualPhone = _phoneController.text.trim();
-      try {
-        actualPhone = await ApiService.getGroomPhoneBySearch(actualPhone);
-      } catch (e) {
-        if (!mounted) return;
-        setState(() => _isLoading = false);
-        _showSnack('المستخدم غير موجود، لا يوجد حساب مسجل بهذا الرقم.', true);
-        return;
-      }
+      // try {
+      //   actualPhone = await ApiService.getGroomPhoneBySearch(actualPhone);
+      // } catch (e) {
+      //   if (!mounted) return;
+      //   setState(() => _isLoading = false);
+      //   _showSnack('المستخدم غير موجود، لا يوجد حساب مسجل بهذا الرقم.', true);
+      //   return;
+      // }
 
       // Login
       final response = await ApiService.login(actualPhone, _passwordController.text);
@@ -149,7 +249,7 @@ void _showSnack(String msg, bool isError) {
       final role = payload['role'];
 
       // Start notifications in background
-      NotificationManager().startMonitoring().catchError((e) => print('Notification error: $e'));
+      NotificationManager().startMonitoring().catchError((e) => print('Notification error'));
 
       // Navigate based on role
       Widget destination;
@@ -176,15 +276,31 @@ void _showSnack(String msg, bool isError) {
           transitionDuration: const Duration(milliseconds: 200),
         ),
       );
+
+
+
+
+
+     
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
       
       String errorMessage = e.toString().replaceFirst('Exception: ', '');
-      _showSnack(errorMessage, true);
+      // _showSnack(errorMessage, true);
+      _showSnack(' .خطأ في تسجيل الدخول ,تحقق من الإنترنت', true);
     }
   }
 
+
+
+
+String? validatePhone(String? value) {
+  if (value == null || value.isEmpty) {
+    return 'رقم الهاتف مطلوب';
+  }
+  return null;
+}
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -322,18 +438,34 @@ void _showSnack(String msg, bool isError) {
                           
                           SizedBox(height: isLargeScreen ? size.height * 0.15 : size.height * 0.05),
                           
-                          // Phone Number Field
-                          CustomTextField(
-                            controller: _phoneController,
-                            label: 'رقم الهاتف',
-                            labelColor: isDark ? Colors.white : Colors.black,
-                            boxcolor: isDark ? const Color.fromARGB(255, 157, 42, 42) : Colors.black,
-                            keyboardType: TextInputType.phone,
-                            validator: (v) => v!.isEmpty ? 'رقم الهاتف مطلوب' : null,
-                            prefixIcon: Icons.phone,
-                            hint: '0xxxxxxxx',
-                          ),
+                          // // Phone Number Field
+                          // CustomTextField(
+                          //   controller: _phoneController,
+                          //   label: 'رقم الهاتف',
+                          //   labelColor: isDark ? Colors.white : Colors.black,
+                          //   boxcolor: isDark ? const Color.fromARGB(255, 157, 42, 42) : Colors.black,
+                          //   keyboardType: TextInputType.phone,
+                          //   validator: (v) => v!.isEmpty ? 'رقم الهاتف مطلوب' : null,
+                          //   prefixIcon: Icons.phone,
+                          //   hint: '0xxxxxxxx',
+                          // ),
                           
+                          _AnimatedWidget(
+                            slideAnimation: slideAnimation,
+                            fadeAnimation: fadeAnimation,
+                            slideMultiplier: 0.5,
+                            child: _AnimatedUnderlineTextField(
+                              controller: _phoneController,
+                              label: ' رقم هاتف العريس',
+                              // label: 'رقم الهاتف (رقم هاتف العريس) ',
+                              labelColor: isDark ? Colors.white : Colors.black,
+                              boxcolor: isDark ? const Color.fromARGB(255, 157, 42, 42) : Colors.black,
+                              keyboardType: TextInputType.phone,
+                              validator: validatePhone,
+                              prefixIcon: Icons.phone,
+                              hint: '0xxxxxxxx',
+                            ),
+                          ),
                           const SizedBox(height: 20),
                           
                           // Password Field
@@ -496,5 +628,177 @@ void _showSnack(String msg, bool isError) {
         ),
       ),
     );
+  }
+}
+
+
+// Replace the _AnimatedUnderlineTextField widget with this updated version:
+class _AnimatedUnderlineTextField extends StatefulWidget {
+  final TextEditingController controller;
+  final String label;
+  final Color labelColor;
+  final Color boxcolor;
+  final TextInputType keyboardType;
+  final String? Function(String?)? validator;
+  final IconData prefixIcon;
+  final String hint;
+
+  const _AnimatedUnderlineTextField({
+    required this.controller,
+    required this.label,
+    required this.labelColor,
+    required this.boxcolor,
+    required this.keyboardType,
+    this.validator,
+    required this.prefixIcon,
+    required this.hint,
+  });
+
+  @override
+  State<_AnimatedUnderlineTextField> createState() => _AnimatedUnderlineTextFieldState();
+}
+
+class _AnimatedUnderlineTextFieldState extends State<_AnimatedUnderlineTextField> 
+    with SingleTickerProviderStateMixin {
+  late AnimationController _underlineController;
+  late Animation<double> _underlineAnimation;
+  final GlobalKey _labelKey = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    _underlineController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    )..repeat(reverse: true);
+
+    _underlineAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _underlineController,
+        curve: Curves.easeInOut,
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _underlineController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Label with animated underline
+        Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Text(
+              widget.label,
+              key: _labelKey,
+              style: TextStyle(
+                color: widget.labelColor,
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            Positioned(
+              bottom: -4,
+              left: 0,
+              right: 0,
+              child: AnimatedBuilder(
+                animation: _underlineAnimation,
+                builder: (context, child) {
+                  return CustomPaint(
+                    size: Size(double.infinity, 3),
+                    painter: _MovingUnderlinePainter(
+                      progress: _underlineAnimation.value,
+                      color: Colors.green,
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        // Text field without label
+        CustomTextField(
+          controller: widget.controller,
+          label: '', // Empty label since we show it above
+          labelColor: widget.labelColor,
+          boxcolor: widget.boxcolor,
+          keyboardType: widget.keyboardType,
+          validator: widget.validator,
+          prefixIcon: widget.prefixIcon,
+          hint: widget.hint,
+        ),
+      ],
+    );
+  }
+}
+
+
+// Reusable animated widget wrapper
+class _AnimatedWidget extends StatelessWidget {
+  final Animation<double> slideAnimation;
+  final Animation<double> fadeAnimation;
+  final Widget child;
+  final double slideMultiplier;
+  final double opacity;
+
+  const _AnimatedWidget({
+    required this.slideAnimation,
+    required this.fadeAnimation,
+    required this.child,
+    this.slideMultiplier = 1.0,
+    this.opacity = 1.0,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Transform.translate(
+      offset: Offset(0, slideAnimation.value * slideMultiplier),
+      child: Opacity(
+        opacity: fadeAnimation.value * opacity,
+        child: child,
+      ),
+    );
+  }
+}
+
+// Keep the _MovingUnderlinePainter class as is (no changes needed)
+class _MovingUnderlinePainter extends CustomPainter {
+  final double progress;
+  final Color color;
+
+  _MovingUnderlinePainter({
+    required this.progress,
+    required this.color,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 3
+      ..strokeCap = StrokeCap.round;
+
+    final lineWidth = size.width * 0.3; // 30% of total width
+    final startX = (size.width - lineWidth) * progress;
+    final endX = startX + lineWidth;
+
+    canvas.drawLine(
+      Offset(startX, size.height / 2),
+      Offset(endX, size.height / 2),
+      paint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_MovingUnderlinePainter oldDelegate) {
+    return oldDelegate.progress != progress;
   }
 }

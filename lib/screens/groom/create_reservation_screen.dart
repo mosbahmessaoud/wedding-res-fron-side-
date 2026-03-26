@@ -562,6 +562,7 @@ bool _isCrossClanReservation() {
          _userProfile!['clan_id'] != _selectedClan!['id'];
 }
 
+
   Map<String, String> _getClanAcceptanceTime(bool isOriginClan) {
     Map<String, dynamic>? settings =isOriginClan ?  _originClanSettings :_selectedClanSettings ;
     
@@ -771,18 +772,22 @@ Widget _buildReservationInstructionWidget() {
             Text('⚠️ تنبيه ', textAlign: TextAlign.center, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.orange)),
             Text('━━━━━━━━━━━━━━━━━━━━━━', textAlign: TextAlign.center),
             SizedBox(height: 12),
-            Text('يجب استكمال هذه الإجراءات خلال $daysMax أيام كحد أقصى', textAlign: TextAlign.center),
+            Text('يجب استكمال هذه الإجراءات خلال $daysMax يوم كحد أقصى', textAlign: TextAlign.center),
             Text('وإلا يُلغى الحجز تلقائياً', textAlign: TextAlign.center, style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600)),
             SizedBox(height: 12),
             Text('بعد ختم وتوقيع جميع الجهات، توجّه إلى إدارة عشيرتك', textAlign: TextAlign.center),
             Text(originClanName, textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.w600)),
-            Text('ليؤكد حجزك في النظام', textAlign: TextAlign.center),
+            Text('لتؤكد حجزك في النظام', textAlign: TextAlign.center),
           ],
         ),
       ),
     ),
   );
 }  
+
+
+
+
 
 Future<void> _submitReservation() async {
   setState(() => _isSubmitting = true);
@@ -795,20 +800,36 @@ Future<void> _submitReservation() async {
       try {
         final clanAdminStatus = await ApiService.checkClanAdminStatus();
         
+//  && !_isOriginClan
+        
         if (clanAdminStatus['has_admin']==false || clanAdminStatus['is_active']==false ) {
-          if (mounted) {
-            _showMessageDialog(
-              title: 'عشيرتك ليست في النضام حالياً',
-              // message:  'يرجى التواصل مع إدارة عشيرتك.',
-              message: 'عذراً،  ${clanAdminStatus['clan_name']} ليست في النضام حالياً.\n\n'
-                      'يرجى التواصل مع إدارة عشيرتك لمزيد من التفاصيل.',
-              // message: 'عذراً،  ${clanAdminStatus['clan_name']} غير مشتركة حالياً في التطبيق.\n\n'
-              //         'يرجى التواصل مع إدارة عشيرتك للانضمام إلى النظام.',
-              icon: Icons.business_center_outlined,
-              titleColor: Colors.orange,
-              isError: true,
-            );
-          }
+            if (clanAdminStatus['has_admin']==false) {
+            if (mounted) {
+                _showMessageDialog(
+                  title: 'عشيرتك ليست في النضام حالياً',
+                  // message:  'يرجى التواصل مع إدارة عشيرتك.',
+                  message: 'عذراً،  ${clanAdminStatus['clan_name']} ليست في النضام حالياً.\n\n'
+                          'يرجى التواصل مع إدارة عشيرتك لمزيد من التفاصيل.',
+                  // message: 'عذراً،  ${clanAdminStatus['clan_name']} غير مشتركة حالياً في التطبيق.\n\n'
+                  //         'يرجى التواصل مع إدارة عشيرتك للانضمام إلى النظام.',
+                  icon: Icons.business_center_outlined,
+                  titleColor: Colors.orange,
+                  isError: true,
+                );
+              }
+          } else if (clanAdminStatus['is_active']==false) {
+            if (mounted) {
+                _showMessageDialog(
+                  title: 'التسجيلات متوقفة مؤقتا ',
+                  message: 'التسجيلات متوقفة مؤقتا في ${clanAdminStatus['clan_name']} سيتم فتحها في أقرب وقت.',
+
+                  icon: Icons.business_center_outlined,
+                  titleColor: Colors.orange,
+                  isError: true,
+                );
+              }
+          } 
+          
           return;
 
         }
@@ -872,7 +893,7 @@ Future<void> _submitReservation() async {
       String daysMax = _getValidationDeadlineDays();
       String successMessage = 
         'تم إنشاء حجز جديد بنجاح!\n\n'
-        'يجب طباعة الحجز وختمه وتوقيعه خلال $daysMax أيام كأقصى حد، '
+        'يجب طباعة الحجز وختمه وتوقيعه خلال $daysMax يوم كأقصى حد، '
         'وإلا سيتم إلغاء الحجز تلقائيًا.\n\n'
         'يمكنك الآن الذهاب إلى قائمة الحجوزات لطباعة الحجز.';
 
@@ -950,10 +971,10 @@ Future<void> _submitReservation() async {
         errorMessage = 'خطأ في الاتصال بالإنترنت.\n\nتحقق من اتصالك بالإنترنت وحاول مرة أخرى.';
       } else {
         String actualError = e.toString();
-        if (actualError.length > 150) {
-          actualError = actualError.substring(0, 150) + '...';
+        if (actualError.length > 250) {
+          actualError = actualError.substring(0, 250) + '...';
         }
-        errorMessage = ' \n\n$actualError\n\nيرجى المحاولة مرة أخرى  .';
+        errorMessage = ' \n\n$actualError\n\n  .';
       }
       
       _showMessageDialog(
@@ -1301,37 +1322,128 @@ Future<void> _loadData() async {
   }
 }
 
+// void _showNoInternetDialog() {
+//   showDialog(
+//     context: context,
+//     barrierDismissible: false,
+//     builder: (context) => AlertDialog(
+//       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+//       title: Row(
+//         children: [
+//           Icon(Icons.wifi_off, color: Colors.orange),
+//           SizedBox(width: 10),
+//           Text('لا يوجد اتصال'),
+//         ],
+//       ),
+//       content: Text('يرجى التحقق من اتصالك بالإنترنت'),
+//       actions: [
+//         TextButton(
+//           onPressed: () => Navigator.pop(context),
+//           child: Text('إلغاء'),
+//         ),
+//         ElevatedButton(
+//           onPressed: () {
+//             Navigator.pop(context);
+//             _checkConnectivityAndLoad();
+//           },
+//           style: ElevatedButton.styleFrom(
+//             backgroundColor: AppColors.primary,
+//             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+//           ),
+//           child: Text('إعادة المحاولة', style: TextStyle(color: Colors.white)),
+//         ),
+//       ],
+//     ),
+//   );
+// }
+
 void _showNoInternetDialog() {
+  if (!mounted) return;
+  
   showDialog(
     context: context,
-    barrierDismissible: false,
+    barrierDismissible: true,
     builder: (context) => AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: Row(
+      contentPadding: const EdgeInsets.all(24),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.wifi_off, color: Colors.orange),
-          SizedBox(width: 10),
-          Text('لا يوجد اتصال'),
+          // Icon Container
+          Container(
+            width: 70,
+            height: 70,
+            decoration: BoxDecoration(
+              color: Colors.orange.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.wifi_off_rounded,
+              color: Colors.orange,
+              size: 36,
+            ),
+          ),
+          const SizedBox(height: 20),
+          
+          // Title
+          const Text(
+            'لا يوجد اتصال بالإنترنت',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 10),
+          
+          // Description
+          Text(
+            'يرجى التحقق من اتصالك بالإنترنت',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[600],
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 24),
+          
+          // Buttons
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text('إغلاق'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _checkConnectivityAndLoad();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text('إعادة المحاولة'),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
-      content: Text('يرجى التحقق من اتصالك بالإنترنت'),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text('إلغاء'),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            Navigator.pop(context);
-            _checkConnectivityAndLoad();
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-          child: Text('إعادة المحاولة', style: TextStyle(color: Colors.white)),
-        ),
-      ],
     ),
   );
 }
@@ -1410,10 +1522,19 @@ Future<void> _selectDate(TextEditingController controller, String title) async {
           hallId: _selectedHall?['id'],
           maxCapacityPerDate: _maxCapacityPerDate,
           initialDate: controller.text.isNotEmpty 
-              ? DateTime.tryParse(controller.text) ?? now.add(const Duration(days: 30))
-              : now.add(const Duration(days: 30)),
+              ? DateTime.tryParse(controller.text) ?? now.add(const Duration(days: 1))
+              : now.add(const Duration(days: 1)),
           firstDate: now,
-          lastDate: now.add(const Duration(days: 365)),
+          // lastDate: now.add(const Duration(days: 365)),
+          // AFTER:
+          // AFTER (correct version):
+          lastDate: DateTime(
+            now.year + (_isOriginClan 
+                ? _years_max_reserv_GrooomFromOriginClan 
+                : _years_max_reserv_GroomFromOutClan) - 1,
+            12,
+            31,
+          ),
           allowTwoConsecutiveDays: _canSelectTwoDays,
           onDateSelected: (selectedDate, availability) {
             Navigator.of(context).pop();
@@ -1976,6 +2097,7 @@ if (_selectedClan != null) ...[
               ),
             ),
           ),
+          _buildIsNormal(),
         ],
         const SizedBox(height: 24),
         _buildBottomNavigation(),
@@ -1985,6 +2107,94 @@ if (_selectedClan != null) ...[
   );
 }
 
+// Fix for _buildIsNormal() - Change from async Widget to FutureBuilder
+Widget _buildIsNormal() {
+  if (_selectedClan == null || _selectedHall ==null) {
+    return const SizedBox.shrink();
+  }
+  if (_selectedClan!['id'] == 24 ) {
+      return const SizedBox.shrink();
+    }
+  return FutureBuilder<Map<String, dynamic>>(
+    future: ApiService.checkClanAdminStatusById(_selectedClan!['id']),
+    builder: (context, snapshot) {
+      if (snapshot.connectionState == ConnectionState.waiting) {
+        return const Center(
+          child: Padding(
+            padding: EdgeInsets.all(16.0),
+            child: CircularProgressIndicator(),
+          ),
+        );
+      }
+      
+      if (snapshot.hasError) {
+        return const SizedBox.shrink();
+      }
+      
+      final clanAdminStatus = snapshot.data;
+      
+      if (clanAdminStatus != null &&
+          (clanAdminStatus['has_admin'] == false || 
+           clanAdminStatus['is_active'] == false)) {
+        return _buildCheckClanIsActiveWidget();
+      }
+      
+      return const SizedBox.shrink();
+    },
+  );
+}
+Widget _buildCheckClanIsActiveWidget() {
+  String clan_name = _selectedClan!['name']?.toString() ?? '';
+  return Center(
+    child: SingleChildScrollView(
+      child: Container(
+        margin: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: Colors.red,
+            width: 3,
+          ),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              // const Text('━━━━━━━━━━━━━━━━━━━━━━', textAlign: TextAlign.center),
+              const Text(
+                '⚠️ تنبيه ',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.orange,
+                ),
+              ),
+              // const Text('━━━━━━━━━━━━━━━━━━━━━━', textAlign: TextAlign.center),
+              // const Text(
+              //   'دار العشيرة المختار لإقامة العرس فيها ليست في النظام حاليا',
+              //   textAlign: TextAlign.center,
+              //   style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+              // ),
+              // const Text('━━━━━━━━━━━━━━━━━━━━━━', textAlign: TextAlign.center),
+              const SizedBox(height: 20),
+              Text(
+                 '  ستدخل $clan_name إلى النضام قريبا ',
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'يمكنك متابعة الحجز لكن يجب عليك التأكد من اليوم المختار إذ هو متاح في $clan_name  لإقامة العرس بعد إتمام الحجز  ',
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
 
 Widget _buildReservationDetailsStep() {
   final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -2024,8 +2234,7 @@ Widget _buildReservationDetailsStep() {
         ),
         const SizedBox(height: 24),
         
-        // Rest of your existing reservation details code...
-        // (Keep all existing content for this step)
+
         
         // Primary Date
         TextFormField(
@@ -2100,7 +2309,7 @@ Widget _buildReservationDetailsStep() {
                     child: Text(
                       _getSelectedMonthName() != null 
                         ? 'العشيرة تسمح بحجز يومين متتاليين (اقامة أمنسي الوزران في نفس العشيرة) لشهر ${_getSelectedMonthName()}. '
-                        : 'العشيرة تسمح بالقامة أمنسي الوزران في نفس العشيرة لهذا الشهر. ',
+                        : 'العشيرة تسمح ب إقامة أمنسي الوزران في نفس العشيرة لهذا الشهر. ',
                       style: TextStyle(color: Colors.green[700]),
                     ),
                   ),
@@ -2123,8 +2332,8 @@ Widget _buildReservationDetailsStep() {
                   Expanded(
                     child: Text(
                       _getSelectedMonthName() != null 
-                        ? 'العشيرة لا تسمح بالقامة أمنسي الوزران في نفس العشيرة لشهر ${_getSelectedMonthName()}'
-                        : 'العشيرة لا تسمح بالقامة أمنسي الوزران في نفس العشيرة لهذا الشهر',
+                        ? '  يمكنك حجز اليوم الثاني لإقامة أمنسي الوزران عند إقتراب العرس ليس الآن'
+                        : 'يمكنك حجز اليوم الثاني لإقامة أمنسي الوزران عند إقتراب العرس ليس الآن',
                       style: TextStyle(color: Colors.orange[700]),
                     ),
                   ),
@@ -2158,7 +2367,8 @@ Widget _buildReservationDetailsStep() {
         
         const SizedBox(height: 24),
         
-        // Haia Committee Selection
+
+                // Haia Committee Selection
         DropdownButtonFormField<Map<String, dynamic>>(
           value: _selectedHaiaCommittee,
           decoration: InputDecoration(
@@ -2167,34 +2377,57 @@ Widget _buildReservationDetailsStep() {
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
             helperText: 'اختر الهيئة الدينية',
           ),
+          isExpanded: true,
+          selectedItemBuilder: (BuildContext context) {
+            return _haiaCommittees.map<Widget>((committee) {
+              return Text(
+                committee['name']?.toString() ?? 'لجنة غير مسماة',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+              );
+            }).toList();
+          },
           items: _haiaCommittees.map((committee) {
             return DropdownMenuItem<Map<String, dynamic>>(
               value: committee,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    committee['name']?.toString() ?? 'لجنة غير مسماة',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  if (committee['description'] != null)
-                    Text(
-                      committee['description'].toString(),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return SizedBox(
+                    width: constraints.maxWidth,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          committee['name']?.toString() ?? 'لجنة غير مسماة',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                        if (committee['description'] != null) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            committee['description'].toString(),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ],
                     ),
-                ],
+                  );
+                },
               ),
             );
           }).toList(),
           onChanged: (value) => setState(() => _selectedHaiaCommittee = value),
           validator: (value) => value == null ? ' الهيئة مطلوبة' : null,
         ),
+
         const SizedBox(height: 16),
 
         // Tilawa Type Selection
@@ -2246,17 +2479,17 @@ Widget _buildReservationDetailsStep() {
               labelText: 'اسم القارئ (اختياري)',
               prefixIcon: const Icon(Icons.person_outline),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-              helperText: 'أدخل اسم القارئ إذا كنت تريد تحديده',
+              helperText: 'أدخل اسم القارئ إن وجد',
               helperMaxLines: 2,
             ),
             maxLength: 300,
- 
+
           ),
           const SizedBox(height: 16),
         ],
-        
+
+
         const SizedBox(height: 16),
-        
 
         // Madaeh Committee Selection
         DropdownButtonFormField<Map<String, dynamic>>(
@@ -2267,37 +2500,57 @@ Widget _buildReservationDetailsStep() {
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
             helperText: 'اختر لجنة المدائح و الانشاد ',
           ),
+          isExpanded: true,
+          selectedItemBuilder: (BuildContext context) {
+            return _madaehCommittees.map<Widget>((committee) {
+              return Text(
+                committee['name']?.toString() ?? 'لجنة غير مسماة',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+              );
+            }).toList();
+          },
           items: _madaehCommittees.map((committee) {
             return DropdownMenuItem<Map<String, dynamic>>(
               value: committee,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    committee['name']?.toString() ?? 'لجنة غير مسماة',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  if (committee['description'] != null)
-                    Text(
-                      committee['description'].toString(),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return SizedBox(
+                    width: constraints.maxWidth,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          committee['name']?.toString() ?? 'لجنة غير مسماة',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                        if (committee['description'] != null) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            committee['description'].toString(),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ],
                     ),
-                ],
+                  );
+                },
               ),
             );
           }).toList(),
           onChanged: (value) {
             setState(() {
               _selectedMadaehCommittee = value;
-              // Check if "لجنة خاصة" is selected
-              _showCustomMadaehInput = value?['name']?.toString() == 'لجنة خاصة';
-              // Clear the custom input if switching away from "لجنة خاصة"
+              _showCustomMadaehInput = value?['name']?.toString() == ' لجنة خاصة';
               if (!_showCustomMadaehInput) {
                 _customMadaehCommitteeController.clear();
               }
@@ -2305,7 +2558,7 @@ Widget _buildReservationDetailsStep() {
           },
           validator: (value) => value == null ? 'لجنة المدائح و الانشاد مطلوبة' : null,
         ),
-
+        
         // Add this spacing and conditional custom input field
         const SizedBox(height: 16),
 
@@ -2317,7 +2570,7 @@ Widget _buildReservationDetailsStep() {
               labelText: 'اسم اللجنة الخاصة (اختياري)',
               prefixIcon: const Icon(Icons.edit),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-              helperText: 'أدخل اسم اللجنة الخاصة إذا كنت تريد تحديدها',
+              helperText: 'أدخل اسم اللجنة الخاصة إن وجد',
               helperMaxLines: 2,
             ),
             maxLength: 100,
@@ -2332,8 +2585,9 @@ Widget _buildReservationDetailsStep() {
           const SizedBox(height: 16),
         ],
         
+       
         const SizedBox(height: 24),
-        
+
         // Options
         Card(
           child: Padding(
@@ -2342,7 +2596,7 @@ Widget _buildReservationDetailsStep() {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'خيارات الحجز',
+                  'عرس  جماعي  ',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -2351,23 +2605,43 @@ Widget _buildReservationDetailsStep() {
                 ),
                 const SizedBox(height: 12),
                 
-                SwitchListTile(
-                  // title: const Text('السماح للآخرين بالانضمام'),
-                  title: const Text('هل تسمح للآخرين بالانضمام الى العرس؟'),
-                  // subtitle: const Text('هل تسمح للآخرين بالانضمام الى العرس ؟'),
-                  value: _allowOthers,
-                  onChanged: (value) => setState(() => _allowOthers = value),
-                  contentPadding: EdgeInsets.zero,
+                // Question text
+                const Text(
+                  'هل يمكن السماح للآخرين بالانضمام إلى عرسكم (عرس جماعي، على الأكثر 3)؟',
+                  style: TextStyle(fontSize: 18),
                 ),
+                const SizedBox(height: 12),
                 
-                // SwitchListTile(
-                //   // title: const Text('الانضمام لعرس جماعي'),
-                //   title: const Text('هل تريد الانضمام الى العرس الجماعي؟'),
-                //   // subtitle: const Text('هل تريد الانضمام الى العرس الجماعي ؟'),
-                //   value: _joinToMassWedding,
-                //   onChanged: (value) => setState(() => _joinToMassWedding = value),
-                //   contentPadding: EdgeInsets.zero,
-                // ),
+                // Yes/No buttons
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => setState(() => _allowOthers = true),
+                        style: OutlinedButton.styleFrom(
+                          backgroundColor: _allowOthers ? AppColors.primary : Colors.transparent,
+                          foregroundColor: _allowOthers ? Colors.white : AppColors.primary,
+                          side: BorderSide(color: AppColors.primary),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        child: const Text('نعم'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => setState(() => _allowOthers = false),
+                        style: OutlinedButton.styleFrom(
+                          backgroundColor: !_allowOthers ? AppColors.primary : Colors.transparent,
+                          foregroundColor: !_allowOthers ? Colors.white : AppColors.primary,
+                          side: BorderSide(color: AppColors.primary),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        child: const Text('لا'),
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -2513,11 +2787,12 @@ Widget _buildConfirmationStep() {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    Text('جاري تحميل معلومات الاستقبال...'),
+                    Text('جاري تحميل تنبيه مهم...'),
                   ],
                 ),
               );
             }
+            
             
             return Container(
                 width: double.infinity,
@@ -3234,7 +3509,14 @@ Future<void> _showFallbackDatePicker(TextEditingController controller, String ti
           ? DateTime.tryParse(controller.text) ?? now.add(const Duration(days: 30))
           : now.add(const Duration(days: 30)),
       firstDate: now,
-      lastDate: now.add(const Duration(days: 365)),
+      // lastDate: now.add(const Duration(days: 365)),
+      lastDate: DateTime(
+        now.year + (_isOriginClan 
+            ? _years_max_reserv_GrooomFromOriginClan 
+            : _years_max_reserv_GroomFromOutClan) - 1,
+        12,
+        31,
+      ),
       helpText: title,
       cancelText: 'إلغاء',
       confirmText: 'تأكيد',

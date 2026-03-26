@@ -1,10 +1,14 @@
 // lib/screens/event_type_selection_screen.dart
 import 'package:flutter/material.dart';
+// import 'package:http/http.dart' as http;
+import 'package:in_app_review/in_app_review.dart';
+import 'package:in_app_update/in_app_update.dart';
+// import 'package:package_info_plus/package_info_plus.dart';
+// import 'package:url_launcher/url_launcher.dart';
+import 'package:wedding_reservation_app/widgets/theme_toggle_button.dart';
+
 import '../auth/welcome_screen.dart';
 import 'religious_event_screen.dart';
-import 'package:wedding_reservation_app/widgets/theme_toggle_button.dart';
-import '../../utils/colors.dart';
-
 class EventTypeSelectionScreen extends StatefulWidget {
   const EventTypeSelectionScreen({super.key});
 
@@ -41,6 +45,8 @@ class _EventTypeSelectionScreenState extends State<EventTypeSelectionScreen>
     );
 
     _animationController.forward();
+      // ✅ Add this — check for update after first frame renders
+  WidgetsBinding.instance.addPostFrameCallback((_) => _checkForUpdate());
   }
 
   @override
@@ -48,6 +54,86 @@ class _EventTypeSelectionScreenState extends State<EventTypeSelectionScreen>
     _animationController.dispose();
     super.dispose();
   }
+
+// ─── Version Check ────────────────────────────────────────────────────────────
+
+
+// Future<void> _checkForUpdate() async {
+//   try {
+//     final packageInfo = await PackageInfo.fromPlatform();
+//     final currentVersion = packageInfo.version; // e.g. "1.2.0"
+
+//     final latestVersion = await _getLatestPlayStoreVersion();
+//     if (latestVersion == null) return;
+
+//     if (_isUpdateAvailable(currentVersion, latestVersion)) {
+//       if (mounted) _showUpdateDialog(latestVersion);
+//     }
+//   } catch (e) {
+//     debugPrint('Version check failed: $e');
+//   }
+// }
+
+// Future<void> _checkForUpdate() async {
+//   try {
+//     final updateInfo = await InAppUpdate.checkForUpdate();
+
+//     if (updateInfo.updateAvailability == UpdateAvailability.updateAvailable) {
+//       // Flexible = user can keep using app while it downloads
+//       await InAppUpdate.startFlexibleUpdate();
+//       await InAppUpdate.completeFlexibleUpdate();
+//     } else {
+//       // No update — show in-app review instead
+//       await _requestInAppReview();
+//     }
+//   } catch (e) {
+//     debugPrint('Update check failed: $e');
+//   }
+// }
+
+// forced for updating 
+Future<void> _checkForUpdate() async {
+  try {
+    final updateInfo = await InAppUpdate.checkForUpdate();
+
+    if (updateInfo.updateAvailability == UpdateAvailability.updateAvailable) {
+      // Immediate = fullscreen blocking screen, user CANNOT skip or dismiss
+      await InAppUpdate.performImmediateUpdate();
+      // No code after this runs until the user updates and app restarts
+    } else {
+      await _requestInAppReview();
+    }
+  } catch (e) {
+    debugPrint('Update check failed: $e');
+  }
+}
+
+Future<void> _requestInAppReview() async {
+  try {
+    final inAppReview = InAppReview.instance;
+    if (await inAppReview.isAvailable()) {
+      await inAppReview.requestReview();
+    }
+  } catch (e) {
+    debugPrint('In-app review failed: $e');
+  }
+}
+
+
+
+// bool _isUpdateAvailable(String current, String latest) {
+//   final currentParts = current.split('.').map(int.parse).toList();
+//   final latestParts = latest.split('.').map(int.parse).toList();
+
+//   for (int i = 0; i < 3; i++) {
+//     final c = i < currentParts.length ? currentParts[i] : 0;
+//     final l = i < latestParts.length ? latestParts[i] : 0;
+//     if (l > c) return true;
+//     if (l < c) return false;
+//   }
+//   return false;
+// }
+
 
   void _navigate(String type) {
     Navigator.push(
@@ -388,3 +474,4 @@ class _EventIcon extends StatelessWidget {
     );
   }
 }
+

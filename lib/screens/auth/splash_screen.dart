@@ -53,7 +53,7 @@ class _SplashScreenState extends State<SplashScreen>
     // Start animation only once (no repeat)
     _animationController.forward();
 
-    Future.delayed(const Duration(milliseconds: 7000), () {
+    Future.delayed(const Duration(milliseconds: 5000), () {
       if (mounted) {
         Navigator.of(context).pushReplacement(
           PageRouteBuilder(

@@ -279,7 +279,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('استعادة كلمة المرور'),
+        title: Text('استعادة كلمة المرور الحساب'),
         backgroundColor: Colors.transparent,
         elevation: 0,
         foregroundColor: AppColors.primary,
@@ -331,7 +331,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               if (_currentStep == 1) ...[
                 CustomTextField(
                   controller: _phoneController,
-                  label: 'رقم الهاتف',
+                  label: 'رقم هاتف العريس',
                   keyboardType: TextInputType.phone,
                   validator: _validatePhone,
                   prefixIcon: Icons.phone,

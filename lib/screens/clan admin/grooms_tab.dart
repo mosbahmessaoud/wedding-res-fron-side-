@@ -65,22 +65,57 @@ int _getCrossAxisCount(BuildContext context) {
     });
   }
 
-  void _applyFilters() {
-    filteredGrooms = grooms.where((groom) {
-      if (_searchQuery.isNotEmpty) {
-        final fullName = '${groom['first_name'] ?? ''} ${groom['last_name'] ?? ''}'.toLowerCase();
-        final phone = groom['phone_number']?.toString().toLowerCase() ?? '';
-        if (!fullName.contains(_searchQuery) && !phone.contains(_searchQuery)) return false;
-      }
-      if (_statusFilter != 'all') {
-        final status = groom['status']?.toString() ?? 'inactive';
-        if (status != _statusFilter) return false;
-      }
-      return true;
-    }).toList();
+  // void _applyFilters() {
+  //   filteredGrooms = grooms.where((groom) {
+  //     if (_searchQuery.isNotEmpty) {
+  //       final fullName = '${groom['first_name'] ?? ''} ${groom['last_name'] ?? ''}'.toLowerCase();
+  //       final phone = groom['phone_number']?.toString().toLowerCase() ?? '';
+  //       if (!fullName.contains(_searchQuery) && !phone.contains(_searchQuery)) return false;
+  //     }
+  //     if (_statusFilter != 'all') {
+  //       final status = groom['status']?.toString() ?? 'inactive';
+  //       if (status != _statusFilter) return false;
+  //     }
+  //     return true;
+  //   }).toList();
     
-    if (_reservationFilter != 'all') _applyReservationFilterSync();
-  }
+  //   if (_reservationFilter != 'all') _applyReservationFilterSync();
+  // }
+
+    void _applyFilters() {
+      filteredGrooms = grooms.where((groom) {
+        if (_searchQuery.isNotEmpty) {
+          final fullName = '${groom['first_name'] ?? ''} ${groom['last_name'] ?? ''}'.toLowerCase();
+          final familyName = groom['family_name']?.toString().toLowerCase() ?? '';
+          final phone = groom['phone_number']?.toString().toLowerCase() ?? '';
+          final guardianPhone = groom['guardian_phone']?.toString().toLowerCase() ?? '';
+          final birthDate = groom['birth_date']?.toString().toLowerCase() ?? '';
+          final guardianName = groom['guardian_name']?.toString().toLowerCase() ?? '';
+          final guardianBirthDate = groom['guardian_birth_date']?.toString().toLowerCase() ?? '';
+
+          final matchesSearch = fullName.contains(_searchQuery) ||
+              familyName.contains(_searchQuery) ||
+              phone.contains(_searchQuery) ||
+              guardianPhone.contains(_searchQuery) ||
+              birthDate.contains(_searchQuery) ||
+              guardianName.contains(_searchQuery) ||
+              guardianBirthDate.contains(_searchQuery);
+
+          if (!matchesSearch) return false;
+        }
+
+        if (_statusFilter != 'all') {
+          final status = groom['status']?.toString() ?? 'inactive';
+          if (status != _statusFilter) return false;
+        }
+
+        return true;
+      }).toList();
+
+      if (_reservationFilter != 'all') _applyReservationFilterSync();
+    }
+
+
 
   void _applyReservationFilterSync() {
     if (_reservationFilter == 'all') return;
@@ -452,25 +487,115 @@ int _getCrossAxisCount(BuildContext context) {
     });
   }
 
-  Future<void> _updateGroomStatus(String phoneNumber, String currentStatus) async {
-    try {
-      final newStatus = currentStatus == 'active' ? 'inactive' : 'active';
-      await ApiService.updateGroomStatus(phoneNumber, newStatus);
+  // Future<void> _updateGroomStatus(String phoneNumber, String currentStatus) async {
+  //   try {
+  //     final newStatus = currentStatus == 'active' ? 'inactive' : 'active';
+  //     await ApiService.updateGroomStatus(phoneNumber, newStatus);
       
-      setState(() {
-        final groomIndex = grooms.indexWhere((g) => g['phone_number']?.toString() == phoneNumber);
-        if (groomIndex != -1) grooms[groomIndex]['status'] = newStatus;
-      });
+  //     setState(() {
+  //       final groomIndex = grooms.indexWhere((g) => g['phone_number']?.toString() == phoneNumber);
+  //       if (groomIndex != -1) grooms[groomIndex]['status'] = newStatus;
+  //     });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تم تحديث حالة العريس بنجاح'), backgroundColor: Colors.green),
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       SnackBar(content: Text('تم تحديث حالة العريس بنجاح'), backgroundColor: Colors.green),
+  //     );
+  //   } catch (e) {
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       SnackBar(content: Text('خطأ في تحديث الحالة: ${e.toString()}'), backgroundColor: Colors.red),
+  //     );
+  //   }
+  // }
+  Future<void> _updateGroomStatus(String phoneNumber, String currentStatus) async {
+  final newStatus = currentStatus == 'active' ? 'inactive' : 'active';
+  final isActivating = newStatus == 'active';
+
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (context) {
+      final isDark = Theme.of(context).brightness == Brightness.dark;
+      return AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(
+              isActivating ? Icons.check_circle_outline : Icons.block,
+              color: isActivating ? Colors.green : Colors.orange,
+            ),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                isActivating ? 'تفعيل العريس' : 'إيقاف العريس',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 18,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          isActivating
+              ? 'هل أنت متأكد أنك تريد تفعيل هذا العريس؟'
+              : 'هل أنت متأكد أنك تريد إيقاف تفعيل هذا العريس؟',
+          style: TextStyle(
+            color: isDark ? Colors.white70 : Colors.grey[700],
+            fontSize: 15,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(
+              'إلغاء',
+              style: TextStyle(color: isDark ? Colors.white60 : Colors.grey[700]),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isActivating ? Colors.green : Colors.orange,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+            ),
+            child: Text(
+              isActivating ? 'تفعيل' : 'إيقاف',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
       );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('خطأ في تحديث الحالة: ${e.toString()}'), backgroundColor: Colors.red),
-      );
-    }
+    },
+  );
+
+  if (confirmed != true) return;
+
+  try {
+    await ApiService.updateGroomStatus(phoneNumber, newStatus);
+
+    setState(() {
+      final groomIndex = grooms.indexWhere((g) => g['phone_number']?.toString() == phoneNumber);
+      if (groomIndex != -1) grooms[groomIndex]['status'] = newStatus;
+      _applyFilters();
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(isActivating ? 'تم تفعيل العريس بنجاح' : 'تم إيقاف العريس بنجاح'),
+        backgroundColor: isActivating ? Colors.green : Colors.orange,
+      ),
+    );
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('خطأ في تحديث الحالة: ${e.toString()}'),
+        backgroundColor: Colors.red,
+      ),
+    );
   }
+}
 
   Future<void> _deleteGroom(String phoneNumber) async {
     final confirmed = await showDialog<bool>(
@@ -630,8 +755,8 @@ int _getCrossAxisCount(BuildContext context) {
                 children: [
                   _buildGridActionButton(Icons.visibility, Colors.purple, () => _showViewGroomDialog(groom)),
                   _buildGridActionButton(Icons.edit, Colors.blue, () async {
-                    bool hasAccess = await _verifyAccessForTab();
-                    if (!hasAccess) return;
+                    // bool hasAccess = await _verifyAccessForTab();
+                    // if (!hasAccess) return;  //// posed the verefication of access password in edit groom 
                     _showEditGroomDialog(groom);
                   }),
                   _buildGridActionButton(Icons.delete, Colors.red, () async {
@@ -812,8 +937,8 @@ int _getCrossAxisCount(BuildContext context) {
                       label: 'تعديل',
                       color: Colors.blue,
                       onPressed: () async {
-                        bool hasAccess = await _verifyAccessForTab();
-                        if (!hasAccess) return;
+                        // bool hasAccess = await _verifyAccessForTab();
+                        // if (!hasAccess) return;
                         _showEditGroomDialog(groom);
                       },
 
@@ -961,7 +1086,7 @@ int _getCrossAxisCount(BuildContext context) {
             controller: _searchController,
             style: TextStyle(color: isDark ? Colors.white : Colors.black87),
             decoration: InputDecoration(
-              hintText: 'ابحث بالاسم أو رقم الهاتف...',
+            hintText: 'ابحث بالاسم، الهاتف، الولي، تاريخ الميلاد...',
               hintStyle: TextStyle(color: isDark ? Colors.white54 : Colors.grey[500]),
               prefixIcon: Icon(Icons.search, color: AppColors.primary),
               suffixIcon: Row(
@@ -1698,11 +1823,11 @@ Widget _buildMobileActionButtons(Map<String, dynamic> groom, String status, bool
             colors: [Colors.green, AppColors.primary],
             onPressed: () async  {
                         // Check if tab requires access verification
-                bool hasAccess = await _verifyAccessForTab();
+                // bool hasAccess = await _verifyAccessForTab();
                 
-                if (!hasAccess) {
-                  return; // Don't navigate if access is denied
-                }
+                // if (!hasAccess) {
+                //   return; // Don't navigate if access is denied
+                // }
                 _showEditGroomDialog(groom);
               },          
           ),
@@ -1770,11 +1895,11 @@ Widget _buildDesktopActionButtons(
         colors: [Colors.green, AppColors.primary],
         onPressed: () async  {
                   // Check if tab requires access verification
-          bool hasAccess = await _verifyAccessForTab();
+          // bool hasAccess = await _verifyAccessForTab();
           
-          if (!hasAccess) {
-            return; // Don't navigate if access is denied
-          }
+          // if (!hasAccess) {
+          //   return; // Don't navigate if access is denied
+          // }
           _showEditGroomDialog(groom);
         },
         isCompact: isTablet,
@@ -2023,6 +2148,7 @@ class _EditGroomDialogState extends State<EditGroomDialog> {
     _guardianBirthAddressController = TextEditingController(text: widget.groom['guardian_birth_address'] ?? '');
     _guardianBirthDateController = TextEditingController(text: widget.groom['guardian_birth_date'] ?? '');
     _guardianRelationController = TextEditingController(text: widget.groom['guardian_relation'] ?? '');
+    _newPasswordController = TextEditingController();
   }
 
   @override
@@ -2041,9 +2167,12 @@ class _EditGroomDialogState extends State<EditGroomDialog> {
     _guardianBirthAddressController.dispose();
     _guardianBirthDateController.dispose();
     _guardianRelationController.dispose();
+    _newPasswordController.dispose();
     super.dispose();
   }
 
+  late TextEditingController _newPasswordController;
+  bool _obscurePassword = true;
   // Future<void> _updateGroom() async {
   //   if (!_formKey.currentState!.validate()) return;
 
@@ -2197,6 +2326,13 @@ class _EditGroomDialogState extends State<EditGroomDialog> {
         }
       }
 
+      // Update password if provided
+      if (_newPasswordController.text.trim().isNotEmpty) {
+        await ApiService.updatePassword(
+          widget.groom['phone_number']?.toString() ?? '',
+          _newPasswordController.text.trim(),
+        );
+      }
       final updatedData = await ApiService.updateGroomDetails(
         widget.groom['id'],
         firstName: _firstNameController.text.trim().isEmpty ? null : _firstNameController.text.trim(),
@@ -2215,6 +2351,7 @@ class _EditGroomDialogState extends State<EditGroomDialog> {
         guardianRelation: _guardianRelationController.text.trim().isEmpty ? null : _guardianRelationController.text.trim(),
       );
 
+      
       widget.onUpdate({
         'first_name': _firstNameController.text.trim(),
         'last_name': _lastNameController.text.trim(),
@@ -2512,6 +2649,36 @@ void _showModernErrorDialog(String message) {
                       _buildTextField(_guardianBirthAddressController, 'مكان ميلاد الولي'),
                       _buildTextField(_guardianBirthDateController, 'تاريخ ميلاد الولي'),
                       _buildTextField(_guardianRelationController, 'صلة القرابة'),
+
+
+                      SizedBox(height: 16),
+                      Text(
+                        'تغيير كلمة المرور',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.red[800]),
+                      ),
+                      Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8),
+                        child: TextFormField(
+                          controller: _newPasswordController,
+                          obscureText: _obscurePassword,
+                          decoration: InputDecoration(
+                            labelText: 'كلمة المرور الجديدة (اختياري)',
+                            hintText: 'اتركه فارغاً إذا لم تريد التغيير',
+                            border: OutlineInputBorder(),
+                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            suffixIcon: IconButton(
+                              icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
+                              onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                            ),
+                          ),
+                          validator: (value) {
+                            if (value != null && value.trim().isNotEmpty && value.trim().length < 6) {
+                              return 'كلمة المرور يجب أن تكون 6 أحرف على الأقل';
+                            }
+                            return null;
+                          },
+                        ),
+                      ),
                     ],
                   ),
                 ),

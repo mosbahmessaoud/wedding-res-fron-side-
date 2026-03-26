@@ -1,4 +1,7 @@
 // lib/main.dart
+import 'dart:io' show Platform;
+
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -11,6 +14,7 @@ import 'package:wedding_reservation_app/screens/groom/create_reservation_screen.
 import 'package:wedding_reservation_app/screens/groom/groom_home_screen.dart';
 import 'package:wedding_reservation_app/services/api_service.dart';
 import 'package:wedding_reservation_app/services/connectivity_service.dart';
+import 'package:window_manager/window_manager.dart' if (dart.library.html) 'dart:html';
 
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/splash_screen.dart';
@@ -18,37 +22,60 @@ import 'utils/colors.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+    // ADD THIS - warm up server silently
+  ApiService.warmUpServer();
 
-  //   // Hide only navigation bar, keep notification bar
-  // SystemChrome.setEnabledSystemUIMode(
-  //   SystemUiMode.immersiveSticky,
-  //   overlays: [SystemUiOverlay.top],
-  // );
-  
-SystemChrome.setEnabledSystemUIMode(
-  SystemUiMode.manual,
-  overlays: [SystemUiOverlay.top],
-);
+  // Only initialize window_manager on desktop platforms (not mobile/web)
+  if (!kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
+    await windowManager.ensureInitialized();
+    
+    await windowManager.waitUntilReadyToShow(
+      const WindowOptions(
+        size: Size(1024, 768),
+        minimumSize: Size(360, 640),
+        center: true,
+      ),
+      () async {
+        await windowManager.show();
+        await windowManager.focus();
+      },
+    );
+  }
 
-// Optional: Make the bottom bar transparent/immersive when it does appear
-SystemChrome.setSystemUIOverlayStyle(
-  const SystemUiOverlayStyle(
-    statusBarColor: Colors.transparent,
-    systemNavigationBarColor: Colors.transparent,
-  ),
-);  // Initialize date formatting for Arabic locale
+
+  SystemChrome.setEnabledSystemUIMode(
+    SystemUiMode.manual,
+    overlays: [SystemUiOverlay.top],
+  );
+
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      systemNavigationBarColor: Colors.transparent,
+    ),
+  );
+  
   await initializeDateFormatting('ar');
   ConnectivityService().initialize();
-  await ApiService.initializeToken(); // Add this line
-
-  runApp(WeddingReservationApp());
+  await ApiService.initializeToken();
+  
+  runApp(const WeddingReservationApp());
 }
 
-class WeddingReservationApp extends StatelessWidget {
+class WeddingReservationApp extends StatefulWidget {
   const WeddingReservationApp({super.key});
 
+  @override
+  State<WeddingReservationApp> createState() => _WeddingReservationAppState();
+}
 
+class _WeddingReservationAppState extends State<WeddingReservationApp> {
+
+  @override
+  void dispose() {
+    ApiService.disposeClient();
+    super.dispose();
+  }
  
   @override
   Widget build(BuildContext context) {

@@ -114,7 +114,6 @@ class _ClanAdminHomeScreenState extends State<ClanAdminHomeScreen>
 
   }
 
-
 // ADD THIS NEW METHOD:
 Future<void> _checkAccessPassword() async {
   try {
@@ -474,12 +473,12 @@ void _navigateToTab(int index) async {
     return;
   }
   
-  // Verify access for protected tabs
-  bool hasAccess = await _verifyAccessForTab(index);
+  // // Verify access for protected tabs
+  // bool hasAccess = await _verifyAccessForTab(index);
   
-  if (!hasAccess) {
-    return;
-  }
+  // if (!hasAccess) {
+  //   return;
+  // }
   
   final screenSize = MediaQuery.of(context).size;
   final isLargeScreen = screenSize.width > 1024;

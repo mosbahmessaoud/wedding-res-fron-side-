@@ -49,11 +49,15 @@ class HomeTabState extends State<HomeTab> with TickerProviderStateMixin {
   bool _hasValidReservation = false;
   bool _isCheckingReservation = true;
 
-  
-  @override
+  bool _isInitialLoading = true;
+  String _connectionStatus = 'checking'; // 'checking', 'loading', 'offline', 'loaded'
+
+
+    @override
   void initState() {
     super.initState();
     _initAnimations();
+    
     _checkReservationStatus().then((_) {
       if (mounted) {
         _loadDataInBackground();
@@ -123,30 +127,37 @@ class HomeTabState extends State<HomeTab> with TickerProviderStateMixin {
   }
 
   Future<void> _loadData() async {
-    try {
-      await Future.wait([
-        _loadUserProfile(),
-        _loadPendingReservation(),
-        _loadReservationStats(),
-        _loadChartStatistics(),
-      ]);
-      
-      if (mounted) {
-        _animationController.forward();
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('خطأ في تحميل البيانات: ${e.toString()}'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-        );
-      }
+  try {
+    await Future.wait([
+      _loadUserProfile(),
+      _loadPendingReservation(),
+      _loadReservationStats(),
+      _loadChartStatistics(),
+    ]);
+    
+    if (mounted) {
+      setState(() {
+        _connectionStatus = 'loaded';
+      });
+      _animationController.forward();
+    }
+  } catch (e) {
+    if (mounted) {
+      setState(() {
+        _connectionStatus = 'offline';
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('خطأ في تحميل البيانات: ${e.toString()}'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
     }
   }
+}
+
 
   Future<void> _loadUserProfile() async {
     try {
@@ -173,57 +184,168 @@ class HomeTabState extends State<HomeTab> with TickerProviderStateMixin {
       }
     }
   }
-
-  Future<void> _checkConnectivityAndLoad() async {
-    final connectivityResult = await Connectivity().checkConnectivity();
-    
-    if (connectivityResult.contains(ConnectivityResult.none)) {
-      if (mounted) {
-        _showNoInternetDialog();
-      }
-      return;
-    }
-    
-    await _loadData();
+Future<void> _checkConnectivityAndLoad() async {
+  if (mounted) {
+    setState(() {
+      _connectionStatus = 'checking';
+    });
   }
-
-  void _showNoInternetDialog() {
-    if (!mounted) return;
+  
+  final connectivityResult = await Connectivity().checkConnectivity();
+  
+  if (connectivityResult.contains(ConnectivityResult.none)) {
+    if (mounted) {
+      setState(() {
+        _connectionStatus = 'offline';
+        _isInitialLoading = false;
+      });
+      _showNoInternetDialog();
+    }
+    return;
+  }
+  
+  if (mounted) {
+    setState(() {
+      _connectionStatus = 'loading';
+    });
+  }
+  
+  await _loadData();
+  
+  if (mounted) {
+    setState(() {
+      _connectionStatus = 'loaded';
+      _isInitialLoading = false;
+    });
+  }
+}
+  // void _showNoInternetDialog() {
+  //   if (!mounted) return;
     
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(
-          children: [
-            Icon(Icons.wifi_off, color: Colors.orange),
-            SizedBox(width: 10),
-            Text('لا يوجد اتصال'),
-          ],
-        ),
-        content: const Text('يرجى التحقق من اتصالك بالإنترنت'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('إلغاء'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _checkConnectivityAndLoad();
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+  //   showDialog(
+  //     context: context,
+  //     barrierDismissible: false,
+  //     builder: (context) => AlertDialog(
+  //       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+  //       title: const Row(
+  //         children: [
+  //           Icon(Icons.wifi_off, color: Colors.orange),
+  //           SizedBox(width: 10),
+  //           Text('لا يوجد اتصال'),
+  //         ],
+  //       ),
+  //       content: const Text('يرجى التحقق من اتصالك بالإنترنت'),
+  //       actions: [
+  //         TextButton(
+  //           onPressed: () => Navigator.pop(context),
+  //           child: const Text('إلغاء'),
+  //         ),
+  //         ElevatedButton(
+  //           onPressed: () {
+  //             Navigator.pop(context);
+  //             _checkConnectivityAndLoad();
+  //           },
+  //           style: ElevatedButton.styleFrom(
+  //             backgroundColor: Colors.blue,
+  //             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+  //           ),
+  //           child: const Text('إعادة المحاولة', style: TextStyle(color: Colors.white)),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
+
+void _showNoInternetDialog() {
+  if (!mounted) return;
+  
+  showDialog(
+    context: context,
+    barrierDismissible: true,
+    builder: (context) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      contentPadding: const EdgeInsets.all(24),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Icon Container
+          Container(
+            width: 70,
+            height: 70,
+            decoration: BoxDecoration(
+              color: Colors.orange.withOpacity(0.1),
+              shape: BoxShape.circle,
             ),
-            child: const Text('إعادة المحاولة', style: TextStyle(color: Colors.white)),
+            child: const Icon(
+              Icons.wifi_off_rounded,
+              color: Colors.orange,
+              size: 36,
+            ),
+          ),
+          const SizedBox(height: 20),
+          
+          // Title
+          const Text(
+            'لا يوجد اتصال بالإنترنت',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 10),
+          
+          // Description
+          Text(
+            'يرجى التحقق من اتصالك بالإنترنت',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[600],
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 24),
+          
+          // Buttons
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text('إغلاق'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _checkConnectivityAndLoad();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text('إعادة المحاولة'),
+                ),
+              ),
+            ],
           ),
         ],
       ),
-    );
-  }
-
+    ),
+  );
+}
   void _initAnimations() {
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 1000),
@@ -481,17 +603,99 @@ class HomeTabState extends State<HomeTab> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildStatusCard(bool isDark) {
-    if (_reservationStats['validated'] != null && _reservationStats['validated']! > 0) {
-      return _buildValidatedCard(isDark);
-    }
-    
-    if (_pendingReservation != null) {
-      return _buildPendingCard(isDark);
-    }
-    
-    return _buildReadyCard(isDark);
+  
+Widget _buildStatusCard(bool isDark) {
+  // Show loading indicator during initial load
+  if (_isInitialLoading) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          _buildConnectionStatusIndicator(),
+          const SizedBox(height: 12),
+          Text(
+            _connectionStatus == 'checking' 
+                ? 'جاري فحص الاتصال...'
+                : _connectionStatus == 'loading'
+                    ? 'جاري تحميل البيانات...'
+                    : 'يتم التحميل...',
+            style: TextStyle(
+              fontSize: 14,
+              color: isDark ? Colors.grey[400] : Colors.grey[600],
+            ),
+          ),
+        ],
+      ),
+    );
   }
+  
+  if (_reservationStats['validated'] != null && _reservationStats['validated']! > 0) {
+    return _buildValidatedCard(isDark);
+  }
+  
+  if (_pendingReservation != null) {
+    return _buildPendingCard(isDark);
+  }
+  
+  return _buildReadyCard(isDark);
+}
+
+Widget _buildConnectionStatusIndicator() {
+  IconData icon;
+  Color color;
+  
+  switch (_connectionStatus) {
+    case 'checking':
+      icon = Icons.sync;
+      color = Colors.blue;
+      break;
+    case 'loading':
+      icon = Icons.cloud_download;
+      color = Colors.green;
+      break;
+    case 'offline':
+      icon = Icons.cloud_off;
+      color = Colors.orange;
+      break;
+    case 'loaded':
+      icon = Icons.cloud_done;
+      color = Colors.green;
+      break;
+    default:
+      icon = Icons.sync;
+      color = Colors.grey;
+  }
+  
+  return Container(
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: color.withOpacity(0.1),
+      shape: BoxShape.circle,
+    ),
+    child: _connectionStatus == 'checking' || _connectionStatus == 'loading'
+        ? SizedBox(
+            width: 32,
+            height: 32,
+            child: CircularProgressIndicator(
+              strokeWidth: 3,
+              valueColor: AlwaysStoppedAnimation<Color>(color),
+            ),
+          )
+        : Icon(icon, size: 32, color: color),
+  );
+}
 
   Widget _buildValidatedCard(bool isDark) {
     if (_validatedReservation == null) return _buildReadyCard(isDark);

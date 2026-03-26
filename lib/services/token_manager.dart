@@ -1,6 +1,7 @@
 // lib/services/token_manager.dart
-import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+
+import 'package:shared_preferences/shared_preferences.dart';
 
 class TokenManager {
   static const String _keyToken = 'saved_token';
@@ -79,4 +80,32 @@ class TokenManager {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_keyRefreshToken);
   }
+
+
+  // Add this new method to TokenManager class
+static Future<bool> hasValidToken() async {
+  final token = await getToken();
+  if (token == null || token.isEmpty) return false;
+  
+  final expired = await isTokenExpired();
+  return !expired;
+}
+
+// Add this to get role from saved token without API call
+static String? getRoleFromToken(String token) {
+  try {
+    final parts = token.split('.');
+    if (parts.length != 3) return null;
+    
+    final payload = json.decode(
+      utf8.decode(base64Url.decode(base64Url.normalize(parts[1])))
+    );
+    return payload['role'] as String?;
+  } catch (e) {
+    print('Error parsing token role: $e');
+    return null;
+  }
+}
+
+
 }

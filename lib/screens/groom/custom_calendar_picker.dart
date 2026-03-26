@@ -74,7 +74,7 @@ class BeautifulCustomCalendarPicker extends StatefulWidget {
     required this.clanId,
     this.hallId,
     this.maxCapacityPerDate = 10,
-    required this.isOriginClan, // ADD THIS
+    required this.isOriginClan, 
     this.yearsMaxReservGroomFromOriginClan = 1, // ADD THIS
     this.yearsMaxReservGroomFromOutClan = 3, // ADD THIS
   }) : super(key: key);
@@ -84,6 +84,8 @@ class BeautifulCustomCalendarPicker extends StatefulWidget {
 }
 class _BeautifulCustomCalendarPickerState extends State<BeautifulCustomCalendarPicker>
     with TickerProviderStateMixin {
+
+  late int _lastAllowedYear;
   late DateTime _currentMonth;
   DateTime? _selectedDate;
   bool _isLocaleInitialized = false;
@@ -96,7 +98,6 @@ class _BeautifulCustomCalendarPickerState extends State<BeautifulCustomCalendarP
   
   Set<String> _specialReservationDates = {};
   Map<String, ReservationSpecial> _specialReservationsMap = {}; 
-
 
 
   bool _showYearPicker = false;
@@ -129,12 +130,20 @@ void initState() {
       : widget.yearsMaxReservGroomFromOutClan;
   
   final today = DateTime.now();
+  // _effectiveLastDate = DateTime(
+  //   today.year + _maxYearsAllowed,
+  //   today.month,
+  //   today.day,
+  // );
+
   _effectiveLastDate = DateTime(
-    today.year + _maxYearsAllowed,
-    today.month,
-    today.day,
+    today.year + _maxYearsAllowed - 1,
+    12,
+    31,
   );
   
+    _lastAllowedYear = today.year + _maxYearsAllowed - 1;
+
   _currentMonth = widget.initialDate ?? DateTime.now();
   _selectedDate = widget.initialDate;
     
@@ -235,6 +244,9 @@ Future<void> _loadMonthData() async {
       specialMap[dateStr] = reservation; // ADD THIS
     }
     
+
+
+
     final validatedDates = await ApiService.getValidatedDates(widget.clanId);
     final pendingDates = await ApiService.getPendingDates(widget.clanId);
 
@@ -450,9 +462,12 @@ DateAvailability _getDateAvailability(DateTime date) {
       date: date,
       status: DateStatus.disabled,
       maxCapacity: _maxGroomsPerDate,
+      // note: widget.isOriginClan 
+      //     ? 'يمكن الحجز حتى $_maxYearsAllowed ${_maxYearsAllowed == 1 ? "سنة" : "سنوات"} فقط'
+      //     : 'يمكن الحجز حتى $_maxYearsAllowed سنوات فقط',
       note: widget.isOriginClan 
-          ? 'يمكن الحجز حتى $_maxYearsAllowed ${_maxYearsAllowed == 1 ? "سنة" : "سنوات"} فقط'
-          : 'يمكن الحجز حتى $_maxYearsAllowed سنوات فقط',
+          ? 'يمكن الحجز حتى نهاية $_lastAllowedYear فقط'
+          : 'يمكن الحجز حتى نهاية ${today.year + _maxYearsAllowed - 1} فقط',
     );
   }
   
@@ -2363,7 +2378,7 @@ Widget _buildYearPicker(bool isDark) {
   final today = DateTime.now();
   final currentYear = today.year;
   final List<int> availableYears = List.generate(
-    _maxYearsAllowed + 1,
+    _maxYearsAllowed ,
     (index) => currentYear + index,
   );
 
@@ -2399,9 +2414,7 @@ Widget _buildYearPicker(bool isDark) {
                 ),
               ),
               Text(
-                widget.isOriginClan 
-                    ? 'متاح حتى $_maxYearsAllowed ${_maxYearsAllowed == 1 ? "سنة" : "سنوات"}'
-                    : 'متاح حتى $_maxYearsAllowed سنوات',
+                  'متاح من ${DateTime.now().year} حتى $_lastAllowedYear',
                 style: TextStyle(
                   fontSize: 12,
                   color: isDark 
@@ -2409,6 +2422,17 @@ Widget _buildYearPicker(bool isDark) {
                     : Colors.green.shade600.withOpacity(0.7),
                 ),
               ),
+              // Text(
+              //   widget.isOriginClan 
+              //       ? 'متاح حتى $_maxYearsAllowed ${_maxYearsAllowed == 1 ? "سنة" : "سنوات"}'
+              //       : 'متاح حتى $_maxYearsAllowed سنوات',
+              //   style: TextStyle(
+              //     fontSize: 12,
+              //     color: isDark 
+              //       ? Colors.green.shade400.withOpacity(0.7)
+              //       : Colors.green.shade600.withOpacity(0.7),
+              //   ),
+              // ),
             ],
           ),
         ),

@@ -11,6 +11,9 @@ import '../../utils/constants.dart';
 import '../../widgets/common/custom_text_field.dart' hide AppColors;
 import 'otp_verification_screen.dart';
 
+enum SmsRecipient { groom, guardian, wakil }
+
+
 class MultiStepSignupScreen extends StatefulWidget {
   const MultiStepSignupScreen({super.key});
 
@@ -18,15 +21,19 @@ class MultiStepSignupScreen extends StatefulWidget {
   _MultiStepSignupScreenState createState() => _MultiStepSignupScreenState();
 }
 
+
 class _MultiStepSignupScreenState extends State<MultiStepSignupScreen>
     with TickerProviderStateMixin {
   final PageController _pageController = PageController();
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
-  bool _SmsToGroom = false; // Default: send to guardian's phone
+  // bool _SmsToGroom = false; // Default: send to guardian's phone
   int _currentStep = 0;
   final int _totalSteps = 5;
   
+    // Add this with your other state variables at the top of _MultiStepSignupScreenState
+  SmsRecipient _selectedSmsRecipient = SmsRecipient.guardian; // Default to guardian
+    
   // Form keys for each step
   final List<GlobalKey<FormState>> _formKeys = [
     GlobalKey<FormState>(),
@@ -55,6 +62,15 @@ class _MultiStepSignupScreenState extends State<MultiStepSignupScreen>
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   
+
+    // Add these new controllers with the other controllers
+  final _familyNameController = TextEditingController();
+  final _wakilFullNameController = TextEditingController();
+  final _wakilPhoneNumberController = TextEditingController();
+
+
+
+
   // Form data
   DateTime? _birthDate;
   DateTime? _guardianBirthDate;
@@ -288,6 +304,8 @@ Future<void> _loadClans() async {
     _isLoadingClans = true;
   });
   
+
+
   try {
     final clans = await ApiService.getAllClans();
     setState(() {
@@ -527,7 +545,6 @@ String? _validateGuardianPhone(String? value) {
 
 
 
-/// Async validation for groom phone - checks API for existing phone
 Future<String?> _validateGroomPhoneAsync(String? value) async {
   // First do basic validation
   String? basicValidation = _validatePhone(value);
@@ -535,8 +552,8 @@ Future<String?> _validateGroomPhoneAsync(String? value) async {
     return basicValidation;
   }
   
-  // Skip API check if phone is optional (SMS going to guardian)
-  if (!_SmsToGroom && (value == null || value.isEmpty)) {
+  // Skip API check if phone is optional (SMS NOT going to groom)
+  if (_selectedSmsRecipient != SmsRecipient.groom && (value == null || value.isEmpty)) {
     return null;
   }
   
@@ -550,23 +567,23 @@ Future<String?> _validateGroomPhoneAsync(String? value) async {
   }
 }
 
-/// Async validation for guardian phone - checks API for existing phone
-Future<String?> _validateGuardianPhoneAsync(String? value) async {
-  // First do basic validation
-  String? basicValidation = _validateGuardianPhone(value);
-  if (basicValidation != null) {
-    return basicValidation;
-  }
+// /// Async validation for guardian phone - checks API for existing phone
+// Future<String?> _validateGuardianPhoneAsync(String? value) async {
+//   // First do basic validation
+//   String? basicValidation = _validateGuardianPhone(value);
+//   if (basicValidation != null) {
+//     return basicValidation;
+//   }
   
-  // Check if phone exists in database
-  try {
-    String? existenceError = await ApiService.validateGuardianPhoneAvailability(value!.trim());
-    return existenceError; // Returns error message if exists, null if available
-  } catch (e) {
-    print('Error checking guardian phone: $e');
-    return null; // Don't block registration on API error
-  }
-}
+//   // Check if phone exists in database
+//   try {
+//     String? existenceError = await ApiService.validateGuardianPhoneAvailability(value!.trim());
+//     return existenceError; // Returns error message if exists, null if available
+//   } catch (e) {
+//     print('Error checking guardian phone: $e');
+//     return null; // Don't block registration on API error
+//   }
+// }
 
 
   String? _validateRequired(String? value, String fieldName) {
@@ -676,12 +693,12 @@ Future<bool> _validateCurrentStepAsync() async {
         return false;
       }
       
-      // Check if phone exists in database
-      String? guardianExistenceError = await _validateGuardianPhoneAsync(_guardianPhoneController.text);
-      if (guardianExistenceError != null) {
-        _showErrorDialog(guardianExistenceError);
-        return false;
-      }
+      // // Check if phone exists in database
+      // String? guardianExistenceError = await _validateGuardianPhoneAsync(_guardianPhoneController.text);
+      // if (guardianExistenceError != null) {
+      //   _showErrorDialog(guardianExistenceError);
+      //   return false;
+      // }
       
       // Validate rest of the form
       if (!_formKeys[0].currentState!.validate()) {
@@ -702,7 +719,7 @@ Future<bool> _validateCurrentStepAsync() async {
       
     case 2:
       // Personal info validation (Groom)
-      if (_phoneController.text.trim().isNotEmpty || _SmsToGroom) {
+      if (_phoneController.text.trim().isNotEmpty || _selectedSmsRecipient == SmsRecipient.groom) {
         String? groomPhoneError = await _validateGroomPhoneAsync(_phoneController.text);
         if (groomPhoneError != null) {
           _showErrorDialog(groomPhoneError);
@@ -727,18 +744,28 @@ Future<bool> _validateCurrentStepAsync() async {
       
     case 4:
       // Phone selection validation
-      if (_SmsToGroom) {
-        String? phoneError = await _validateGroomPhoneAsync(_phoneController.text);
-        if (phoneError != null) {
-          _showErrorDialog(phoneError);
-          return false;
-        }
-      } else {
-        String? guardianError = await _validateGuardianPhoneAsync(_guardianPhoneController.text);
-        if (guardianError != null) {
-          _showErrorDialog(guardianError);
-          return false;
-        }
+      switch (_selectedSmsRecipient) {
+        case SmsRecipient.groom:
+          String? phoneError = await _validateGroomPhoneAsync(_phoneController.text);
+          if (phoneError != null) {
+            _showErrorDialog(phoneError);
+            return false;
+          }
+          break;
+        case SmsRecipient.guardian:
+          // String? guardianError = await _validateGuardianPhoneAsync(_guardianPhoneController.text);
+          // if (guardianError != null) {
+          //   _showErrorDialog(guardianError);
+          //   return false;
+          // }
+          break;
+        case SmsRecipient.wakil:
+          // String? wakilError = await _validateGroomPhoneAsync(_wakilPhoneNumberController.text);
+          // if (wakilError != null) {
+          //   _showErrorDialog(wakilError);
+          //   return false;
+          // }
+          break;
       }
       return true;
       
@@ -819,7 +846,77 @@ Future<void> _nextStep() async {
     }
   }
 
-// Update _signup method
+// // Update _signup method
+// Future<void> _signup() async {
+//   final hasInternet = await _checkConnectivity();
+//   if (!hasInternet) {
+//     _showNoInternetDialog();
+//     return;
+//   }
+  
+//   setState(() {
+//     _isLoading = true;
+//   });
+
+//   try {
+//     final userData = {
+//       'phone_number': _phoneController.text.trim(),
+//       'first_name': _firstNameController.text.trim(),
+//       'last_name': _lastNameController.text.trim(),
+//       'father_name': _fatherNameController.text.trim(),
+//       'grandfather_name': _grandfatherNameController.text.trim(),
+//       'birth_date': DateFormat('yyyy-MM-dd').format(_birthDate!),
+//       'birth_address': _birthAddressController.text.trim(),
+//       'home_address': _homeAddressController.text.trim(),
+//       'clan_id': _selectedClan!.id,
+//       'county_id': _selectedCounty!.id,
+//       'password': _passwordController.text,
+//       'role': 'groom',
+//       'guardian_name': _guardianNameController.text.trim(),
+//       'guardian_phone': _guardianPhoneController.text.trim(),
+//       'guardian_birth_date': DateFormat('yyyy-MM-dd').format(_guardianBirthDate!),
+//       'guardian_birth_address': _guardianBirthAddressController.text.trim(),
+//       'guardian_home_address': _guardianHomeAddressController.text.trim(),
+//       'guardian_relation': _selectedGuardianRelation,
+//       'sms_to_groom_phone' : _SmsToGroom,
+//       'family_name': _familyNameController.text.trim(), // new column optional input
+//       'wakil_full_name' : _wakilFullNameController.text.trim(),// new column optional input
+//       'wakil_phone_number' : _wakilPhoneNumberController.text.trim(),// new column optional input
+//     };
+
+//     await ApiService.registerGroom(userData);
+    
+//     if (_SmsToGroom){
+//       Navigator.push(
+//             context,
+//             MaterialPageRoute(
+//               builder: (context) => OTPVerificationScreen(
+//                 phoneNumber: _phoneController.text.trim(),
+//               ),
+//             ),
+//           );
+
+//     }else{
+//       Navigator.push(
+//             context,
+//             MaterialPageRoute(
+//               builder: (context) => OTPVerificationScreen(
+//                 phoneNumber: _guardianPhoneController.text.trim(),
+//               ),
+//             ),
+//           );
+//     }
+    
+
+//   } catch (e) {
+//     _showErrorDialog('فشل في التسجيل: $e');
+//   } finally {
+//     setState(() {
+//       _isLoading = false;
+//     });
+//   }
+// }
+
 Future<void> _signup() async {
   final hasInternet = await _checkConnectivity();
   if (!hasInternet) {
@@ -832,6 +929,21 @@ Future<void> _signup() async {
   });
 
   try {
+    // Determine which phone receives SMS based on enum selection
+    String smsRecipient;
+    switch (_selectedSmsRecipient) {
+      case SmsRecipient.groom:
+        smsRecipient = 'groom';
+        break;
+      case SmsRecipient.wakil:
+        smsRecipient = 'wakil';
+        break;
+      case SmsRecipient.guardian:
+      default:
+        smsRecipient = 'guardian';
+        break;
+    }
+
     final userData = {
       'phone_number': _phoneController.text.trim(),
       'first_name': _firstNameController.text.trim(),
@@ -851,32 +963,35 @@ Future<void> _signup() async {
       'guardian_birth_address': _guardianBirthAddressController.text.trim(),
       'guardian_home_address': _guardianHomeAddressController.text.trim(),
       'guardian_relation': _selectedGuardianRelation,
-      'sms_to_groom_phone' : _SmsToGroom,
+      'sms_to_groom_phone': smsRecipient, // Changed to string: 'groom', 'guardian', or 'wakil'
+      'family_name': _familyNameController.text.trim(),
+      'wakil_full_name': _wakilFullNameController.text.trim(),
+      'wakil_phone_number': _wakilPhoneNumberController.text.trim(),
     };
 
     await ApiService.registerGroom(userData);
     
-    if (_SmsToGroom){
-      Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => OTPVerificationScreen(
-                phoneNumber: _phoneController.text.trim(),
-              ),
-            ),
-          );
-
-    }else{
-      Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => OTPVerificationScreen(
-                phoneNumber: _guardianPhoneController.text.trim(),
-              ),
-            ),
-          );
+    // Navigate based on recipient
+    String otpPhoneNumber;
+    String originPhone;
+    originPhone = _phoneController.text.trim();
+    if (smsRecipient == 'groom') {
+      otpPhoneNumber = _phoneController.text.trim();
+    } else if (smsRecipient == 'wakil') {
+      otpPhoneNumber = _wakilPhoneNumberController.text.trim();
+    } else {
+      otpPhoneNumber = _guardianPhoneController.text.trim();
     }
-    
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => OTPVerificationScreen(
+          phoneNumber: otpPhoneNumber,
+          originPhone:originPhone,
+        ),
+      ),
+    );
 
   } catch (e) {
     _showErrorDialog('فشل في التسجيل: $e');
@@ -1074,110 +1189,207 @@ Widget build(BuildContext context) {
     ),
   );
 }
-  Widget _buildPersonalInfoStep() {
-    return SingleChildScrollView(
-      padding: EdgeInsets.all(10),
-      child: Form(
-        key: _formKeys[1],
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildStepTitle('المعلومات الشخصية للعريس'),
-            SizedBox(height: 32),
-
-            CustomTextField(
-              controller: _phoneController,
-              label: 'رقم الهاتف ',
-              keyboardType: TextInputType.phone,
-              validator: _validatePhone,
-              prefixIcon: Icons.phone,
-              hint: ' رقم هاتف العريس',
-            ),
-            SizedBox(height: 20),
-
-            // In _buildPersonalInfoStep method, replace the phone field section with:
-
-            // _AnimatedUnderlineTextField(
-            //   controller: _phoneController,
-            //   label: 'رقم الهاتف',
-            //   labelColor: AppColors.textPrimary,
-            //   boxcolor: Colors.green,
-            //   keyboardType: TextInputType.phone,
-            //   validator: _validatePhone,
-            //   prefixIcon: Icons.phone,
-            //   hint: '0xxxxxxxxx',
-            // ),
-            SizedBox(height: 20),
 
 
-            Row(
-              children: [
-                Expanded(
-                  child: CustomTextField(
-                    controller: _firstNameController,
-                    label: 'الإسم ',
-                    validator: (value) => _validateRequired(value, 'الإسم '),
-                    prefixIcon: Icons.person,
-                  ),
-                ),
-                SizedBox(width: 16),
-                Expanded(
-                  child: CustomTextField(
-                    controller: _lastNameController,
-                    label: 'اللقب',
-                    validator: (value) => _validateRequired(value, 'اللقب'),
-                    prefixIcon: Icons.person_outline,
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: 20),
+  // Widget _buildPersonalInfoStep() {
+  //   return SingleChildScrollView(
+  //     padding: EdgeInsets.all(10),
+  //     child: Form(
+  //       key: _formKeys[1],
+  //       child: Column(
+  //         crossAxisAlignment: CrossAxisAlignment.start,
+  //         children: [
+  //           _buildStepTitle('المعلومات الشخصية للعريس'),
+  //           SizedBox(height: 32),
 
-            CustomTextField(
-              controller: _fatherNameController,
-              label: 'إسم الأب',
-              validator: (value) => _validateRequired(value, 'إسم الأب'),
-              prefixIcon: Icons.family_restroom,
-            ),
-            SizedBox(height: 20),
+  //           CustomTextField(
+  //             controller: _phoneController,
+  //             label: 'رقم الهاتف ',
+  //             keyboardType: TextInputType.phone,
+  //             validator: _validatePhone,
+  //             prefixIcon: Icons.phone,
+  //             hint: ' رقم هاتف العريس',
+  //           ),
+  //           SizedBox(height: 20),
 
-            CustomTextField(
-              controller: _grandfatherNameController,
-              label: 'إسم الجد الاول و الثاني',
-              validator: (value) => _validateRequired(value, 'إسم الجد'),
-              prefixIcon: Icons.elderly,
-            ),
-            SizedBox(height: 20),
+  //           // In _buildPersonalInfoStep method, replace the phone field section with:
 
-            _buildDateSelector(
-              label: 'تاريخ الميلاد',
-              selectedDate: _birthDate,
-              onTap: () => _selectDate(isGuardian: false),
-              icon: Icons.calendar_today,
-            ),
-            SizedBox(height: 20),
+  //           // _AnimatedUnderlineTextField(
+  //           //   controller: _phoneController,
+  //           //   label: 'رقم الهاتف',
+  //           //   labelColor: AppColors.textPrimary,
+  //           //   boxcolor: Colors.green,
+  //           //   keyboardType: TextInputType.phone,
+  //           //   validator: _validatePhone,
+  //           //   prefixIcon: Icons.phone,
+  //           //   hint: '0xxxxxxxxx',
+  //           // ),
+  //           SizedBox(height: 20),
 
-            CustomTextField(
-              controller: _birthAddressController,
-              label: 'مكان الميلاد',
-              validator: (value) => _validateRequired(value, 'مكان الميلاد'),
-              prefixIcon: Icons.location_on,
-              // hint: _birthAddressController.text,
-            ),
-            SizedBox(height: 20),
 
-            CustomTextField(
-              controller: _homeAddressController,
-              label: 'عنوان السكن',
-              validator: (value) => _validateRequired(value, 'عنوان السكن'),
-              prefixIcon: Icons.home,
-            ),
-          ],
-        ),
+  //           Row(
+  //             children: [
+  //               Expanded(
+  //                 child: CustomTextField(
+  //                   controller: _firstNameController,
+  //                   label: 'الإسم ',
+  //                   validator: (value) => _validateRequired(value, 'الإسم '),
+  //                   prefixIcon: Icons.person,
+  //                 ),
+  //               ),
+  //               SizedBox(width: 16),
+  //               Expanded(
+  //                 child: CustomTextField(
+  //                   controller: _lastNameController,
+  //                   label: 'اللقب',
+  //                   validator: (value) => _validateRequired(value, 'اللقب'),
+  //                   prefixIcon: Icons.person_outline,
+  //                 ),
+  //               ),
+  //             ],
+  //           ),
+  //           SizedBox(height: 20),
+
+  //           CustomTextField(
+  //             controller: _fatherNameController,
+  //             label: 'إسم الأب',
+  //             validator: (value) => _validateRequired(value, 'إسم الأب'),
+  //             prefixIcon: Icons.family_restroom,
+  //           ),
+  //           SizedBox(height: 20),
+
+  //           CustomTextField(
+  //             controller: _grandfatherNameController,
+  //             label: 'إسم الجد الاول و الثاني',
+  //             validator: (value) => _validateRequired(value, 'إسم الجد'),
+  //             prefixIcon: Icons.elderly,
+  //           ),
+  //           SizedBox(height: 20),
+
+  //           _buildDateSelector(
+  //             label: 'تاريخ الميلاد',
+  //             selectedDate: _birthDate,
+  //             onTap: () => _selectDate(isGuardian: false),
+  //             icon: Icons.calendar_today,
+  //           ),
+  //           SizedBox(height: 20),
+
+  //           CustomTextField(
+  //             controller: _birthAddressController,
+  //             label: 'مكان الميلاد',
+  //             validator: (value) => _validateRequired(value, 'مكان الميلاد'),
+  //             prefixIcon: Icons.location_on,
+  //             // hint: _birthAddressController.text,
+  //           ),
+  //           SizedBox(height: 20),
+
+  //           CustomTextField(
+  //             controller: _homeAddressController,
+  //             label: 'عنوان السكن',
+  //             validator: (value) => _validateRequired(value, 'عنوان السكن'),
+  //             prefixIcon: Icons.home,
+  //           ),
+  //         ],
+  //       ),
+  //     ),
+  //   );
+  // }
+Widget _buildPersonalInfoStep() {
+  return SingleChildScrollView(
+    padding: EdgeInsets.all(10),
+    child: Form(
+      key: _formKeys[1],
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildStepTitle('المعلومات الشخصية للعريس'),
+          SizedBox(height: 32),
+
+          CustomTextField(
+            controller: _phoneController,
+            label: 'رقم الهاتف ',
+            keyboardType: TextInputType.phone,
+            validator: _validatePhone,
+            prefixIcon: Icons.phone,
+            hint: ' رقم هاتف العريس',
+          ),
+          SizedBox(height: 20),
+
+          CustomTextField(
+            controller: _lastNameController,
+            label: 'اللقب',
+            validator: (value) => _validateRequired(value, 'اللقب'),
+            prefixIcon: Icons.person_outline,
+            hint: ' لقب العريس',
+
+          ),
+        
+          SizedBox(height: 20),
+
+          CustomTextField(
+            controller: _firstNameController,
+            label: 'الإسم ',
+            validator: (value) => _validateRequired(value, 'الإسم '),
+            hint: ' إسم العريس',
+
+            prefixIcon: Icons.person,
+          ),
+        
+          SizedBox(height: 20),
+
+          CustomTextField(
+            controller: _fatherNameController,
+            label: 'إسم الأب',
+            validator: (value) => _validateRequired(value, 'إسم الأب'),
+            prefixIcon: Icons.family_restroom,
+            hint: ' إسم أب العريس',
+
+          ),
+          SizedBox(height: 20),
+
+          CustomTextField(
+            controller: _grandfatherNameController,
+            label: 'إسم الجد الاول و الثاني',
+            validator: (value) => _validateRequired(value, 'إسم الجد'),
+            prefixIcon: Icons.elderly,
+          ),
+          SizedBox(height: 20),
+
+          // NEW FIELD: Family Name (optional)
+          CustomTextField(
+            controller: _familyNameController,
+            label: 'اسم العائلة (اختياري)',
+            prefixIcon: Icons.family_restroom_outlined,
+          ),
+          SizedBox(height: 20),
+
+          _buildDateSelector(
+            label: 'تاريخ الميلاد',
+            selectedDate: _birthDate,
+            onTap: () => _selectDate(isGuardian: false),
+            icon: Icons.calendar_today,
+          ),
+          SizedBox(height: 20),
+
+          CustomTextField(
+            controller: _birthAddressController,
+            label: 'مكان الميلاد',
+            validator: (value) => _validateRequired(value, 'مكان الميلاد'),
+            prefixIcon: Icons.location_on,
+          ),
+          SizedBox(height: 20),
+
+          CustomTextField(
+            controller: _homeAddressController,
+            label: 'عنوان السكن',
+            validator: (value) => _validateRequired(value, 'عنوان السكن'),
+            prefixIcon: Icons.home,
+          ),
+        ],
       ),
-    );
-  }
-
+    ),
+  );
+}
   
 Widget _buildLocationStep() {
   final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -1403,6 +1615,85 @@ Widget _buildLocationStep() {
     ),
   );
 }
+
+
+// Widget _buildGuardianInfoStep() {
+//   return SingleChildScrollView(
+//     padding: EdgeInsets.all(24),
+//     child: Form(
+//       key: _formKeys[0],
+//       child: Column(
+//         crossAxisAlignment: CrossAxisAlignment.start,
+//         children: [
+//           _buildStepTitle('المعلومات الشخصية لولي العريس'),
+//           SizedBox(height: 32),
+
+//           CustomTextField(
+//             controller: _guardianNameController,
+//             label: 'الإسم الكامل',
+//             hint: "الإسم اللقب, إسم الاب, الجد الاول و الثاني",
+//             validator: (value) => _validateRequired(value, 'الإسم الكامل'),
+//             prefixIcon: Icons.person_4,
+//           ),
+//           SizedBox(height: 20),
+
+//           CustomTextField(
+//             controller: _guardianPhoneController,
+//             label: 'رقم الهاتف ',
+//             keyboardType: TextInputType.phone,
+//             validator: _validateGuardianPhone,
+//             prefixIcon: Icons.phone,
+//             hint: 'رقم هاتف الولي ',
+//           ),
+//           SizedBox(height: 20),
+
+//           CustomDropdown<String>(
+//             label: 'صلة القرابة بالعريس',
+//             value: _selectedGuardianRelation,
+//             hint: ' صلة القرابة بالعريس ',
+//             items: AppConstants.guardianRelations.map((relation) => 
+//               DropdownMenuItem<String>(
+//                 value: relation,
+//                 child: Text(relation),
+//               )
+//             ).toList(),
+//             onChanged: (relation) {
+//               setState(() {
+//                 _selectedGuardianRelation = relation;
+//               });
+//             },
+//             prefixIcon: Icons.family_restroom,
+//           ),
+//           SizedBox(height: 20),
+
+//           _buildDateSelector(
+//             label: 'تاريخ ميلاد ',
+//             selectedDate: _guardianBirthDate,
+//             onTap: () => _selectDate(isGuardian: true),
+//             icon: Icons.calendar_today,
+//           ),
+//           SizedBox(height: 20),
+
+//           CustomTextField(
+//             controller: _guardianBirthAddressController,
+//             label: 'مكان الميلاد ',
+//             validator: (value) => _validateRequired(value, 'مكان الميلاد '),
+//             prefixIcon: Icons.location_on,
+//           ),
+//           SizedBox(height: 20),
+
+//           CustomTextField(
+//             controller: _guardianHomeAddressController,
+//             label: 'عنوان السكن ',
+//             validator: (value) => _validateRequired(value, 'عنوان السكن '),
+//             prefixIcon: Icons.home,
+//           ),
+//         ],
+//       ),
+//     ),
+//   );
+// }
+
 Widget _buildGuardianInfoStep() {
   return SingleChildScrollView(
     padding: EdgeInsets.all(24),
@@ -1474,6 +1765,47 @@ Widget _buildGuardianInfoStep() {
             validator: (value) => _validateRequired(value, 'عنوان السكن '),
             prefixIcon: Icons.home,
           ),
+          
+          SizedBox(height: 32),
+          
+          // Section header for Wakil (Representative) info
+          Divider(color: AppColors.primary.withOpacity(0.3)),
+          SizedBox(height: 16),
+          
+          Text(
+            'معلومات الوكيل (اختياري)',
+            style: TextStyle(
+              color: AppColors.primary,
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          SizedBox(height: 16),
+
+          // NEW FIELD: Wakil Full Name (optional)
+          CustomTextField(
+            controller: _wakilFullNameController,
+            label: 'الاسم الكامل للوكيل',
+            prefixIcon: Icons.person_pin,
+            hint: 'أدخل الاسم الكامل للوكيل',
+          ),
+          SizedBox(height: 20),
+
+          // NEW FIELD: Wakil Phone Number (optional)
+          CustomTextField(
+            controller: _wakilPhoneNumberController,
+            label: 'رقم هاتف الوكيل',
+            keyboardType: TextInputType.phone,
+            prefixIcon: Icons.phone_android,
+            hint: '05xxxxxxxx',
+            validator: (value) {
+              // Only validate if user entered something
+              if (value != null && value.trim().isNotEmpty) {
+                return _validatePhone(value);
+              }
+              return null; // Valid if empty (optional field)
+            },
+          ),
         ],
       ),
     ),
@@ -1488,7 +1820,7 @@ Widget _buildGuardianInfoStep() {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildStepTitle('معلومات الأمان', 'أنشئ كلمة مرور لحسابك'), 
+            _buildStepTitle('معلومات الأمان', 'أنشئ كلمة مرور لحسابك , تحتاجها في كل مرة تسجل الدخول '), 
             SizedBox(height: 32),
 
             CustomTextField(
@@ -1589,7 +1921,87 @@ Widget _buildGuardianInfoStep() {
   }
 
 
-// Add this new widget method after _buildPasswordRequirement
+// // Add this new widget method after _buildPasswordRequirement
+// Widget _buildPhoneSelectionStep() {
+//   return SingleChildScrollView(
+//     padding: EdgeInsets.all(24),
+//     child: Column(
+//       crossAxisAlignment: CrossAxisAlignment.start,
+//       children: [
+//         _buildStepTitle(
+//           'اختيار رقم الهاتف لاستقبال رمز التحقق',
+//           'حدد الرقم الذي سيستقبل رسالة SMS',
+//         ),
+//         SizedBox(height: 32),
+
+//         Container(
+//           padding: EdgeInsets.all(20),
+//           decoration: BoxDecoration(
+//             color: AppColors.primary.withOpacity(0.05),
+//             borderRadius: BorderRadius.circular(16),
+//             border: Border.all(
+//               color: AppColors.primary.withOpacity(0.2),
+//             ),
+//           ),
+//           child: Column(
+//             children: [
+//               _buildPhoneOption(
+//                 title: 'رقم هاتف الولي',
+//                 phoneNumber: _guardianPhoneController.text.trim(),
+//                 isSelected: !_SmsToGroom,
+//                 onTap: () {
+//                   setState(() {
+//                     _SmsToGroom = false;
+//                   });
+//                 },
+//                 icon: Icons.supervisor_account,
+//               ),
+//               SizedBox(height: 16),
+//               _buildPhoneOption(
+//                 title: 'رقم هاتف العريس',
+//                 phoneNumber: _phoneController.text.trim(),
+//                 isSelected: _SmsToGroom,
+//                 onTap: () {
+//                   setState(() {
+//                     _SmsToGroom = true;
+//                   });
+//                 },
+//                 icon: Icons.person,
+//               ),
+//             ],
+//           ),
+//         ),
+
+//         SizedBox(height: 24),
+        
+//         Container(
+//           padding: EdgeInsets.all(16),
+//           decoration: BoxDecoration(
+//             color: Colors.blue.shade50,
+//             borderRadius: BorderRadius.circular(12),
+//             border: Border.all(color: Colors.blue.shade200),
+//           ),
+//           child: Row(
+//             children: [
+//               Icon(Icons.info_outline, color: Colors.blue.shade700, size: 20),
+//               SizedBox(width: 12),
+//               Expanded(
+//                 child: Text(
+//                   'سيتم إرسال رمز التحقق SMS إلى الرقم المحدد',
+//                   style: TextStyle(
+//                     color: Colors.blue.shade900,
+//                     fontSize: 13,
+//                   ),
+//                 ),
+//               ),
+//             ],
+//           ),
+//         ),
+//       ],
+//     ),
+//   );
+// }
+
 Widget _buildPhoneSelectionStep() {
   return SingleChildScrollView(
     padding: EdgeInsets.all(24),
@@ -1616,10 +2028,10 @@ Widget _buildPhoneSelectionStep() {
               _buildPhoneOption(
                 title: 'رقم هاتف الولي',
                 phoneNumber: _guardianPhoneController.text.trim(),
-                isSelected: !_SmsToGroom,
+                isSelected: _selectedSmsRecipient == SmsRecipient.guardian,
                 onTap: () {
                   setState(() {
-                    _SmsToGroom = false;
+                    _selectedSmsRecipient = SmsRecipient.guardian;
                   });
                 },
                 icon: Icons.supervisor_account,
@@ -1628,14 +2040,29 @@ Widget _buildPhoneSelectionStep() {
               _buildPhoneOption(
                 title: 'رقم هاتف العريس',
                 phoneNumber: _phoneController.text.trim(),
-                isSelected: _SmsToGroom,
+                isSelected: _selectedSmsRecipient == SmsRecipient.groom,
                 onTap: () {
                   setState(() {
-                    _SmsToGroom = true;
+                    _selectedSmsRecipient = SmsRecipient.groom;
                   });
                 },
                 icon: Icons.person,
               ),
+              // Show wakil option only if wakil phone is provided
+              if (_wakilPhoneNumberController.text.trim().isNotEmpty) ...[
+                SizedBox(height: 16),
+                _buildPhoneOption(
+                  title: 'رقم هاتف الوكيل',
+                  phoneNumber: _wakilPhoneNumberController.text.trim(),
+                  isSelected: _selectedSmsRecipient == SmsRecipient.wakil,
+                  onTap: () {
+                    setState(() {
+                      _selectedSmsRecipient = SmsRecipient.wakil;
+                    });
+                  },
+                  icon: Icons.person_pin,
+                ),
+              ],
             ],
           ),
         ),
@@ -1669,6 +2096,7 @@ Widget _buildPhoneSelectionStep() {
     ),
   );
 }
+
 
 Widget _buildPhoneOption({
   required String title,
@@ -1816,6 +2244,11 @@ Widget _buildPhoneOption({
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     
+        // NEW: Dispose new controllers
+    _familyNameController.dispose();
+    _wakilFullNameController.dispose();
+    _wakilPhoneNumberController.dispose();
+
     super.dispose();
   }
 

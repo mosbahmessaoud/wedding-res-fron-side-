@@ -1,7 +1,6 @@
 // lib/main.dart
-import 'dart:io' show Platform;
-
-import 'package:flutter/foundation.dart' show kIsWeb;
+// ✅ FIXED: only import desktop stuff when NOT on web
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -14,34 +13,24 @@ import 'package:wedding_reservation_app/screens/groom/create_reservation_screen.
 import 'package:wedding_reservation_app/screens/groom/groom_home_screen.dart';
 import 'package:wedding_reservation_app/services/api_service.dart';
 import 'package:wedding_reservation_app/services/connectivity_service.dart';
-import 'package:window_manager/window_manager.dart' if (dart.library.html) 'dart:html';
 
+// ignore: depend_on_referenced_packages
+import 'desktop_init.dart' if (dart.library.html) 'desktop_init_web.dart';
+// ✅ FIXED: conditional imports for window_manager and Platform
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/splash_screen.dart';
 import 'utils/colors.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-    // ADD THIS - warm up server silently
+
+  // ADD THIS - warm up server silently
   ApiService.warmUpServer();
 
-  // Only initialize window_manager on desktop platforms (not mobile/web)
-  if (!kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
-    await windowManager.ensureInitialized();
-    
-    await windowManager.waitUntilReadyToShow(
-      const WindowOptions(
-        size: Size(1024, 768),
-        minimumSize: Size(360, 640),
-        center: true,
-      ),
-      () async {
-        await windowManager.show();
-        await windowManager.focus();
-      },
-    );
+  // ✅ FIXED: only runs on desktop, skipped on web
+  if (!kIsWeb) {
+    await initDesktop();
   }
-
 
   SystemChrome.setEnabledSystemUIMode(
     SystemUiMode.manual,
@@ -54,11 +43,11 @@ void main() async {
       systemNavigationBarColor: Colors.transparent,
     ),
   );
-  
+
   await initializeDateFormatting('ar');
   ConnectivityService().initialize();
   await ApiService.initializeToken();
-  
+
   runApp(const WeddingReservationApp());
 }
 
@@ -70,13 +59,12 @@ class WeddingReservationApp extends StatefulWidget {
 }
 
 class _WeddingReservationAppState extends State<WeddingReservationApp> {
-
   @override
   void dispose() {
     ApiService.disposeClient();
     super.dispose();
   }
- 
+
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
@@ -86,10 +74,10 @@ class _WeddingReservationAppState extends State<WeddingReservationApp> {
           return MaterialApp(
             title: 'نظام حجز الأعراس',
             debugShowCheckedModeBanner: false,
-            
+
             // Theme Mode from Provider
             themeMode: themeProvider.themeMode,
-            
+
             // Add localization support
             localizationsDelegates: const [
               GlobalMaterialLocalizations.delegate,
@@ -97,28 +85,27 @@ class _WeddingReservationAppState extends State<WeddingReservationApp> {
               GlobalCupertinoLocalizations.delegate,
             ],
             supportedLocales: const [
-              Locale('ar', 'DZ'), 
-              Locale('ar'), 
-              Locale('en'), 
+              Locale('ar', 'DZ'),
+              Locale('ar'),
+              Locale('en'),
             ],
-            locale: const Locale('ar', 'DZ'), // Default to Arabic
-            
+            locale: const Locale('ar', 'DZ'),
+
             // Add route definitions
             routes: {
-              '/': (context) => const SplashScreen(), 
+              '/': (context) => const SplashScreen(),
               '/login': (context) => const LoginScreen(),
               '/signup': (context) => const MultiStepSignupScreen(),
               '/splash': (context) => const SplashScreen(),
               '/clan_admin_home': (context) => const ClanAdminHomeScreen(),
               '/creat_new_reservation': (context) => const CreateReservationScreen(),
               '/groom_home': (context) => const GroomHomeScreen(
-                initialTabIndex: 0
+                initialTabIndex: 0,
               ),
             },
-            
-            // Set initial route
+
             initialRoute: '/',
-            
+
             // Light Theme
             theme: ThemeData(
               useMaterial3: true,
@@ -147,11 +134,11 @@ class _WeddingReservationAppState extends State<WeddingReservationApp> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
-                  padding: EdgeInsets.symmetric(vertical: 16),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  textStyle: TextStyle(
+                  textStyle: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
                   ),
@@ -174,25 +161,25 @@ class _WeddingReservationAppState extends State<WeddingReservationApp> {
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(color: AppColors.error),
                 ),
-                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
               ),
             ),
-            
+
             // Dark Theme
             darkTheme: ThemeData(
               useMaterial3: true,
               brightness: Brightness.dark,
               primarySwatch: Colors.blue,
               primaryColor: AppColors.primary,
-              scaffoldBackgroundColor: Color(0xFF121212),
+              scaffoldBackgroundColor: const Color(0xFF121212),
               fontFamily: 'Cairo',
               textTheme: TextTheme(
-                displayLarge: TextStyle(
+                displayLarge: const TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
                 ),
-                titleLarge: TextStyle(
+                titleLarge: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
                   color: Colors.white,
@@ -206,11 +193,11 @@ class _WeddingReservationAppState extends State<WeddingReservationApp> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
-                  padding: EdgeInsets.symmetric(vertical: 16),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  textStyle: TextStyle(
+                  textStyle: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
                   ),
@@ -233,7 +220,7 @@ class _WeddingReservationAppState extends State<WeddingReservationApp> {
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(color: AppColors.error),
                 ),
-                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
               ),
             ),
           );

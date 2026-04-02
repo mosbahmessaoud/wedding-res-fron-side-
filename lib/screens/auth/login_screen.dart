@@ -11,6 +11,9 @@ import 'package:wedding_reservation_app/screens/super%20admin/home_screen.dart';
 import 'package:wedding_reservation_app/services/notification_manager.dart';
 import 'package:wedding_reservation_app/services/token_manager.dart';
 
+import 'package:wedding_reservation_app/services/notification_service.dart';
+import 'package:wedding_reservation_app/services/foreground_notification_service.dart';
+
 import '../../services/api_service.dart';
 import '../../widgets/common/custom_text_field.dart';
 import '../../widgets/theme_toggle_button.dart';
@@ -170,6 +173,9 @@ void _showSnack(String msg, bool isError) {
 
 // added new 
 
+// ─────────────────────────────────────────────────────────────────
+// Replace _checkExistingAuth()
+// ─────────────────────────────────────────────────────────────────
 Future<void> _checkExistingAuth() async {
   try {
     final hasValid = await TokenManager.hasValidToken();
@@ -183,30 +189,41 @@ Future<void> _checkExistingAuth() async {
 
     if (!mounted) return;
 
-    // Start notifications silently
-    NotificationManager().startMonitoring().catchError((e) => print('Notification error: $e'));
+    // ── NEW: start notification services for the already-logged-in user ──
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('user_role', role);
+    // Token is already persisted; just re-initialise ApiService headers
+    await ApiService.initializeToken();
+
+    // Fire-and-forget: start monitoring without blocking navigation
+    WeddingNotificationService()
+        .forceImmediateCheck()
+        .catchError((e) => print('Notification check error: $e'));
+
+    WeddingForegroundNotificationService()
+        .startService()
+        .catchError((e) => print('Foreground service error: $e'));
 
     Widget destination;
     switch (role) {
       case 'groom':
-        destination = GroomHomeScreen(initialTabIndex: 0);
+        destination = const GroomHomeScreen(initialTabIndex: 0);
         break;
       case 'super_admin':
-        destination = SuperAdminHomeScreen();
+        destination = const SuperAdminHomeScreen();
         break;
       case 'clan_admin':
-        destination = ClanAdminHomeScreen();
+        destination = const ClanAdminHomeScreen();
         break;
       default:
-        return; // Unknown role, stay on login
+        return; // Unknown role — stay on login
     }
 
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) => destination,
-        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          return FadeTransition(opacity: animation, child: child);
-        },
+        pageBuilder: (_, __, ___) => destination,
+        transitionsBuilder: (_, animation, __, child) =>
+            FadeTransition(opacity: animation, child: child),
         transitionDuration: const Duration(milliseconds: 200),
       ),
     );
@@ -216,83 +233,75 @@ Future<void> _checkExistingAuth() async {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────
+// Replace _login()
+// ─────────────────────────────────────────────────────────────────
+Future<void> _login() async {
+  if (!_formKey.currentState!.validate()) return;
 
-  Future<void> _login() async {
-    if (!_formKey.currentState!.validate()) return;
+  setState(() => _isLoading = true);
 
-    setState(() => _isLoading = true);
+  try {
+    final phone = _phoneController.text.trim();
+    final response = await ApiService.login(phone, _passwordController.text);
 
-    try {
-      // Get groom's actual phone
-      String actualPhone = _phoneController.text.trim();
-      // try {
-      //   actualPhone = await ApiService.getGroomPhoneBySearch(actualPhone);
-      // } catch (e) {
-      //   if (!mounted) return;
-      //   setState(() => _isLoading = false);
-      //   _showSnack('المستخدم غير موجود، لا يوجد حساب مسجل بهذا الرقم.', true);
-      //   return;
-      // }
+    if (!mounted) return;
 
-      // Login
-      final response = await ApiService.login(actualPhone, _passwordController.text);
-      
-      if (!mounted) return;
+    // Persist phone for next login
+    await _saveLastPhone(phone);
 
-      // Save phone number for next login
-      await _saveLastPhone(_phoneController.text.trim());
+    // Decode JWT to get role
+    final token = response['access_token'] as String;
+    final parts = token.split('.');
+    final payload = json.decode(
+      utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))),
+    );
+    final role = payload['role'] as String;
 
-      // Decode JWT to get role
-      final token = response['access_token'];
-      final parts = token.split('.');
-      final payload = json.decode(utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))));
-      final role = payload['role'];
+    // ── NEW: persist role + kick off notification services ──
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('auth_token', token);
+    await prefs.setString('user_role', role);
 
-      // Start notifications in background
-      NotificationManager().startMonitoring().catchError((e) => print('Notification error'));
+    // Fire-and-forget — don't await so navigation isn't blocked
+    WeddingNotificationService()
+        .forceImmediateCheck()
+        .catchError((e) => print('Notification check error: $e'));
 
-      // Navigate based on role
-      Widget destination;
-      switch (role) {
-        case 'groom':
-          destination = GroomHomeScreen(initialTabIndex: 0);
-          break;
-        case 'super_admin':
-          destination = SuperAdminHomeScreen();
-          break;
-        case 'clan_admin':
-          destination = ClanAdminHomeScreen();
-          break;
-        default:
-          throw Exception('دور المستخدم غير معروف');
-      }
+    WeddingForegroundNotificationService()
+        .startService()
+        .catchError((e) => print('Foreground service error: $e'));
 
-      Navigator.of(context).pushReplacement(
-        PageRouteBuilder(
-          pageBuilder: (context, animation, secondaryAnimation) => destination,
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return FadeTransition(opacity: animation, child: child);
-          },
-          transitionDuration: const Duration(milliseconds: 200),
-        ),
-      );
-
-
-
-
-
-     
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _isLoading = false);
-      
-      String errorMessage = e.toString().replaceFirst('Exception: ', '');
-      // _showSnack(errorMessage, true);
-      _showSnack(' .خطأ في تسجيل الدخول ,تحقق من الإنترنت', true);
+    // Navigate based on role
+    Widget destination;
+    switch (role) {
+      case 'groom':
+        destination = const GroomHomeScreen(initialTabIndex: 0);
+        break;
+      case 'super_admin':
+        destination = const SuperAdminHomeScreen();
+        break;
+      case 'clan_admin':
+        destination = const ClanAdminHomeScreen();
+        break;
+      default:
+        throw Exception('دور المستخدم غير معروف');
     }
+
+    Navigator.of(context).pushReplacement(
+      PageRouteBuilder(
+        pageBuilder: (_, __, ___) => destination,
+        transitionsBuilder: (_, animation, __, child) =>
+            FadeTransition(opacity: animation, child: child),
+        transitionDuration: const Duration(milliseconds: 200),
+      ),
+    );
+  } catch (e) {
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+    _showSnack('خطأ في تسجيل الدخول، تحقق من الإنترنت.', true);
   }
-
-
+}
 
 
 String? validatePhone(String? value) {

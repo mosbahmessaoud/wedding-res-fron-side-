@@ -9,7 +9,12 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:wedding_reservation_app/screens/groom/clan_rules_view_page.dart';
 import 'package:wedding_reservation_app/screens/groom/food_menu_tab_Groom.dart';
 import 'package:wedding_reservation_app/services/api_service.dart';
+import 'package:wedding_reservation_app/services/notification_manager.dart';
+import 'package:wedding_reservation_app/services/token_manager.dart';
 
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:wedding_reservation_app/services/notification_service.dart';
+import 'package:wedding_reservation_app/services/foreground_notification_service.dart';
 import '../../providers/theme_provider.dart';
 import '../../utils/colors.dart';
 import '../../utils/constants.dart';
@@ -141,14 +146,19 @@ void initState() {
       // Check profile completion after user is authenticated
       _checkGroomProfileCompletion();
       
-      if (_hasValidReservation) {
-        _refreshCurrentTabInBackground(_currentIndex);
-        _loadUnreadNotificationCount();
-        _startNotificationPolling();
-        _startHideTimer();
-      } else {
-        _startHideTimer();
-      }
+      _refreshCurrentTabInBackground(_currentIndex);
+      _loadUnreadNotificationCount();
+      _startNotificationPolling();
+      _startHideTimer();
+      
+      // if (_hasValidReservation) {
+      //   _refreshCurrentTabInBackground(_currentIndex);
+      //   _loadUnreadNotificationCount();
+      //   _startNotificationPolling();
+      //   _startHideTimer();
+      // } else {
+      //   _startHideTimer();
+      // }
     });
   });
 }
@@ -821,10 +831,10 @@ String _formatDateTime(String? dateTimeStr) {
 /// Navigate to notifications screen
 void _navigateToNotifications() async {
   // Check if user has valid reservation
-  if (!_hasValidReservation) {
-    _showNoReservationForNotificationsDialog();
-    return;
-  }
+  // if (!_hasValidReservation) {
+  //   _showNoReservationForNotificationsDialog();
+  //   return;
+  // }
   
   // Mark all notifications as read when opening the screen
   try {
@@ -1237,47 +1247,113 @@ void _navigateToExternalScreen(Widget screen, String title) async {
     });
   }
    
+  // void _showLogoutDialog(bool isDark) {
+  //   showDialog(
+  //     context: context,
+  //     builder: (context) => AlertDialog(
+  //       backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+  //       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+  //       title: Text(
+  //         'تسجيل الخروج',
+  //         style: TextStyle(
+  //           fontWeight: FontWeight.w600,
+  //           color: isDark ? Colors.white : Colors.black87,
+  //         ),
+  //       ),
+  //       content: Text(
+  //         'هل أنت متأكد من رغبتك في تسجيل الخروج؟',
+  //         style: TextStyle(color: isDark ? Colors.white70 : Colors.black87),
+  //       ),
+  //       actions: [
+  //         TextButton(
+  //           onPressed: () => Navigator.pop(context),
+  //           child: Text(
+  //             'إلغاء',
+  //             style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[700]),
+  //           ),
+  //         ),
+  //         ElevatedButton(
+  //           onPressed: () async {
+  //             await TokenManager.clearToken(); // ← ADD THIS
+  //             ApiService.clearToken();         // keep this too
+  //             // await NotificationManager().stopMonitoring(); // ✅ now awaited
+  //             await NotificationManager().cancelAllNotifications();
+  //             if (!context.mounted) return;
+  //             Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+  //           },
+  //           style: ElevatedButton.styleFrom(
+  //             backgroundColor: AppColors.primary,
+  //             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+  //             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+  //           ),
+  //           child: const Text('تسجيل الخروج'),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
+  
   void _showLogoutDialog(bool isDark) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(
-          'تسجيل الخروج',
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            color: isDark ? Colors.white : Colors.black87,
-          ),
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Text(
+        'تسجيل الخروج',
+        style: TextStyle(
+          fontWeight: FontWeight.w600,
+          color: isDark ? Colors.white : Colors.black87,
         ),
-        content: Text(
-          'هل أنت متأكد من رغبتك في تسجيل الخروج؟',
-          style: TextStyle(color: isDark ? Colors.white70 : Colors.black87),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'إلغاء',
-              style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[700]),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              ApiService.clearToken();
-              Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-            ),
-            child: const Text('تسجيل الخروج'),
-          ),
-        ],
       ),
-    );
-  }
+      content: Text(
+        'هل أنت متأكد من رغبتك في تسجيل الخروج؟',
+        style: TextStyle(color: isDark ? Colors.white70 : Colors.black87),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(
+            'إلغاء',
+            style: TextStyle(
+              color: isDark ? Colors.grey[400] : Colors.grey[700],
+            ),
+          ),
+        ),
+        ElevatedButton(
+          onPressed: () async {
+            // ── 1. Clear auth token ──
+            await TokenManager.clearToken();
+            await ApiService.clearToken();
+ 
+            // ── 2. Clear stored credentials from SharedPreferences ──
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.remove('auth_token');
+            await prefs.remove('user_role');
+ 
+            // ── 3. Stop notification services & clear tracking ──
+            await WeddingNotificationService().clearOnLogout();
+            await WeddingForegroundNotificationService().stopService();
+ 
+            if (!context.mounted) return;
+            Navigator.of(context)
+                .pushNamedAndRemoveUntil('/login', (route) => false);
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+          ),
+          child: const Text('تسجيل الخروج'),
+        ),
+      ],
+    ),
+  );
+}
+ 
 @override
 Widget build(BuildContext context) {
   final isDark = Theme.of(context).brightness == Brightness.dark;

@@ -51,6 +51,8 @@ class ReservationsTabState extends State<ReservationsTab> with SingleTickerProvi
 
   final TextEditingController _searchController = TextEditingController();
   Timer? _searchDebounce;
+  String _sortBy = 'date1'; // default
+  bool _sortAscending = true;   // newest first by default
 
   // @override
   // void initState() {
@@ -92,6 +94,249 @@ Future<void> _loadInitialData() async {
     _searchDebounce?.cancel();
     super.dispose();
   }
+
+
+List<dynamic> _applySorting(List<dynamic> reservations) {
+  final sorted = List<dynamic>.from(reservations);
+
+  sorted.sort((a, b) {
+    int result = 0;
+
+    switch (_sortBy) {
+      case 'date1':
+        final aDate = a['date1'] ?? '';
+        final bDate = b['date1'] ?? '';
+        result = aDate.compareTo(bDate);
+        break;
+
+      case 'status':
+        const statusOrder = {
+          'pending_validation': 0,
+          'validated': 1,
+          'cancelled': 2,
+        };
+        final aOrder = statusOrder[a['status'] ?? ''] ?? 99;
+        final bOrder = statusOrder[b['status'] ?? ''] ?? 99;
+        result = aOrder.compareTo(bOrder);
+        break;
+
+      case 'payment_status':
+        const paymentOrder = {
+          'not_paid': 0,
+          'partially_paid': 1,
+          'paid': 2,
+        };
+        final aOrder = paymentOrder[a['payment_status'] ?? ''] ?? 99;
+        final bOrder = paymentOrder[b['payment_status'] ?? ''] ?? 99;
+        result = aOrder.compareTo(bOrder);
+        break;
+
+      case 'created_at':
+      default:
+        final aDate = a['created_at'] ?? '';
+        final bDate = b['created_at'] ?? '';
+        result = aDate.compareTo(bDate);
+        break;
+    }
+
+    return _sortAscending ? result : -result;
+  });
+
+  return sorted;
+}
+Widget _buildSortBar(bool isDark) {
+  final options = [
+    {'value': 'created_at', 'label': 'تاريخ الإنشاء'},
+    {'value': 'date1',      'label': 'تاريخ الحجز'},
+    {'value': 'status',     'label': 'الحالة'},
+    {'value': 'payment_status', 'label': 'الدفع'},
+  ];
+
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    color: isDark ? AppColors.darkCard : Colors.white,
+    child: Row(
+      children: [
+        Icon(Icons.sort_rounded,
+            size: 18,
+            color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+        const SizedBox(width: 8),
+        Text(
+          'ترتيب:',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: options.map((opt) {
+                final isSelected = _sortBy == opt['value'];
+                return Padding(
+                  padding: const EdgeInsets.only(left: 6),
+                  child: GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        if (_sortBy == opt['value']) {
+                          _sortAscending = !_sortAscending;
+                        } else {
+                          _sortBy = opt['value']!;
+                          _sortAscending = false;
+                        }
+                      });
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? AppColors.primary.withOpacity(0.15)
+                            : (isDark
+                                ? Colors.grey.shade800
+                                : Colors.grey.shade100),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: isSelected
+                              ? AppColors.primary.withOpacity(0.5)
+                              : Colors.transparent,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            opt['label']!,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: isSelected
+                                  ? FontWeight.w600
+                                  : FontWeight.normal,
+                              color: isSelected
+                                  ? AppColors.primary
+                                  : (isDark
+                                      ? Colors.grey.shade300
+                                      : Colors.grey.shade700),
+                            ),
+                          ),
+                          if (isSelected) ...[
+                            const SizedBox(width: 4),
+                            Icon(
+                              _sortAscending
+                                  ? Icons.arrow_upward_rounded
+                                  : Icons.arrow_downward_rounded,
+                              size: 13,
+                              color: AppColors.primary,
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+
+
+Future<void> _deleteReservation(int reservationId, String groomName) async {
+  final confirmed = await _showConfirmationDialog(
+    'حذف الحجز نهائياً',
+    'هل أنت متأكد من حذف حجز $groomName نهائياً؟\n\nلا يمكن التراجع عن هذا الإجراء.',
+    Colors.red.shade700,
+    Icons.delete_forever_rounded,
+  );
+
+  if (!confirmed) return;
+
+  // Double confirmation for permanent deletion
+  final doubleConfirmed = await showDialog<bool>(
+    context: context,
+    builder: (context) {
+      final isDark = Theme.of(context).brightness == Brightness.dark;
+      return AlertDialog(
+        backgroundColor: isDark ? AppColors.darkCard : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.red.shade700, size: 28),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'تأكيد الحذف النهائي',
+                style: TextStyle(color: Colors.red.shade700, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.red.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: Colors.red.shade400, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'سيتم حذف بيانات الحجز بشكل دائم ولا يمكن استعادتها.',
+                      style: TextStyle(color: Colors.red.shade700, fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text('إلغاء', style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade600)),
+          ),
+          ElevatedButton.icon(
+            onPressed: () => Navigator.of(context).pop(true),
+            icon: const Icon(Icons.delete_forever_rounded, color: Colors.white, size: 18),
+            label: const Text('حذف نهائياً', style: TextStyle(color: Colors.white)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red.shade700,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+        ],
+      );
+    },
+  ) ?? false;
+
+  if (!doubleConfirmed) return;
+
+  try {
+    setState(() => _isLoading = true);
+    await ApiService.deleteReservation(reservationId);
+    await _loadAllReservations();
+    _showSnackBar('تم حذف الحجز نهائياً', Colors.red.shade700);
+  } catch (e) {
+    _showSnackBar('خطأ في حذف الحجز: $e', Colors.red.shade400);
+  } finally {
+    setState(() => _isLoading = false);
+  }
+}
+
 
 Future<void> _openWhatsApp(String phone) async {
   String cleaned = phone.replaceAll(RegExp(r'[\s\-()]'), '');
@@ -181,6 +426,87 @@ Future<void> _showUpdateDateDialog(int reservationId, String groomName, String c
   }
 }
 
+// Widget _buildOutsideActionButtons(Map<String, dynamic> reservation, String status,
+//     int groomId, int reservationId, String groomName, int destinationClanId) {
+//   List<Widget> buttons = [];
+//   final paymentStatus = reservation['payment_status'] ?? 'not_paid';
+//   final currentPayment =
+//       double.tryParse(reservation['payment']?.toString() ?? '0') ?? 0.0;
+//   final screenWidth = MediaQuery.of(context).size.width;
+
+//   // Download PDF button
+//   buttons.add(
+//     _buildActionButton(
+//       onPressed: () => _downloadPdfSimple(reservationId),
+//       icon: Icons.download_rounded,
+//       label: 'تحميل PDF',
+//       color: Colors.blue.shade400,
+//       isCompact: screenWidth < 600,
+//     ),
+//   );
+
+//   if (status == 'pending_validation' || status == 'validated') {
+//     buttons.add(
+//       _buildActionButton(
+//         onPressed: () async {
+//           // Fetch required payment from the DESTINATION clan
+//           double requiredPayment = 0.0;
+//           try {
+//             requiredPayment = await ApiService.getRequiredPaymentByClanId(destinationClanId);
+//           } catch (e) {
+//             print('Could not fetch required payment for clan $destinationClanId: $e');
+//           }
+//           _togglePaymentStatus(
+//               reservationId, groomName, paymentStatus, currentPayment, requiredPayment);
+//         },
+//         icon: _getPaymentStatusIcon(paymentStatus),
+//         label: 'تحديث الدفع',
+//         color: _getPaymentStatusColor(paymentStatus),
+//         isCompact: screenWidth < 600,
+//       ),
+//     );
+//   }
+
+//   if (status == 'pending_validation') {
+//     buttons.add(
+//       _buildActionButton(
+//         onPressed: () async {
+//           double requiredPayment = 0.0;
+//           try {
+//             requiredPayment =
+//                 await ApiService.getRequiredPaymentByClanId(destinationClanId);
+//           } catch (e) {
+//             print('Could not fetch required payment: $e');
+//           }
+//           _validateReservation(reservationId, groomName, paymentStatus != 'not_paid');
+//         },
+//         icon: Icons.check_rounded,
+//         label: 'تأكيد',
+//         color: Colors.green.shade400,
+//         isCompact: screenWidth < 600,
+//       ),
+//     );
+//   }
+
+//   if (status == 'pending_validation' || status == 'validated') {
+//     buttons.add(
+//       _buildActionButton(
+//         onPressed: () => _cancelReservation(reservationId, groomName),
+//         icon: Icons.close_rounded,
+//         label: 'إلغاء',
+//         color: Colors.red.shade400,
+//         isCompact: screenWidth < 600,
+//       ),
+//     );
+//   }
+
+//   return Wrap(
+//     spacing: 8,
+//     runSpacing: 8,
+//     alignment: screenWidth < 600 ? WrapAlignment.center : WrapAlignment.start,
+//     children: buttons,
+//   );
+// }
 Widget _buildOutsideActionButtons(Map<String, dynamic> reservation, String status,
     int groomId, int reservationId, String groomName, int destinationClanId) {
   List<Widget> buttons = [];
@@ -188,8 +514,8 @@ Widget _buildOutsideActionButtons(Map<String, dynamic> reservation, String statu
   final currentPayment =
       double.tryParse(reservation['payment']?.toString() ?? '0') ?? 0.0;
   final screenWidth = MediaQuery.of(context).size.width;
+  final isArchived = _isReservationArchived(reservation);
 
-  // Download PDF button
   buttons.add(
     _buildActionButton(
       onPressed: () => _downloadPdfSimple(reservationId),
@@ -204,7 +530,6 @@ Widget _buildOutsideActionButtons(Map<String, dynamic> reservation, String statu
     buttons.add(
       _buildActionButton(
         onPressed: () async {
-          // Fetch required payment from the DESTINATION clan
           double requiredPayment = 0.0;
           try {
             requiredPayment = await ApiService.getRequiredPaymentByClanId(destinationClanId);
@@ -250,6 +575,18 @@ Widget _buildOutsideActionButtons(Map<String, dynamic> reservation, String statu
         icon: Icons.close_rounded,
         label: 'إلغاء',
         color: Colors.red.shade400,
+        isCompact: screenWidth < 600,
+      ),
+    );
+  }
+
+  if (status == 'cancelled' || isArchived) {
+    buttons.add(
+      _buildActionButton(
+        onPressed: () => _deleteReservation(reservationId, groomName),
+        icon: Icons.delete_forever_rounded,
+        label: 'حذف',
+        color: Colors.red.shade700,
         isCompact: screenWidth < 600,
       ),
     );
@@ -1941,14 +2278,14 @@ PreferredSizeWidget _buildModernAppBar() {
                   horizontal: MediaQuery.of(context).size.width < 600 ? 8 : 12
                 ),
                 tabs: [
-  Tab(text: 'الحجوزات'),
+  Tab(text: 'الحجوزات الداخلية'),
   Tab(
     child: Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         Icon(Icons.output, size: 14, color: Colors.teal),
         SizedBox(width: 4),
-        Text('حجزو خارج (${_belongPendingOutsideReservations.length + _belongValidatedOutsideReservations.length})'),
+        Text('حجزو خارج '),
       ],
     ),
   ),
@@ -1958,7 +2295,7 @@ PreferredSizeWidget _buildModernAppBar() {
       children: [
         Icon(Icons.swap_horiz, size: 14, color: Colors.purple),
         SizedBox(width: 4),
-        Text('أتو من خارج (${_notBelongPendingReservations.length + _notBelongValidatedReservations.length})'),
+        Text('أتو من خارج '),
       ],
     ),
   ),
@@ -2063,23 +2400,49 @@ Widget _buildModernStatistics(bool isDark) {
 }
 
 
-  Widget _buildReservationsList(List<dynamic> reservations, String type, bool isDark) {
-    if (reservations.isEmpty) {
-      return _buildEmptyState(type, isDark);
-    }
+  // Widget _buildReservationsList(List<dynamic> reservations, String type, bool isDark) {
+  //   if (reservations.isEmpty) {
+  //     return _buildEmptyState(type, isDark);
+  //   }
 
-    return RefreshIndicator(
-      onRefresh: _loadAllReservations,
-      color: AppColors.primary,
-      child: ListView.builder(
-        padding: EdgeInsets.all(MediaQuery.of(context).size.width < 600 ? 12 : 20),
-        itemCount: reservations.length,
-        itemBuilder: (context, index) {
-          return _buildModernReservationCard(reservations[index], type, isDark);
-        },
-      ),
-    );
+  //   return RefreshIndicator(
+  //     onRefresh: _loadAllReservations,
+  //     color: AppColors.primary,
+  //     child: ListView.builder(
+  //       padding: EdgeInsets.all(MediaQuery.of(context).size.width < 600 ? 12 : 20),
+  //       itemCount: reservations.length,
+  //       itemBuilder: (context, index) {
+  //         return _buildModernReservationCard(reservations[index], type, isDark);
+  //       },
+  //     ),
+  //   );
+  // }
+  Widget _buildReservationsList(List<dynamic> reservations, String type, bool isDark) {
+  final sorted = _applySorting(reservations);
+
+  if (sorted.isEmpty) {
+    return _buildEmptyState(type, isDark);
   }
+
+  return Column(
+    children: [
+      _buildSortBar(isDark),
+      Expanded(
+        child: RefreshIndicator(
+          onRefresh: _loadAllReservations,
+          color: AppColors.primary,
+          child: ListView.builder(
+            padding: EdgeInsets.all(
+                MediaQuery.of(context).size.width < 600 ? 12 : 20),
+            itemCount: sorted.length,
+            itemBuilder: (context, index) =>
+                _buildModernReservationCard(sorted[index], type, isDark),
+          ),
+        ),
+      ),
+    ],
+  );
+}
 
   Widget _buildEmptyState(String type, bool isDark) {
     final emptyStates = {
@@ -2630,6 +2993,116 @@ Widget _buildModernStatistics(bool isDark) {
 //     children: buttons,
 //   );
 // }
+
+// Widget _buildModernActionButtons(Map<String, dynamic> reservation, String status, int groomId, int reservationId, String groomName) {
+//   List<Widget> buttons = [];
+//   final paymentStatus = reservation['payment_status'] ?? 'not_paid';
+//   final currentPayment = double.tryParse(reservation['payment']?.toString() ?? '0') ?? 0.0;
+//   final requiredPayment = double.tryParse(reservation['required_payment']?.toString() ?? '0') ?? 0.0;
+//   final screenWidth = MediaQuery.of(context).size.width;
+//   final isCompact = screenWidth < 600;
+//   final currentDate = reservation['date1'] ?? '';
+
+//   // WhatsApp buttons — always shown if phones exist
+//   final groomPhone = reservation['phone_number'] ?? '';
+//   final guardianPhone = reservation['guardian_phone'] ?? '';
+//   buttons.add(_whatsAppBtn(groomPhone, 'العريس', isCompact));
+//   buttons.add(_whatsAppBtn(guardianPhone, 'الولي', isCompact));
+
+//   if (status == 'pending_validation') {
+//     buttons.add(
+//       _buildActionButton(
+//         onPressed: () => _togglePaymentStatus(reservationId, groomName, paymentStatus, currentPayment, requiredPayment),
+//         icon: _getPaymentStatusIcon(paymentStatus),
+//         label: 'تحديث الدفع',
+//         color: _getPaymentStatusColor(paymentStatus),
+//         isCompact: isCompact,
+//       ),
+//     );
+//     buttons.add(
+//       _buildActionButton(
+//         onPressed: () => _showUpdateDateDialog(reservationId, groomName, currentDate),
+//         icon: Icons.edit_calendar_rounded,
+//         label: 'تعديل التاريخ',
+//         color: Colors.indigo.shade400,
+//         isCompact: isCompact,
+//       ),
+//     );
+//     buttons.add(
+//       _buildActionButton(
+//         onPressed: () => _validateReservation(reservationId, groomName, paymentStatus != 'not_paid'),
+//         icon: Icons.check_rounded,
+//         label: 'تأكيد',
+//         color: Colors.green.shade400,
+//         isCompact: isCompact,
+//       ),
+//     );
+//     buttons.add(
+//       _buildActionButton(
+//         onPressed: () => _cancelReservation(reservationId, groomName),
+//         icon: Icons.close_rounded,
+//         label: 'إلغاء',
+//         color: Colors.red.shade400,
+//         isCompact: isCompact,
+//       ),
+//     );
+//   } else if (status == 'validated') {
+//     buttons.add(
+//       _buildActionButton(
+//         onPressed: () => _togglePaymentStatus(reservationId, groomName, paymentStatus, currentPayment, requiredPayment),
+//         icon: _getPaymentStatusIcon(paymentStatus),
+//         label: 'تحديث الدفع',
+//         color: _getPaymentStatusColor(paymentStatus),
+//         isCompact: isCompact,
+//       ),
+//     );
+//     buttons.add(
+//       _buildActionButton(
+//         onPressed: () => _showUpdateDateDialog(reservationId, groomName, currentDate),
+//         icon: Icons.edit_calendar_rounded,
+//         label: 'تعديل التاريخ',
+//         color: Colors.indigo.shade400,
+//         isCompact: isCompact,
+//       ),
+//     );
+//     buttons.add(
+//       _buildActionButton(
+//         onPressed: () => _cancelReservation(reservationId, groomName),
+//         icon: Icons.close_rounded,
+//         label: 'إلغاء',
+//         color: Colors.red.shade400,
+//         isCompact: isCompact,
+//       ),
+//     );
+//   } else if (status == 'cancelled') {
+//     buttons.add(
+//       _buildActionButton(
+//         onPressed: () => _validateReservationFromCancelledTab(reservationId, groomName, paymentStatus != 'not_paid'),
+//         icon: Icons.restore_rounded,
+//         label: 'استعادة',
+//         color: Colors.amber.shade900,
+//         isCompact: isCompact,
+//       ),
+//     );
+//     buttons.add(
+//       _buildActionButton(
+//         onPressed: () => _showUpdateDateDialog(reservationId, groomName, currentDate),
+//         icon: Icons.edit_calendar_rounded,
+//         label: 'تعديل التاريخ',
+//         color: Colors.indigo.shade400,
+//         isCompact: isCompact,
+//       ),
+//     );
+//   }
+
+//   return Wrap(
+//     spacing: 8,
+//     runSpacing: 8,
+//     alignment: isCompact ? WrapAlignment.center : WrapAlignment.start,
+//     children: buttons,
+//   );
+// }
+
 Widget _buildModernActionButtons(Map<String, dynamic> reservation, String status, int groomId, int reservationId, String groomName) {
   List<Widget> buttons = [];
   final paymentStatus = reservation['payment_status'] ?? 'not_paid';
@@ -2638,6 +3111,7 @@ Widget _buildModernActionButtons(Map<String, dynamic> reservation, String status
   final screenWidth = MediaQuery.of(context).size.width;
   final isCompact = screenWidth < 600;
   final currentDate = reservation['date1'] ?? '';
+  final isArchived = _isReservationArchived(reservation);
 
   // WhatsApp buttons — always shown if phones exist
   final groomPhone = reservation['phone_number'] ?? '';
@@ -2729,6 +3203,28 @@ Widget _buildModernActionButtons(Map<String, dynamic> reservation, String status
         isCompact: isCompact,
       ),
     );
+    buttons.add(
+      _buildActionButton(
+        onPressed: () => _deleteReservation(reservationId, groomName),
+        icon: Icons.delete_forever_rounded,
+        label: 'حذف',
+        color: Colors.red.shade700,
+        isCompact: isCompact,
+      ),
+    );
+  }
+
+  // Show delete for archived reservations regardless of status
+  if (isArchived) {
+    buttons.add(
+      _buildActionButton(
+        onPressed: () => _deleteReservation(reservationId, groomName),
+        icon: Icons.delete_forever_rounded,
+        label: 'حذف',
+        color: Colors.red.shade700,
+        isCompact: isCompact,
+      ),
+    );
   }
 
   return Wrap(
@@ -2738,7 +3234,6 @@ Widget _buildModernActionButtons(Map<String, dynamic> reservation, String status
     children: buttons,
   );
 }
-
 Widget _buildActionButton({
   required VoidCallback onPressed,
   required IconData icon,
@@ -2957,8 +3452,53 @@ final allCancelled = _notBelongCancelledReservations
   );
 }
 
+// Widget _buildNotBelongList(List<Map<String, dynamic>> items, bool isDark) {
+//   if (items.isEmpty) {
+//     return RefreshIndicator(
+//       onRefresh: _loadAllReservations,
+//       color: AppColors.primary,
+//       child: SingleChildScrollView(
+//         physics: const AlwaysScrollableScrollPhysics(),
+//         child: SizedBox(
+//           height: 350,
+//           child: Center(
+//             child: Column(
+//               mainAxisAlignment: MainAxisAlignment.center,
+//               children: [
+//                 Icon(Icons.swap_horiz, size: 56,
+//                     color: isDark ? Colors.grey.shade700 : Colors.grey.shade300),
+//                 const SizedBox(height: 12),
+//                 Text(
+//                   'لا توجد حجوزات',
+//                   style: TextStyle(
+//                     fontSize: 15,
+//                     color: isDark ? Colors.grey.shade400 : Colors.grey.shade500,
+//                     fontWeight: FontWeight.w500,
+//                   ),
+//                 ),
+//               ],
+//             ),
+//           ),
+//         ),
+//       ),
+//     );
+//   }
+
+//   return RefreshIndicator(
+//     onRefresh: _loadAllReservations,
+//     color: AppColors.primary,
+//     child: ListView.builder(
+//       padding: EdgeInsets.all(MediaQuery.of(context).size.width < 600 ? 12 : 16),
+//       itemCount: items.length,
+//       itemBuilder: (context, index) => _buildNotBelongReservationCard(items[index], isDark),
+//     ),
+//   );
+// }
+
 Widget _buildNotBelongList(List<Map<String, dynamic>> items, bool isDark) {
-  if (items.isEmpty) {
+  final sorted = _applySorting(items).cast<Map<String, dynamic>>();
+
+  if (sorted.isEmpty) {
     return RefreshIndicator(
       onRefresh: _loadAllReservations,
       color: AppColors.primary,
@@ -2970,14 +3510,18 @@ Widget _buildNotBelongList(List<Map<String, dynamic>> items, bool isDark) {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.swap_horiz, size: 56,
-                    color: isDark ? Colors.grey.shade700 : Colors.grey.shade300),
+                Icon(Icons.swap_horiz,
+                    size: 56,
+                    color:
+                        isDark ? Colors.grey.shade700 : Colors.grey.shade300),
                 const SizedBox(height: 12),
                 Text(
                   'لا توجد حجوزات',
                   style: TextStyle(
                     fontSize: 15,
-                    color: isDark ? Colors.grey.shade400 : Colors.grey.shade500,
+                    color: isDark
+                        ? Colors.grey.shade400
+                        : Colors.grey.shade500,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -2989,16 +3533,27 @@ Widget _buildNotBelongList(List<Map<String, dynamic>> items, bool isDark) {
     );
   }
 
-  return RefreshIndicator(
-    onRefresh: _loadAllReservations,
-    color: AppColors.primary,
-    child: ListView.builder(
-      padding: EdgeInsets.all(MediaQuery.of(context).size.width < 600 ? 12 : 16),
-      itemCount: items.length,
-      itemBuilder: (context, index) => _buildNotBelongReservationCard(items[index], isDark),
-    ),
+  return Column(
+    children: [
+      _buildSortBar(isDark),
+      Expanded(
+        child: RefreshIndicator(
+          onRefresh: _loadAllReservations,
+          color: AppColors.primary,
+          child: ListView.builder(
+            padding: EdgeInsets.all(
+                MediaQuery.of(context).size.width < 600 ? 12 : 16),
+            itemCount: sorted.length,
+            itemBuilder: (context, index) =>
+                _buildNotBelongReservationCard(sorted[index], isDark),
+          ),
+        ),
+      ),
+    ],
   );
 }
+
+
 Widget _buildNotBelongStatCard(
     String label, int count, Color color, IconData icon, bool isDark) {
   return Container(
@@ -3476,8 +4031,54 @@ Widget _buildBelongOutsideReservationsPage(bool isDark) {
     ),
   );
 }
+
+// Widget _buildBelongOutsideList(List<Map<String, dynamic>> items, bool isDark) {
+//   if (items.isEmpty) {
+//     return RefreshIndicator(
+//       onRefresh: _loadAllReservations,
+//       color: AppColors.primary,
+//       child: SingleChildScrollView(
+//         physics: const AlwaysScrollableScrollPhysics(),
+//         child: SizedBox(
+//           height: 350,
+//           child: Center(
+//             child: Column(
+//               mainAxisAlignment: MainAxisAlignment.center,
+//               children: [
+//                 Icon(Icons.output, size: 56,
+//                     color: isDark ? Colors.grey.shade700 : Colors.grey.shade300),
+//                 const SizedBox(height: 12),
+//                 Text(
+//                   'لا توجد حجوزات',
+//                   style: TextStyle(
+//                     fontSize: 15,
+//                     color: isDark ? Colors.grey.shade400 : Colors.grey.shade500,
+//                     fontWeight: FontWeight.w500,
+//                   ),
+//                 ),
+//               ],
+//             ),
+//           ),
+//         ),
+//       ),
+//     );
+//   }
+
+//   return RefreshIndicator(
+//     onRefresh: _loadAllReservations,
+//     color: AppColors.primary,
+//     child: ListView.builder(
+//       padding: EdgeInsets.all(MediaQuery.of(context).size.width < 600 ? 12 : 16),
+//       itemCount: items.length,
+//       itemBuilder: (context, index) => _buildBelongOutsideReservationCard(items[index], isDark),
+//     ),
+//   );
+// }
+
 Widget _buildBelongOutsideList(List<Map<String, dynamic>> items, bool isDark) {
-  if (items.isEmpty) {
+  final sorted = _applySorting(items).cast<Map<String, dynamic>>();
+
+  if (sorted.isEmpty) {
     return RefreshIndicator(
       onRefresh: _loadAllReservations,
       color: AppColors.primary,
@@ -3489,14 +4090,18 @@ Widget _buildBelongOutsideList(List<Map<String, dynamic>> items, bool isDark) {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.output, size: 56,
-                    color: isDark ? Colors.grey.shade700 : Colors.grey.shade300),
+                Icon(Icons.output,
+                    size: 56,
+                    color:
+                        isDark ? Colors.grey.shade700 : Colors.grey.shade300),
                 const SizedBox(height: 12),
                 Text(
                   'لا توجد حجوزات',
                   style: TextStyle(
                     fontSize: 15,
-                    color: isDark ? Colors.grey.shade400 : Colors.grey.shade500,
+                    color: isDark
+                        ? Colors.grey.shade400
+                        : Colors.grey.shade500,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -3508,14 +4113,23 @@ Widget _buildBelongOutsideList(List<Map<String, dynamic>> items, bool isDark) {
     );
   }
 
-  return RefreshIndicator(
-    onRefresh: _loadAllReservations,
-    color: AppColors.primary,
-    child: ListView.builder(
-      padding: EdgeInsets.all(MediaQuery.of(context).size.width < 600 ? 12 : 16),
-      itemCount: items.length,
-      itemBuilder: (context, index) => _buildBelongOutsideReservationCard(items[index], isDark),
-    ),
+  return Column(
+    children: [
+      _buildSortBar(isDark),
+      Expanded(
+        child: RefreshIndicator(
+          onRefresh: _loadAllReservations,
+          color: AppColors.primary,
+          child: ListView.builder(
+            padding: EdgeInsets.all(
+                MediaQuery.of(context).size.width < 600 ? 12 : 16),
+            itemCount: sorted.length,
+            itemBuilder: (context, index) =>
+                _buildBelongOutsideReservationCard(sorted[index], isDark),
+          ),
+        ),
+      ),
+    ],
   );
 }
 

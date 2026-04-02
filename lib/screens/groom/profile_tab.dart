@@ -7,7 +7,11 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:wedding_reservation_app/models/clan.dart';
 import 'package:wedding_reservation_app/models/county.dart';
 import 'package:wedding_reservation_app/screens/groom/updating_patge.dart';
-
+import 'package:wedding_reservation_app/services/notification_manager.dart';
+import 'package:wedding_reservation_app/services/token_manager.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:wedding_reservation_app/services/notification_service.dart';
+import 'package:wedding_reservation_app/services/foreground_notification_service.dart';
 import '../../../services/api_service.dart';
 import '../../../utils/colors.dart';
 class ProfileTab extends StatefulWidget {
@@ -313,9 +317,9 @@ class ProfileTabState extends State<ProfileTab> {
               ],
             ),
             const SizedBox(height: 16),
-            _buildInfoRow(Icons.person, 'الاسم الأول', _userProfile?['first_name'] ?? 'غير محدد'),
+            _buildInfoRow(Icons.person, 'إسم العريس', _userProfile?['first_name'] ?? 'غير محدد'),
             const SizedBox(height: 12),
-            _buildInfoRow(Icons.person_outline, 'اسم العائلة', _userProfile?['last_name'] ?? 'غير محدد'),
+            _buildInfoRow(Icons.person_outline, 'اللقب', _userProfile?['last_name'] ?? 'غير محدد'),
             const SizedBox(height: 12),
             _buildInfoRow(Icons.person, 'اسم الأب', _userProfile?['father_name'] ?? 'غير محدد'),
             const SizedBox(height: 12),
@@ -330,7 +334,7 @@ class ProfileTabState extends State<ProfileTab> {
             _buildInfoRow(Icons.home, 'عنوان السكن', _userProfile?['home_address'] ?? 'غير محدد'),
             if (_userProfile?['family_name'] != null && _userProfile!['family_name'].toString().isNotEmpty) ...[
               const SizedBox(height: 12),
-              _buildInfoRow(Icons.family_restroom, 'اسم العائلة', _userProfile?['family_name']),
+              _buildInfoRow(Icons.family_restroom, 'إسم العائلة (إختياري)', _userProfile?['family_name']),
             ],
           ],
         ),
@@ -1214,11 +1218,108 @@ void _showOTPVerificationDialog(String newPhone, String? tempPhone) {
 
 
 
-  // ==================== EXISTING METHODS ====================
+//   // ==================== EXISTING METHODS ====================
+// void _showEditGroomDialog() {
+//   final controllers = {
+//     'first_name': TextEditingController(text: _userProfile?['first_name']),
+//     'last_name': TextEditingController(text: _userProfile?['last_name']),
+//     'birth_address': TextEditingController(text: _userProfile?['birth_address']),
+//     'home_address': TextEditingController(text: _userProfile?['home_address']),
+//     'family_name': TextEditingController(text: _userProfile?['family_name']),
+//   };
+  
+//   DateTime? selectedBirthDate = _parseDate(_userProfile?['birth_date']);
+
+//   showDialog(
+//     context: context,
+//     builder: (context) => StatefulBuilder(
+//       builder: (context, setState) => AlertDialog(
+//         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+//         title: Row(
+//           mainAxisSize: MainAxisSize.min, // Add this
+//           children: [
+//             Icon(Icons.edit, color: AppColors.primary),
+//             SizedBox(width: 10),
+//             Flexible( // Wrap text in Flexible
+//               child: Text(
+//                 'تعديل معلومات العريس',
+//                 overflow: TextOverflow.fade, // Handle overflow
+//               ),
+//             ),
+            
+
+//           ],
+          
+//         ),
+//         content: SingleChildScrollView(
+//           child: SizedBox(
+//             width: MediaQuery.of(context).size.width * 0.9, // Constrain width
+//             child: Column(
+//               mainAxisSize: MainAxisSize.min,
+//               children: [
+//                 SizedBox(height: 12),
+//                 _buildTextField(controllers['first_name']!, 'إسم العريس'),
+//                 SizedBox(height: 12),
+//                 _buildTextField(controllers['last_name']!, 'اللقب'),
+//                 SizedBox(height: 12),
+//                 _buildDateField(
+//                   label: 'تاريخ الميلاد',
+//                   selectedDate: selectedBirthDate,
+//                   onTap: () async {
+//                     final date = await _selectDate(context, selectedBirthDate);
+//                     if (date != null) setState(() => selectedBirthDate = date);
+//                   },
+//                 ),
+//                 SizedBox(height: 12),
+//                 _buildTextField(controllers['birth_address']!, 'مكان الميلاد'),
+//                 SizedBox(height: 12),
+//                 _buildTextField(controllers['home_address']!, 'عنوان السكن'),
+//                 SizedBox(height: 12),
+//                 _buildTextField(controllers['family_name']!, 'اللقب (اختياري)'),
+//               ],
+//             ),
+//           ),
+//         ),
+
+//         actions: [
+//           TextButton(
+//             onPressed: () => Navigator.pop(context),
+//             child: Text('إلغاء'),
+//           ),
+//           ElevatedButton(
+//             onPressed: () async {
+//               Navigator.pop(context);
+//               await _updateProfile(
+//                 firstName: controllers['first_name']!.text.trim(),
+//                 lastName: controllers['last_name']!.text.trim(),
+//                 birthDate: selectedBirthDate != null 
+//                     ? DateFormat('yyyy-MM-dd').format(selectedBirthDate!) 
+//                     : null,
+//                 birthAddress: controllers['birth_address']!.text.trim(),
+//                 homeAddress: controllers['home_address']!.text.trim(),
+//                 familyName: controllers['family_name']!.text.trim().isEmpty 
+//                     ? null 
+//                     : controllers['family_name']!.text.trim(),
+//               );
+//             },
+//             style: ElevatedButton.styleFrom(
+//               backgroundColor: AppColors.primary,
+//               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+//             ),
+//             child: Text('حفظ', style: TextStyle(color: Colors.white)),
+//           ),
+//         ],
+//       ),
+//     ),
+//   );
+// }
+
 void _showEditGroomDialog() {
   final controllers = {
     'first_name': TextEditingController(text: _userProfile?['first_name']),
     'last_name': TextEditingController(text: _userProfile?['last_name']),
+    'father_name': TextEditingController(text: _userProfile?['father_name']),
+    'grandfather_name': TextEditingController(text: _userProfile?['grandfather_name']),
     'birth_address': TextEditingController(text: _userProfile?['birth_address']),
     'home_address': TextEditingController(text: _userProfile?['home_address']),
     'family_name': TextEditingController(text: _userProfile?['family_name']),
@@ -1232,31 +1333,32 @@ void _showEditGroomDialog() {
       builder: (context, setState) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
-          mainAxisSize: MainAxisSize.min, // Add this
+          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(Icons.edit, color: AppColors.primary),
             SizedBox(width: 10),
-            Flexible( // Wrap text in Flexible
+            Flexible(
               child: Text(
                 'تعديل معلومات العريس',
-                overflow: TextOverflow.fade, // Handle overflow
+                overflow: TextOverflow.fade,
               ),
             ),
-            
-
           ],
-          
         ),
         content: SingleChildScrollView(
           child: SizedBox(
-            width: MediaQuery.of(context).size.width * 0.9, // Constrain width
+            width: MediaQuery.of(context).size.width * 0.9,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 SizedBox(height: 12),
-                _buildTextField(controllers['first_name']!, 'الاسم الأول'),
+                _buildTextField(controllers['first_name']!, 'إسم العريس'),
                 SizedBox(height: 12),
-                _buildTextField(controllers['last_name']!, 'اسم العائلة'),
+                _buildTextField(controllers['last_name']!, 'اللقب'),
+                SizedBox(height: 12),
+                _buildTextField(controllers['father_name']!, 'اسم الأب'),
+                SizedBox(height: 12),
+                _buildTextField(controllers['grandfather_name']!, 'اسم الجد'),
                 SizedBox(height: 12),
                 _buildDateField(
                   label: 'تاريخ الميلاد',
@@ -1271,12 +1373,11 @@ void _showEditGroomDialog() {
                 SizedBox(height: 12),
                 _buildTextField(controllers['home_address']!, 'عنوان السكن'),
                 SizedBox(height: 12),
-                _buildTextField(controllers['family_name']!, 'اسم العائلة (اختياري)'),
+                _buildTextField(controllers['family_name']!, 'اللقب (اختياري)'),
               ],
             ),
           ),
         ),
-
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -1288,6 +1389,8 @@ void _showEditGroomDialog() {
               await _updateProfile(
                 firstName: controllers['first_name']!.text.trim(),
                 lastName: controllers['last_name']!.text.trim(),
+                fatherName: controllers['father_name']!.text.trim(),
+                grandfatherName: controllers['grandfather_name']!.text.trim(),
                 birthDate: selectedBirthDate != null 
                     ? DateFormat('yyyy-MM-dd').format(selectedBirthDate!) 
                     : null,
@@ -1309,7 +1412,6 @@ void _showEditGroomDialog() {
     ),
   );
 }
-
   void _showEditGuardianDialog() {
     final controllers = {
       'name': TextEditingController(text: _userProfile?['guardian_name']),
@@ -1490,6 +1592,8 @@ void _showEditGroomDialog() {
   Future<void> _updateProfile({
     String? firstName,
     String? lastName,
+    String? fatherName,
+    String? grandfatherName,
     String? birthDate,
     String? birthAddress,
     String? homeAddress,
@@ -1509,6 +1613,8 @@ void _showEditGroomDialog() {
       await ApiService.updateGroomProfileDetails(
         firstName: firstName,
         lastName: lastName,
+        fatherName: fatherName,
+        grandfatherName: grandfatherName,
         birthDate: birthDate,
         birthAddress: birthAddress,
         homeAddress: homeAddress,
@@ -1679,7 +1785,32 @@ void _showEditGroomDialog() {
     );
   }
 
-  void _showLogoutDialog() => showDialog(context: context, builder: (context) => AlertDialog(title: const Text('تسجيل الخروج'), content: const Text('هل أنت متأكد من رغبتك في تسجيل الخروج؟'), actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')), ElevatedButton(onPressed: () { ApiService.clearToken(); Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false); }, style: ElevatedButton.styleFrom(backgroundColor: Colors.orange), child: const Text('تسجيل الخروج'))]));
+  void _showLogoutDialog() => 
+  showDialog(context: context, builder: (context) =>
+   AlertDialog(title: const Text('تسجيل الخروج'), 
+   content: const Text('هل أنت متأكد من رغبتك في تسجيل الخروج؟'), 
+   actions: [TextButton(onPressed: () => Navigator.pop(context), 
+   child: const Text('إلغاء')), 
+   ElevatedButton(
+    onPressed: () async {
+            // ── 1. Clear auth token ──
+            await TokenManager.clearToken();
+            await ApiService.clearToken();
+ 
+            // ── 2. Clear stored credentials from SharedPreferences ──
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.remove('auth_token');
+            await prefs.remove('user_role');
+ 
+            // ── 3. Stop notification services & clear tracking ──
+            await WeddingNotificationService().clearOnLogout();
+            await WeddingForegroundNotificationService().stopService();
+ 
+            if (!context.mounted) return;
+            Navigator.of(context)
+                .pushNamedAndRemoveUntil('/login', (route) => false);
+          },
+     style: ElevatedButton.styleFrom(backgroundColor: Colors.orange), child: const Text('تسجيل الخروج'))]));
 
   void _showDeleteAccountDialog() {
     showDialog(
@@ -1731,7 +1862,10 @@ void _showEditGroomDialog() {
   Future<void> _deleteAccount() async {
     try {
       await ApiService.deleteProfile();
-      await ApiService.clearToken();
+      await TokenManager.clearToken(); // ← ADD THIS
+      await ApiService.clearToken();         // keep this too
+      // await NotificationManager().stopMonitoring(); // ✅ now awaited
+      await NotificationManager().cancelAllNotifications();
       if (mounted) {
         Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حذف الحساب بنجاح'), backgroundColor: Colors.green));

@@ -22,7 +22,7 @@ class ClanAdminStatisticsPageState extends State<ClanAdminStatisticsPage> {
   DateTime? _startDate;
   DateTime? _endDate;
   bool _isLoading = false;
-
+  String _reservationStatusFilter = 'all'; // 'all' | 'pending' | 'validated'
   void refreshData() {}
 
   Future<void> _selectDateRange() async {
@@ -96,94 +96,340 @@ class ClanAdminStatisticsPageState extends State<ClanAdminStatisticsPage> {
     )).toList();
   }
 
-  Future<List<Map<String, dynamic>>> _fetchData() async {
-    if (_exportType == 'grooms') {
-      final response = await ApiService.listGroomsForClanAdmin();
-      return response.map((g) {
-        final groom = g as Map<String, dynamic>;
-        return {
-          'اسم العريس': groom['first_name'] ?? '',
-           'اسم الأب': groom['father_name'] ?? '',
-           'اسم الجد': groom['grandfather_name'] ?? '',
-          // 'اللقب': groom['last_name'] ?? '',
-           'رقم الهاتف': groom['phone_number'] ?? '',
-           'تاريخ الميلاد': groom['birth_date'] ?? '',
-          'مكان الميلاد': groom['birth_address'] ?? '',
-           'العنوان': groom['home_address'] ?? '',
-           'اسم ولي الأمر': groom['guardian_name'] ?? '',
-          'هاتف ولي الأمر': groom['guardian_phone'] ?? '',
-           'صلة القرابة': groom['guardian_relation'] ?? '',
-          'تاريخ ميلاد ولي الأمر': groom['guardian_birth_date'] ?? '',
-           'مكان ميلاد ولي الأمر': groom['guardian_birth_address'] ?? '',
-          'عنوان ولي الأمر': groom['guardian_home_address'] ?? '',
-          //  'الحالة': groom['status'] ?? 'نشط',
-          // 'تاريخ التسجيل': groom['created_at']?.toString().split('T')[0] ?? '',
-        };
-      }).toList();
-    } else {
-      try {
-        final response = await ApiService.getAllReservationsClanAdmin();
-        final now = DateTime.now();
-        return response.map((r) => r as Map<String, dynamic>).where((r) {
-          final date1 = r['date1'] != null ? DateTime.parse(r['date1']) : null;
-          if (_startDate != null && _endDate != null && date1 != null && (date1.isBefore(_startDate!) || date1.isAfter(_endDate!))) return false;
-          if (_reservationFilter == 'upcoming' && date1 != null && date1.isBefore(now)) return false;
-          if (_reservationFilter == 'past' && date1 != null && date1.isAfter(now)) return false;
-          return true;
-        }).map((r) => {
-          'تاريخ اقامة العرس': r['date1'] ?? '','الاسم الكامل للعريس': '${r['first_name']} ${r['father_name']} ${r['grandfather_name']} ${r['last_name']}',
-          'اسم العريس': r['first_name'] ?? '', 'اسم الأب': r['father_name'] ?? '', 'اسم الجد': r['grandfather_name'] ?? '',
-          // 'اللقب': r['last_name'] ?? '', 
-          'رقم الهاتف': r['phone_number'] ?? '', 'تاريخ الميلاد': r['birth_date'] ?? '',
-          'مكان الميلاد': r['birth_address'] ?? '', 'العنوان': r['home_address'] ?? '', 'اسم ولي الأمر': r['guardian_name'] ?? '',
-          'هاتف ولي الأمر': r['guardian_phone'] ?? '', 'عنوان ولي الأمر': r['guardian_home_address'] ?? '',
-          'مكان ميلاد ولي الأمر': r['guardian_birth_address'] ?? '', 'تاريخ ميلاد ولي الأمر': r['guardian_birth_date'] ?? '',
-          //  'يومين': r['date2_bool'] == true ? 'نعم' : 'لا',
-          'القاعة': r['hall_name'] ?? '', ' الهيئة': r['haia_committee_name'] ?? '', 'لجنة المداح': r['madaeh_committee_name'] ?? '',
-          // 'الحالة': r['status'] ?? '', 
-          // ' يقبل عرس جماعي': r['join_to_mass_wedding'] == true ? 'نعم' : 'لا',
-           'الدفع': r['payment_valid'] == true ? 'مدفوع' : 'غير مدفوع',
-          // 'تاريخ إنشاء الحجز': r['created_at']?.toString().split('T')[0] ?? '',
-        }).toList();
-      } catch (e) {
-        _showSnackBar('خطأ في جلب البيانات: $e', isError: true);
-        return [];
+//   Future<List<Map<String, dynamic>>> _fetchData() async {
+//     if (_exportType == 'grooms') {
+//       final response = await ApiService.listGroomsForClanAdmin();
+//       return response.map((g) {
+//         final groom = g as Map<String, dynamic>;
+//         return {
+//           'اسم العريس': groom['first_name'] ?? '',
+//            'اسم الأب': groom['father_name'] ?? '',
+//            'اسم الجد': groom['grandfather_name'] ?? '',
+//           // 'اللقب': groom['last_name'] ?? '',
+//            'رقم الهاتف': groom['phone_number'] ?? '',
+//            'تاريخ الميلاد': groom['birth_date'] ?? '',
+//           'مكان الميلاد': groom['birth_address'] ?? '',
+//            'العنوان': groom['home_address'] ?? '',
+//            'اسم ولي الأمر': groom['guardian_name'] ?? '',
+//           'هاتف ولي الأمر': groom['guardian_phone'] ?? '',
+//            'صلة القرابة': groom['guardian_relation'] ?? '',
+//           'تاريخ ميلاد ولي الأمر': groom['guardian_birth_date'] ?? '',
+//            'مكان ميلاد ولي الأمر': groom['guardian_birth_address'] ?? '',
+//           'عنوان ولي الأمر': groom['guardian_home_address'] ?? '',
+//           //  'الحالة': groom['status'] ?? 'نشط',
+//           // 'تاريخ التسجيل': groom['created_at']?.toString().split('T')[0] ?? '',
+//         };
+//       }).toList();
+//     } else {
+//       try {
+//         final response = await ApiService.getAllReservationsClanAdmin();
+//         final now = DateTime.now();
+//         return response.map((r) => r as Map<String, dynamic>).where((r) {
+//           final date1 = r['date1'] != null ? DateTime.parse(r['date1']) : null;
+//           if (_startDate != null && _endDate != null && date1 != null && (date1.isBefore(_startDate!) || date1.isAfter(_endDate!))) return false;
+//           if (_reservationFilter == 'upcoming' && date1 != null && date1.isBefore(now)) return false;
+//           if (_reservationFilter == 'past' && date1 != null && date1.isAfter(now)) return false;
+//           return true;
+//         }).map((r) => {
+//           'تاريخ اقامة العرس': r['date1'] ?? '','الاسم الكامل للعريس': '${r['first_name']} ${r['father_name']} ${r['grandfather_name']} ${r['last_name']}',
+//           'اسم العريس': r['first_name'] ?? '', 'اسم الأب': r['father_name'] ?? '', 'اسم الجد': r['grandfather_name'] ?? '',
+//           // 'اللقب': r['last_name'] ?? '', 
+//           'رقم الهاتف': r['phone_number'] ?? '', 'تاريخ الميلاد': r['birth_date'] ?? '',
+//           'مكان الميلاد': r['birth_address'] ?? '', 'العنوان': r['home_address'] ?? '', 'اسم ولي الأمر': r['guardian_name'] ?? '',
+//           'هاتف ولي الأمر': r['guardian_phone'] ?? '', 'عنوان ولي الأمر': r['guardian_home_address'] ?? '',
+//           'مكان ميلاد ولي الأمر': r['guardian_birth_address'] ?? '', 'تاريخ ميلاد ولي الأمر': r['guardian_birth_date'] ?? '',
+//           //  'يومين': r['date2_bool'] == true ? 'نعم' : 'لا',
+//           'القاعة': r['hall_name'] ?? '', ' الهيئة': r['haia_committee_name'] ?? '', 'لجنة المداح': r['madaeh_committee_name'] ?? '',
+//           // 'الحالة': r['status'] ?? '', 
+//           // ' يقبل عرس جماعي': r['join_to_mass_wedding'] == true ? 'نعم' : 'لا',
+//            'الدفع': r['payment_valid'] == true ? 'مدفوع' : 'غير مدفوع',
+//           // 'تاريخ إنشاء الحجز': r['created_at']?.toString().split('T')[0] ?? '',
+//         }).toList();
+//       } catch (e) {
+//         _showSnackBar('خطأ في جلب البيانات: $e', isError: true);
+//         return [];
+//       }
+//     }
+//   }
+// Future<void> _exportToExcel(List<Map<String, dynamic>> data) async {
+//   setState(() => _isLoading = true);
+//   try {
+//     if (data.isEmpty) { _showSnackBar('لا توجد بيانات للتصدير', isError: true); return; }
+    
+//     final excel = excel_lib.Excel.createExcel();
+//     final sheet = excel['البيانات'];
+//     final headers = data.first.keys.toList();
+    
+//     for (var i = 0; i < headers.length; i++) {
+//       final cell = sheet.cell(excel_lib.CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0));
+//       cell.value = excel_lib.TextCellValue(headers[i]);
+//       cell.cellStyle = excel_lib.CellStyle(bold: true, backgroundColorHex: excel_lib.ExcelColor.blue, fontColorHex: excel_lib.ExcelColor.white);
+//     }
+
+//     for (var rowIndex = 0; rowIndex < data.length; rowIndex++) {
+//       for (var colIndex = 0; colIndex < headers.length; colIndex++) {
+//         sheet.cell(excel_lib.CellIndex.indexByColumnRow(columnIndex: colIndex, rowIndex: rowIndex + 1))
+//           .value = excel_lib.TextCellValue(data[rowIndex][headers[colIndex]]?.toString() ?? '');
+//       }
+//     }
+
+//     for (var i = 0; i < headers.length; i++) sheet.setColumnWidth(i, 20);
+
+//     final fileBytes = excel.save();
+//     if (fileBytes != null) {
+//       final directory = await getApplicationDocumentsDirectory();
+//       final filePath = '${directory.path}/${_exportType}_${DateFormat('yyyy-MM-dd_HHmmss').format(DateTime.now())}.xlsx';
+//       final file = File(filePath);
+//       await file.writeAsBytes(fileBytes);
+      
+//       _showSnackBar('تم حفظ الملف بنجاح');
+//       _showFileOptionsDialog(filePath);
+//     }
+//   } catch (e) {
+//     _showSnackBar('فشل التصدير: $e', isError: true);
+//   } finally {
+//     setState(() => _isLoading = false);
+//   }
+// }
+
+Future<Map<String, List<Map<String, dynamic>>>> _fetchData() async {
+  if (_exportType == 'grooms') {
+    final response = await ApiService.listGroomsForClanAdmin();
+    final data = response.map((g) {
+      final groom = g as Map<String, dynamic>;
+      return {
+        'اسم العريس': groom['first_name'] ?? '',
+        'اسم الأب': groom['father_name'] ?? '',
+        'اسم الجد': groom['grandfather_name'] ?? '',
+        'رقم الهاتف': groom['phone_number'] ?? '',
+        'تاريخ الميلاد': groom['birth_date'] ?? '',
+        'مكان الميلاد': groom['birth_address'] ?? '',
+        'العنوان': groom['home_address'] ?? '',
+        'اسم ولي الأمر': groom['guardian_name'] ?? '',
+        'هاتف ولي الأمر': groom['guardian_phone'] ?? '',
+        'صلة القرابة': groom['guardian_relation'] ?? '',
+        'تاريخ ميلاد ولي الأمر': groom['guardian_birth_date'] ?? '',
+        'مكان ميلاد ولي الأمر': groom['guardian_birth_address'] ?? '',
+        'عنوان ولي الأمر': groom['guardian_home_address'] ?? '',
+      };
+    }).toList();
+    return {'all': data};
+  } else {
+    try {
+      List<dynamic> response;
+
+      if (_reservationStatusFilter == 'validated') {
+        response = await ApiService.getAllReservationsValidatedClanAdmin();
+      } else if (_reservationStatusFilter == 'pending') {
+        response = await ApiService.getAllReservationsPendingClanAdmin();
+      } else {
+        response = await ApiService.getAllReservationsClanAdmin();
       }
+
+      final now = DateTime.now();
+
+      final filtered = response.map((r) => r as Map<String, dynamic>).where((r) {
+        final date1 = r['date1'] != null ? DateTime.parse(r['date1']) : null;
+        if (_startDate != null && _endDate != null && date1 != null &&
+            (date1.isBefore(_startDate!) || date1.isAfter(_endDate!))) return false;
+        if (_reservationFilter == 'upcoming' && date1 != null && date1.isBefore(now)) return false;
+        if (_reservationFilter == 'past' && date1 != null && date1.isAfter(now)) return false;
+        return true;
+      }).toList();
+
+      Map<String, dynamic> mapReservation(Map<String, dynamic> r) => {
+        'تاريخ اقامة العرس': r['date1'] ?? '',
+        'الاسم الكامل للعريس': '${r['first_name']} ${r['father_name']} ${r['grandfather_name']} ${r['last_name']}',
+        'اسم العريس': r['first_name'] ?? '',
+        'اسم الأب': r['father_name'] ?? '',
+        'اسم الجد': r['grandfather_name'] ?? '',
+        'رقم الهاتف': r['phone_number'] ?? '',
+        'تاريخ الميلاد': r['birth_date'] ?? '',
+        'مكان الميلاد': r['birth_address'] ?? '',
+        'العنوان': r['home_address'] ?? '',
+        'اسم ولي الأمر': r['guardian_name'] ?? '',
+        'هاتف ولي الأمر': r['guardian_phone'] ?? '',
+        'عنوان ولي الأمر': r['guardian_home_address'] ?? '',
+        'مكان ميلاد ولي الأمر': r['guardian_birth_address'] ?? '',
+        'تاريخ ميلاد ولي الأمر': r['guardian_birth_date'] ?? '',
+        'القاعة': r['hall_name'] ?? '',
+        'الهيئة': r['haia_committee_name'] ?? '',
+        'لجنة المداح': r['madaeh_committee_name'] ?? '',
+        'الدفع': r['payment_valid'] == true ? 'مدفوع' : 'غير مدفوع',
+        // ✅ New fields from updated router
+        'انتماء العريس': r['belongs_to_clan'] ?? '',
+        'نوع الحجز': r['reserved_incide'] ?? '',
+      };
+
+      // ✅ Split by belongs_to_clan using exact string from updated router
+      final belongs = filtered
+          .where((r) => r['belongs_to_clan'] == 'ينتمي إلى عشيرتنا')
+          .map(mapReservation)
+          .toList();
+      final notBelongs = filtered
+          .where((r) => r['belongs_to_clan'] == 'لا ينتمي إلى عشيرتنا')
+          .map(mapReservation)
+          .toList();
+
+      debugPrint('✅ Belongs count: ${belongs.length}');
+      debugPrint('❌ Not belongs count: ${notBelongs.length}');
+
+      return {'belongs': belongs, 'not_belongs': notBelongs};
+    } catch (e) {
+      _showSnackBar('خطأ في جلب البيانات: $e', isError: true);
+      return {'belongs': [], 'not_belongs': []};
     }
   }
-Future<void> _exportToExcel(List<Map<String, dynamic>> data) async {
+}
+
+Future<void> _exportToExcel(Map<String, List<Map<String, dynamic>>> dataMap) async {
   setState(() => _isLoading = true);
   try {
-    if (data.isEmpty) { _showSnackBar('لا توجد بيانات للتصدير', isError: true); return; }
-    
-    final excel = excel_lib.Excel.createExcel();
-    final sheet = excel['البيانات'];
-    final headers = data.first.keys.toList();
-    
-    for (var i = 0; i < headers.length; i++) {
-      final cell = sheet.cell(excel_lib.CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0));
-      cell.value = excel_lib.TextCellValue(headers[i]);
-      cell.cellStyle = excel_lib.CellStyle(bold: true, backgroundColorHex: excel_lib.ExcelColor.blue, fontColorHex: excel_lib.ExcelColor.white);
+    final allData = dataMap.values.expand((e) => e).toList();
+    if (allData.isEmpty) {
+      _showSnackBar('لا توجد بيانات للتصدير', isError: true);
+      return;
     }
 
-    for (var rowIndex = 0; rowIndex < data.length; rowIndex++) {
-      for (var colIndex = 0; colIndex < headers.length; colIndex++) {
-        sheet.cell(excel_lib.CellIndex.indexByColumnRow(columnIndex: colIndex, rowIndex: rowIndex + 1))
-          .value = excel_lib.TextCellValue(data[rowIndex][headers[colIndex]]?.toString() ?? '');
+    final directory = await getApplicationDocumentsDirectory();
+    final timestamp = DateFormat('yyyy-MM-dd_HHmmss').format(DateTime.now());
+    final headers = allData.first.keys.toList();
+
+    if (_exportType == 'grooms') {
+      final data = dataMap['all'] ?? [];
+      final groomHeaders = data.first.keys.toList();
+      final excel = excel_lib.Excel.createExcel();
+      excel.delete('Sheet1');
+      final sheet = excel['البيانات'];
+
+      for (var i = 0; i < groomHeaders.length; i++) {
+        final cell = sheet.cell(
+          excel_lib.CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0),
+        );
+        cell.value = excel_lib.TextCellValue(groomHeaders[i]);
+        cell.cellStyle = excel_lib.CellStyle(
+          bold: true,
+          backgroundColorHex: excel_lib.ExcelColor.blue,
+          fontColorHex: excel_lib.ExcelColor.white,
+        );
       }
-    }
+      for (var rowIndex = 0; rowIndex < data.length; rowIndex++) {
+        for (var colIndex = 0; colIndex < groomHeaders.length; colIndex++) {
+          sheet
+              .cell(excel_lib.CellIndex.indexByColumnRow(
+                columnIndex: colIndex,
+                rowIndex: rowIndex + 1,
+              ))
+              .value = excel_lib.TextCellValue(
+            data[rowIndex][groomHeaders[colIndex]]?.toString() ?? '',
+          );
+        }
+      }
+      for (var i = 0; i < groomHeaders.length; i++) sheet.setColumnWidth(i, 22);
 
-    for (var i = 0; i < headers.length; i++) sheet.setColumnWidth(i, 20);
+      final fileBytes = excel.save();
+      if (fileBytes != null) {
+        final path = '${directory.path}/قائمة_العرسان_$timestamp.xlsx';
+        await File(path).writeAsBytes(fileBytes);
+        _showSnackBar('تم حفظ الملف بنجاح');
+        _showFileOptionsDialog(path);
+      }
+    } else {
+      final belongs    = dataMap['belongs']     ?? [];
+      final notBelongs = dataMap['not_belongs'] ?? [];
 
-    final fileBytes = excel.save();
-    if (fileBytes != null) {
-      final directory = await getApplicationDocumentsDirectory();
-      final filePath = '${directory.path}/${_exportType}_${DateFormat('yyyy-MM-dd_HHmmss').format(DateTime.now())}.xlsx';
-      final file = File(filePath);
-      await file.writeAsBytes(fileBytes);
-      
-      _showSnackBar('تم حفظ الملف بنجاح');
-      _showFileOptionsDialog(filePath);
+      final excel = excel_lib.Excel.createExcel();
+      excel.delete('Sheet1');
+
+      final sheetName = switch (_reservationStatusFilter) {
+        'validated' => 'الحجوزات المؤكدة',
+        'pending'   => 'الحجوزات المعلقة',
+        _           => 'جميع الحجوزات',
+      };
+      final sheet = excel[sheetName];
+
+      int currentRow = 0;
+
+      void writeSectionTitle(String title, excel_lib.ExcelColor bgColor) {
+        final cell = sheet.cell(
+          excel_lib.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: currentRow),
+        );
+        cell.value = excel_lib.TextCellValue(title);
+        cell.cellStyle = excel_lib.CellStyle(
+          bold: true,
+          fontSize: 16,
+          backgroundColorHex: bgColor,
+          fontColorHex: excel_lib.ExcelColor.white,
+          horizontalAlign: excel_lib.HorizontalAlign.Center,
+        );
+        sheet.merge(
+          excel_lib.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: currentRow),
+          excel_lib.CellIndex.indexByColumnRow(columnIndex: headers.length - 1, rowIndex: currentRow),
+        );
+        currentRow++;
+      }
+
+      void writeHeaders(excel_lib.ExcelColor bgColor) {
+        for (var i = 0; i < headers.length; i++) {
+          final cell = sheet.cell(
+            excel_lib.CellIndex.indexByColumnRow(columnIndex: i, rowIndex: currentRow),
+          );
+          cell.value = excel_lib.TextCellValue(headers[i]);
+          cell.cellStyle = excel_lib.CellStyle(
+            bold: true,
+            backgroundColorHex: bgColor,
+            fontColorHex: excel_lib.ExcelColor.white,
+          );
+        }
+        currentRow++;
+      }
+
+      void writeRows(List<Map<String, dynamic>> data) {
+        for (final row in data) {
+          for (var colIndex = 0; colIndex < headers.length; colIndex++) {
+            sheet
+                .cell(excel_lib.CellIndex.indexByColumnRow(
+                  columnIndex: colIndex,
+                  rowIndex: currentRow,
+                ))
+                .value = excel_lib.TextCellValue(
+              row[headers[colIndex]]?.toString() ?? '',
+            );
+          }
+          currentRow++;
+        }
+      }
+
+      // ── Section 1: حجوزات أبناء العشيرة ──
+      writeSectionTitle('◆  حجوزات أبناء العشيرة  ◆', excel_lib.ExcelColor.green);
+      writeHeaders(excel_lib.ExcelColor.fromHexString('#1B5E20'));
+      writeRows(belongs);
+
+      currentRow += 2;
+
+      // ── Section 2: حجوزات خارج العشيرة ──
+      writeSectionTitle('◆  حجوزات خارج العشيرة  ◆', excel_lib.ExcelColor.orange);
+      writeHeaders(excel_lib.ExcelColor.fromHexString('#E65100'));
+      writeRows(notBelongs);
+
+      for (var i = 0; i < headers.length; i++) sheet.setColumnWidth(i, 22);
+
+      final fileBytes = excel.save();
+      if (fileBytes != null) {
+        final fileName = switch (_reservationStatusFilter) {
+          'validated' => 'الحجوزات_المؤكدة',
+          'pending'   => 'الحجوزات_المعلقة',
+          _           => 'جميع_الحجوزات',
+        };
+        final path = '${directory.path}/${fileName}_$timestamp.xlsx';
+        await File(path).writeAsBytes(fileBytes);
+        _showSnackBar(
+          'تم حفظ الملف بنجاح (${belongs.length} عشيرة + ${notBelongs.length} خارج) ✅',
+        );
+        _showFileOptionsDialog(path);
+      } else {
+        _showSnackBar('فشل إنشاء الملف', isError: true);
+      }
     }
   } catch (e) {
     _showSnackBar('فشل التصدير: $e', isError: true);
@@ -313,10 +559,37 @@ void _showFileOptionsDialog(String filePath) {
                       if (_exportType == 'reservations') ...[
                         const SizedBox(height: 16),
                         _buildCard(isDark, 'تصفية الحجوزات', Column(children: [
-                          RadioListTile<String>(title: const Text('جميع الحجوزات', style: TextStyle(fontFamily: 'Cairo')), value: 'all', groupValue: _reservationFilter, onChanged: (v) => setState(() => _reservationFilter = v!)),
-                          RadioListTile<String>(title: const Text('القادمة', style: TextStyle(fontFamily: 'Cairo')), value: 'upcoming', groupValue: _reservationFilter, onChanged: (v) => setState(() => _reservationFilter = v!)),
-                          RadioListTile<String>(title: const Text('الماضية', style: TextStyle(fontFamily: 'Cairo')), value: 'past', groupValue: _reservationFilter, onChanged: (v) => setState(() => _reservationFilter = v!)),
-                        ])),
+                        // --- Status filter ---
+                        const Align(
+                          alignment: Alignment.centerRight,
+                          child: Text('حالة الحجز', style: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold)),
+                        ),
+                        RadioListTile<String>(
+                          title: const Text('الكل', style: TextStyle(fontFamily: 'Cairo')),
+                          value: 'all', groupValue: _reservationStatusFilter,
+                          onChanged: (v) => setState(() => _reservationStatusFilter = v!),
+                        ),
+                        RadioListTile<String>(
+                          title: const Text('المعلقة فقط', style: TextStyle(fontFamily: 'Cairo')),
+                          value: 'pending', groupValue: _reservationStatusFilter,
+                          onChanged: (v) => setState(() => _reservationStatusFilter = v!),
+                        ),
+                        RadioListTile<String>(
+                          title: const Text('المؤكدة فقط', style: TextStyle(fontFamily: 'Cairo')),
+                          subtitle: const Text('سيتم تقسيمها إلى ورقتين: عشيرتنا وخارج العشيرة', style: TextStyle(fontFamily: 'Cairo', fontSize: 11)),
+                          value: 'validated', groupValue: _reservationStatusFilter,
+                          onChanged: (v) => setState(() => _reservationStatusFilter = v!),
+                        ),
+                        const Divider(),
+                        // --- Date filter ---
+                        const Align(
+                          alignment: Alignment.centerRight,
+                          child: Text('موعد العرس', style: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold)),
+                        ),
+                        RadioListTile<String>(title: const Text('جميع الحجوزات', style: TextStyle(fontFamily: 'Cairo')), value: 'all', groupValue: _reservationFilter, onChanged: (v) => setState(() => _reservationFilter = v!)),
+                        RadioListTile<String>(title: const Text('القادمة', style: TextStyle(fontFamily: 'Cairo')), value: 'upcoming', groupValue: _reservationFilter, onChanged: (v) => setState(() => _reservationFilter = v!)),
+                        RadioListTile<String>(title: const Text('الماضية', style: TextStyle(fontFamily: 'Cairo')), value: 'past', groupValue: _reservationFilter, onChanged: (v) => setState(() => _reservationFilter = v!)),
+                      ])),
                         const SizedBox(height: 16),
                         _buildCard(isDark, 'تحديد الفترة الزمنية (اختياري)', Column(children: [
                           if (_startDate != null && _endDate != null)
@@ -347,7 +620,11 @@ void _showFileOptionsDialog(String filePath) {
                       _buildCard(isDark, 'التصدير', SizedBox(
                         width: double.infinity,
                         child: ElevatedButton.icon(
-                          onPressed: () async { final data = await _fetchData(); await _exportToExcel(data); },
+                          // onPressed: () async { final data = await _fetchData(); await _exportToExcel(data); },
+                          onPressed: () async {
+                              final data = await _fetchData();
+                              await _exportToExcel(data);
+                            },
                           icon: const Icon(Icons.table_chart),
                           label: const Text('تصدير Excel', style: TextStyle(fontFamily: 'Cairo', fontSize: 16)),
                           style: ElevatedButton.styleFrom(backgroundColor: isDark ? Colors.green.shade700 : Colors.green, foregroundColor: Colors.white, padding: const EdgeInsets.all(16)),

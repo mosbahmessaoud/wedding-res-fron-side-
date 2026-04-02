@@ -15,7 +15,10 @@ import 'package:wedding_reservation_app/screens/clan%20admin/notifications_tab.d
 import 'package:wedding_reservation_app/screens/clan%20admin/reservations_tab.dart';
 import 'package:wedding_reservation_app/screens/clan%20admin/special_reservations_tab.dart';
 import 'package:wedding_reservation_app/services/notification_manager.dart';
-
+import 'package:wedding_reservation_app/services/token_manager.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:wedding_reservation_app/services/notification_service.dart';
+import 'package:wedding_reservation_app/services/foreground_notification_service.dart';
 import '../../services/api_service.dart';
 import '../../utils/colors.dart';
 import '../../utils/constants.dart';
@@ -582,14 +585,32 @@ void _navigateToTab(int index) async {
             ),
           ),
           ElevatedButton(
-            onPressed: () async  {
-              await ApiService.clearToken();
-               // Stop notification monitoring
-              NotificationManager().stopMonitoring();
-              // Clear all notifications
-              await NotificationManager().cancelAllNotifications();
-              Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
-            },
+            // onPressed: () async {
+            //   await TokenManager.clearToken(); // ← ADD THIS
+            //   await ApiService.clearToken();
+            //   NotificationManager().stopMonitoring();
+            //   await NotificationManager().cancelAllNotifications();
+            //   if (!context.mounted) return; // ← ADD THIS
+            //   Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+            // },
+            onPressed: () async {
+            // ── 1. Clear auth token ──
+            await TokenManager.clearToken();
+            await ApiService.clearToken();
+ 
+            // ── 2. Clear stored credentials from SharedPreferences ──
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.remove('auth_token');
+            await prefs.remove('user_role');
+ 
+            // ── 3. Stop notification services & clear tracking ──
+            await WeddingNotificationService().clearOnLogout();
+            await WeddingForegroundNotificationService().stopService();
+ 
+            if (!context.mounted) return;
+            Navigator.of(context)
+                .pushNamedAndRemoveUntil('/login', (route) => false);
+          },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),

@@ -2303,6 +2303,44 @@ static Future<List<dynamic>> getAllReservationsClanAdmin() async {
     throw Exception('خطأ في الاتصال: $e');
   }
 }
+  // List pending Reservations for Clan Admin (for export)
+static Future<List<dynamic>> getAllReservationsPendingClanAdmin() async {
+  try {
+    final response = await _client.get(
+      Uri.parse('$baseUrl/reservations/clan_admin/all_reservations_pending'),
+      headers: await _headers,
+    ).timeout(_timeout);
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else if (response.statusCode == 403) {
+      throw Exception('غير مصرح لك بالوصول إلى هذه البيانات');
+    } else {
+      throw Exception('فشل في تحميل الحجوزات: ${response.statusCode}');
+    }
+  } catch (e) {
+    throw Exception('خطأ في الاتصال: $e');
+  }
+}
+  // List validated Reservations for Clan Admin (for export)
+static Future<List<dynamic>> getAllReservationsValidatedClanAdmin() async {
+  try {
+    final response = await _client.get(
+      Uri.parse('$baseUrl/reservations/clan_admin/all_reservations_validated'),
+      headers: await _headers,
+    ).timeout(_timeout);
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else if (response.statusCode == 403) {
+      throw Exception('غير مصرح لك بالوصول إلى هذه البيانات');
+    } else {
+      throw Exception('فشل في تحميل الحجوزات: ${response.statusCode}');
+    }
+  } catch (e) {
+    throw Exception('خطأ في الاتصال: $e');
+  }
+}
 
   static Future<List<dynamic>> getPendingReservations() async {
     try {

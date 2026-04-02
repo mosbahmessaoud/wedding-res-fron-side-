@@ -4,11 +4,14 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:open_file/open_file.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:wedding_reservation_app/utils/pdf_mobile_downloader.dart'
+    if (dart.library.html) 'package:wedding_reservation_app/utils/pdf_web_downloader.dart';
 
 import '../../../services/api_service.dart';
 import '../../../utils/colors.dart';
@@ -797,20 +800,21 @@ Widget _buildReservationInstructionWidget() {
             ),
             SizedBox(height: 12),
             Text(
-              'بعد ختم وتوقيع جميع الجهات، توجّه إلى إدارة عشيرتك',
+              'بعد ختم وتوقيع جميع الجهات، توجّه إلى إدارة العشيرة التي تقيم فيها العرس',
               textAlign: TextAlign.center,
               style: TextStyle(color: _getTextColor(context)),
             ),
+            // Text(
+            //   originClanName,
+              
+            //   textAlign: TextAlign.center,
+            //   style: TextStyle(
+            //     fontWeight: FontWeight.w600,
+            //     color: _getTextColor(context),
+            //   ),
+            // ),
             Text(
-              originClanName,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                color: _getTextColor(context),
-              ),
-            ),
-            Text(
-              'ليؤكد حجزك في النظام',
+              'ليؤكدو حجزك في النظام',
               textAlign: TextAlign.center,
               style: TextStyle(color: _getTextColor(context)),
             ),
@@ -1844,110 +1848,88 @@ void _showPermissionExplanationDialog() {
 }
 
 Future<void> _sharePdf(int reservationId, Uint8List pdfBytes) async {
-
+  // Web: just trigger another download (no native share on web)
+  if (kIsWeb) {
+    await _downloadPdfWeb(pdfBytes, reservationId);
+    return;
+  }
+ 
   try {
-
-    // Get reservation data for custom filename
     final reservation = _getReservationById(reservationId);
-    
-    // Generate custom filename
     final fileName = _generatePdfFileName(reservationId, reservation);
-    
-    // Create a temporary file for sharing
     final tempDir = await getTemporaryDirectory();
     final tempFile = File('${tempDir.path}/$fileName');
-    
     await tempFile.writeAsBytes(pdfBytes);
-    
-    // Share the file
+ 
     await Share.shareXFiles(
       [XFile(tempFile.path)],
       text: 'ملف حجز رقم $reservationId',
       subject: 'حجز الزفاف رقم $reservationId',
     );
-    
+ 
     _showSnackBar('تم فتح خيارات المشاركة', Colors.green.shade400);
   } catch (e) {
-
+    print('Share error: $e');
   }
 }
 
 
   // Replace these 3 functions in your code:
 
-// 1. Updated _downloadPdf function
 Future<void> _downloadPdf(int reservationId) async {
-  final connectivityResult = await Connectivity().checkConnectivity();
-  
-  if (connectivityResult.contains(ConnectivityResult.none)) {
-    _showNoInternetDialog();
-    return;
+  // Skip connectivity check on web (browser handles it)
+  if (!kIsWeb) {
+    final connectivityResult = await Connectivity().checkConnectivity();
+    if (connectivityResult.contains(ConnectivityResult.none)) {
+      _showNoInternetDialog();
+      return;
+    }
   }
-
+ 
   try {
-    _showSnackBar('جاري التحقق من الملف...', Colors.blue.shade400);
-    
-    // final status = await ApiService.checkPdfStatus(reservationId);
-    
-    // if (status['pdf_exists'] != true) {
-      _showSnackBar('جاري إنشاء الملف...', Colors.blue.shade400);
-      await ApiService.generatePdf(reservationId);
-      await Future.delayed(const Duration(seconds: 1));
-    // }
-    
+    _showSnackBar('جاري إنشاء الملف...', Colors.blue.shade400);
+    await ApiService.generatePdf(reservationId);
+    await Future.delayed(const Duration(seconds: 1));
+ 
     _showSnackBar('جاري تحميل الملف...', Colors.blue.shade400);
-    
     final pdfBytes = await ApiService.downloadPdf(reservationId);
-    print('PDF bytes downloaded: ${pdfBytes.length} bytes');
-    
-    // Clear snackbars before saving
-    if (mounted) {
-      ScaffoldMessenger.of(context).clearSnackBars();
-    }
-    
-    _showSnackBar('جاري حفظ الملف...', Colors.blue.shade400);
-    
-    final savedFile = await _savePdfFile(pdfBytes, reservationId, reservation: _getReservationById(reservationId));
-    print('File saved result: ${savedFile?.path ?? "NULL"}');
-
-    if (savedFile != null) {
-      print('Mounted status before dialog: $mounted');
-      
-      if (mounted) {
-        // Clear any existing snackbars
-        ScaffoldMessenger.of(context).clearSnackBars();
-        
-        _showSnackBar('تم تحميل الملف بنجاح ✓', Colors.green.shade400);
-        
-        // Use post frame callback to ensure UI is ready
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          print('Post frame callback - showing dialog');
-          if (mounted) {
-            _showPdfActionsDialog(savedFile.path, reservationId, pdfBytes);
-          } else {
-            print('Widget unmounted in post frame callback');
-          }
-        });
-      } else {
-        print('Widget not mounted after file save');
-      }
+ 
+    if (mounted) ScaffoldMessenger.of(context).clearSnackBars();
+ 
+    if (kIsWeb) {
+      // ✅ WEB: trigger browser download directly
+      await _downloadPdfWeb(pdfBytes, reservationId);
     } else {
-      print('Failed to save file - savedFile is null');
-      if (mounted) {
-        ScaffoldMessenger.of(context).clearSnackBars();
-        _showSnackBar('فشل حفظ الملف. تحقق من صلاحيات التطبيق', Colors.red);
-        
-        // Show a dialog explaining the issue
-        Future.delayed(Duration(milliseconds: 500), () {
-          if (mounted) {
-            _showPermissionExplanationDialog();
-          }
-        });
+      // ✅ MOBILE/DESKTOP: save to local storage
+      _showSnackBar('جاري حفظ الملف...', Colors.blue.shade400);
+      final savedFile = await _savePdfFile(
+        pdfBytes,
+        reservationId,
+        reservation: _getReservationById(reservationId),
+      );
+ 
+      if (savedFile != null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).clearSnackBars();
+          _showSnackBar('تم تحميل الملف بنجاح ✓', Colors.green.shade400);
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              _showPdfActionsDialog(savedFile.path, reservationId, pdfBytes);
+            }
+          });
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).clearSnackBars();
+          _showSnackBar('فشل حفظ الملف. تحقق من صلاحيات التطبيق', Colors.red);
+          Future.delayed(Duration(milliseconds: 500), () {
+            if (mounted) _showPermissionExplanationDialog();
+          });
+        }
       }
     }
-  } catch (e, stackTrace) {
+  } catch (e) {
     print('Download error: $e');
-    print('Stack trace: $stackTrace');
     if (mounted) {
       ScaffoldMessenger.of(context).clearSnackBars();
       _showSnackBar('خطأ في تحميل الملف: $e', Colors.red.shade400);
@@ -1955,11 +1937,20 @@ Future<void> _downloadPdf(int reservationId) async {
   }
 }
 
+
+Future<void> _downloadPdfWeb(Uint8List pdfBytes, int reservationId) async {
+  final reservation = _getReservationById(reservationId);
+  final fileName = _generatePdfFileName(reservationId, reservation);
+  downloadPdfOnWeb(pdfBytes, fileName); // ← calls the right file automatically
+  _showSnackBar('تم تحميل الملف ✓', Colors.green.shade400);
+}
+ 
 void _showPdfActionsDialog(String filePath, int reservationId, Uint8List pdfBytes) {
   if (!mounted) return;
-  
-  final isDesktop = Platform.isWindows || Platform.isLinux || Platform.isMacOS;
-  
+ 
+  // On web this dialog is never called (web downloads directly)
+  // This is only for mobile/desktop
+ 
   showDialog(
     context: context,
     builder: (ctx) => AlertDialog(
@@ -1996,7 +1987,8 @@ void _showPdfActionsDialog(String filePath, int reservationId, Uint8List pdfByte
           onPressed: () => Navigator.pop(ctx),
           child: Text('إغلاق'),
         ),
-        if (!isDesktop)
+        // Share button only on mobile (not desktop, not web)
+        if (!kIsWeb)
           FilledButton.icon(
             onPressed: () {
               Navigator.pop(ctx);
@@ -2018,34 +2010,33 @@ void _showPdfActionsDialog(String filePath, int reservationId, Uint8List pdfByte
     ),
   );
 }
+ 
+
 
 Future<void> _openPdfFile(String filePath) async {
+  // Web never reaches here
+  if (kIsWeb) return;
+ 
   try {
-    // Check if file exists
     final file = File(filePath);
     if (!await file.exists()) {
-      if (mounted) {
-        _showSnackBar('الملف غير موجود', Colors.red);
-      }
+      if (mounted) _showSnackBar('الملف غير موجود', Colors.red);
       return;
     }
-
-    // Try to open the file
+ 
     final result = await OpenFile.open(filePath);
-    
-    // Handle different result types
+ 
     if (mounted) {
       switch (result.type) {
         case ResultType.done:
-          // File opened successfully - no need to show message
-          print('PDF opened successfully');
           break;
         case ResultType.fileNotFound:
           _showSnackBar('الملف غير موجود', Colors.red);
           break;
         case ResultType.noAppToOpen:
-          _showSnackBar('لا يوجد تطبيق لفتح ملفات PDF. يرجى تثبيت قارئ PDF', Colors.orange);
-          // Optionally, show a dialog with options to install a PDF reader
+          _showSnackBar(
+              'لا يوجد تطبيق لفتح ملفات PDF. يرجى تثبيت قارئ PDF',
+              Colors.orange);
           _showInstallPdfReaderDialog(filePath);
           break;
         case ResultType.permissionDenied:
@@ -2058,13 +2049,13 @@ Future<void> _openPdfFile(String filePath) async {
       }
     }
   } catch (e) {
-    print('Error opening PDF: $e');
     if (mounted) {
       _showSnackBar('خطأ في فتح الملف', Colors.red);
       _showFileLocationDialog(filePath);
     }
   }
 }
+
 
 // New helper method to suggest PDF reader installation
 void _showInstallPdfReaderDialog(String filePath) {
@@ -2150,164 +2141,101 @@ void _showInstallPdfReaderDialog(String filePath) {
     ),
   );
 }
-// 2. Updated _savePdfFile function
-Future<File?> _savePdfFile(Uint8List pdfBytes, int reservationId, {Map<String, dynamic>? reservation}) async {
+
+Future<File?> _savePdfFile(Uint8List pdfBytes, int reservationId,
+    {Map<String, dynamic>? reservation}) async {
+  
+  // Web never reaches here (handled by _downloadPdfWeb)
+  if (kIsWeb) return null;
+ 
   try {
-    print('=== Starting _savePdfFile ===');
-    print('PDF bytes length: ${pdfBytes.length}');
-    print('Platform: ${Platform.operatingSystem}');
-    
     Directory? directory;
-    
+ 
     if (Platform.isAndroid) {
-      print('Android detected - checking permissions');
-      
-      // For Android 13+ (API 33+), we don't need storage permission for app-specific directories
-      // But we'll request it anyway for broader compatibility
       var status = await Permission.storage.status;
-      print('Storage permission status: $status');
-      
       if (!status.isGranted) {
-        print('Requesting storage permission...');
         status = await Permission.storage.request();
-        print('Storage permission after request: $status');
-        
         if (!status.isGranted) {
-          // Try manageExternalStorage for Android 11+
-          print('Trying manageExternalStorage permission...');
           var manageStatus = await Permission.manageExternalStorage.request();
-          print('ManageExternalStorage permission: $manageStatus');
-          
           if (!manageStatus.isGranted) {
-            print('Permissions denied - using app directory instead');
-            // Use app-specific directory which doesn't need permissions
             directory = await getExternalStorageDirectory();
-            
             if (directory != null) {
-              // Create a "Downloads" subfolder in app directory
               final downloadsDir = Directory('${directory.path}/Downloads');
               if (!await downloadsDir.exists()) {
                 await downloadsDir.create(recursive: true);
               }
               directory = downloadsDir;
-              print('Using app directory: ${directory.path}');
             }
           }
         }
       }
-      
-      // If we have permission or it's granted, try to use public Downloads
+ 
       if (directory == null) {
-        print('Attempting to use public Downloads directory');
-        
-        // Try multiple possible Downloads paths
         final possiblePaths = [
           '/storage/emulated/0/Download',
           '/storage/emulated/0/Downloads',
           '/sdcard/Download',
           '/sdcard/Downloads',
         ];
-        
         for (final path in possiblePaths) {
           final dir = Directory(path);
-          print('Checking path: $path');
-          
           if (await dir.exists()) {
             directory = dir;
-            print('Found valid Downloads directory: $path');
             break;
           }
         }
-        
-        // If still no directory found, fall back to app directory
+ 
         if (directory == null) {
-          print('No public Downloads found - using app external storage');
           directory = await getExternalStorageDirectory();
-          
           if (directory != null) {
-            // Create Downloads subfolder
             final downloadsDir = Directory('${directory.path}/Downloads');
             if (!await downloadsDir.exists()) {
               await downloadsDir.create(recursive: true);
             }
             directory = downloadsDir;
-            print('Using fallback directory: ${directory.path}');
           }
         }
       }
     } else if (Platform.isIOS) {
-      // iOS - use documents directory
-      print('iOS detected - using documents directory');
       directory = await getApplicationDocumentsDirectory();
     } else {
-      // Desktop platforms
-      print('Desktop platform - using downloads directory');
+      // Desktop
       directory = await getDownloadsDirectory();
       directory ??= await getApplicationDocumentsDirectory();
     }
-    
-    if (directory == null) {
-      print('ERROR: Could not determine storage directory');
-      throw Exception('لا يمكن الوصول إلى مجلد التخزين');
-    }
-    
-    print('Final directory path: ${directory.path}');
-    
-    // Ensure directory exists
+ 
+    if (directory == null) throw Exception('لا يمكن الوصول إلى مجلد التخزين');
+ 
     if (!await directory.exists()) {
-      print('Creating directory: ${directory.path}');
       await directory.create(recursive: true);
     }
-    
-    // Generate filename
+ 
     final fileName = _generatePdfFileName(reservationId, reservation);
-    print('Generated filename: $fileName');
-    
-    // Create full file path
     final filePath = '${directory.path}/$fileName';
-    print('Full file path: $filePath');
-    
     final file = File(filePath);
-    
-    // Write bytes to file
-    print('Writing ${pdfBytes.length} bytes to file...');
+ 
     await file.writeAsBytes(pdfBytes, flush: true);
-    
-    // Verify file was written
+ 
     if (await file.exists()) {
-      final fileSize = await file.length();
-      print('SUCCESS: File created with size: $fileSize bytes');
-      print('File path: ${file.path}');
       return file;
     } else {
-      print('ERROR: File was not created');
       throw Exception('فشل في إنشاء الملف');
     }
-    
-  } catch (e, stackTrace) {
-    print('ERROR in _savePdfFile: $e');
-    print('Stack trace: $stackTrace');
-    
-    // Last resort: try app-specific directory without any permissions
+  } catch (e) {
+    // Last resort: app directory
     try {
-      print('Attempting last resort - app directory...');
       final appDir = await getApplicationDocumentsDirectory();
       final fileName = _generatePdfFileName(reservationId, reservation);
       final file = File('${appDir.path}/$fileName');
-      
       await file.writeAsBytes(pdfBytes, flush: true);
-      
-      if (await file.exists()) {
-        print('Last resort SUCCESS: ${file.path}');
-        return file;
-      }
+      if (await file.exists()) return file;
     } catch (e2) {
-      print('Last resort also failed: $e2');
+      print('Last resort failed: $e2');
     }
-    
     return null;
   }
 }
+ 
 
 
   // Helper method to show snack bar

@@ -625,8 +625,12 @@ class _UpdateReservationInfoPageState extends State<UpdateReservationInfoPage> {
             // ),
             const SizedBox(height: 12),
             const Text(
-              ' إمكانية إستقبال أعراس أخرى معك في نفس اليوم',
+              ' إمكانية إستقبال أعراس أخرى معك في نفس اليوم  ',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+            ),
+            const Text(
+              ' (في حالة فتحت و أضفت عرسان معك تأكد معهم بوضع الحالة "مغلق" أيضا في حساباتهم بعد الاضافة )  ',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 12),
             Row(

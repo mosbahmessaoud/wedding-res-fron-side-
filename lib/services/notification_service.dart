@@ -1,372 +1,424 @@
 // lib/services/notification_service.dart
+//
+// Mirrors the shopping-app NotificationService pattern exactly,
+// adapted for the Wedding Reservation app.
+//
+// Platform support:
+//   ✅ Android  — local notifications + WorkManager (15-min background)
+//   ✅ iOS      — local notifications
+//   ✅ Windows  — local notifications (Windows channel)
+//   ✅ Web      — silent poll only (no OS notifications)
+//
+// pubspec.yaml:
+//   flutter_local_notifications: ^18.0.0
+//   workmanager: ^0.5.2
+//   shared_preferences: ^2.2.0
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'package:wedding_reservation_app/services/api_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:workmanager/workmanager.dart';
 
-class NotificationService {
-  static final NotificationService _instance = NotificationService._internal();
-  factory NotificationService() => _instance;
-  NotificationService._internal();
+import 'api_service.dart';
+import 'token_manager.dart';
 
-  final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
-  Timer? _pollingTimer;
-  int _lastUnreadCount = 0;
-  List<int> _shownNotificationIds = [];
-  bool _isInitialized = false;
+// ──────────────────────────────────────────────────────────────
+// WorkManager background entry-point — Android only, top-level
+// ──────────────────────────────────────────────────────────────
+@pragma('vm:entry-point')
+void callbackDispatcher() {
+  Workmanager().executeTask((task, inputData) async {
+    try {
+      print('🔔 [WM] Background task: $task');
 
-  // Initialize the notification service
-  Future<void> initialize() async {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+
+      if (token == null || token.isEmpty) {
+        print('⚠️ [WM] No token – skipping');
+        return Future.value(false);
+      }
+
+      await ApiService.initializeToken();
+
+      final service = WeddingNotificationService();
+      await service.initializeForBackground();
+      await service.checkAndShowNewNotifications();
+
+      print('✅ [WM] Background task completed');
+      return Future.value(true);
+    } catch (e) {
+      print('❌ [WM] Error: $e');
+      return Future.value(false);
+    }
+  });
+}
+
+// ──────────────────────────────────────────────────────────────
+// Main service
+// ──────────────────────────────────────────────────────────────
+class WeddingNotificationService {
+  static final WeddingNotificationService _instance =
+      WeddingNotificationService._internal();
+  factory WeddingNotificationService() => _instance;
+  WeddingNotificationService._internal();
+
+  final FlutterLocalNotificationsPlugin _notifications =
+      FlutterLocalNotificationsPlugin();
+
+  static const String _channelId   = 'wedding_reservation_notifications';
+  static const String _channelName = 'Wedding Reservation Notifications';
+  static const String _shownIdsKey = 'wedding_shown_notification_ids';
+
+  bool _isInitialized        = false;
+  bool _workManagerInitialized = false;
+
+  // ── Lightweight init used by WorkManager isolate ──────────
+  Future<void> initializeForBackground() async {
     if (_isInitialized) return;
+    if (kIsWeb) return;
 
-    try {
-      // Request notification permissions
-      await requestPermissions();
-
-      // Android initialization settings
-      const AndroidInitializationSettings androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-
-      // iOS initialization settings
-      const DarwinInitializationSettings iosSettings = DarwinInitializationSettings(
-        requestAlertPermission: true,
-        requestBadgePermission: true,
-        requestSoundPermission: true,
-      );
-
-      // Combined initialization settings
-      const InitializationSettings initSettings = InitializationSettings(
-        android: androidSettings,
-        iOS: iosSettings,
-      );
-
-      // Initialize plugin
-      await _notifications.initialize(
-        initSettings,
-        onDidReceiveNotificationResponse: _onNotificationTap,
-        onDidReceiveBackgroundNotificationResponse: _onBackgroundNotificationTap,
-      );
-
-      // Create notification channel for Android
-      await _createNotificationChannel();
-
-      _isInitialized = true;
-      print('✅ Notification service initialized successfully');
-    } catch (e) {
-      print('❌ Error initializing notification service: $e');
-    }
+    const android  = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const settings = InitializationSettings(android: android);
+    await _notifications.initialize(settings);
+    _isInitialized = true;
   }
 
-  // Request notification permissions
-  Future<bool> requestPermissions() async {
-    try {
-      // Check Android version
-      if (defaultTargetPlatform == TargetPlatform.android) {
-        final status = await Permission.notification.request();
-        
-        if (status.isGranted) {
-          print('✅ Notification permission granted');
-          return true;
-        } else if (status.isDenied) {
-          print('⚠️ Notification permission denied');
-          return false;
-        } else if (status.isPermanentlyDenied) {
-          print('❌ Notification permission permanently denied');
-          await openAppSettings();
-          return false;
-        }
-      }
-
-      // For iOS
-      if (defaultTargetPlatform == TargetPlatform.iOS) {
-        final granted = await _notifications
-            .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>()
-            ?.requestPermissions(alert: true, badge: true, sound: true);
-        
-        return granted ?? false;
-      }
-
-      return true;
-    } catch (e) {
-      print('❌ Error requesting notification permissions: $e');
-      return false;
-    }
-  }
-
-  // Create notification channel for Android
-  Future<void> _createNotificationChannel() async {
-    const AndroidNotificationChannel channel = AndroidNotificationChannel(
-      'wedding_reservations', // Channel ID
-      'Wedding Reservations', // Channel name
-      description: 'Notifications for wedding reservation updates', // Channel description
-      importance: Importance.high,
-      playSound: true,
-      enableVibration: true,
-      enableLights: true,
-    );
-
-    await _notifications
-        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
-        ?.createNotificationChannel(channel);
-  }
-
-  // Start polling for new notifications
-  void startPolling({Duration interval = const Duration(seconds: 30)}) {
-    if (!_isInitialized) {
-      print('⚠️ Cannot start polling: Notification service not initialized');
+  // ── Full init — called from main() ───────────────────────
+  Future<void> initialize() async {
+    if (_isInitialized) {
+      print('⚠️ WeddingNotificationService already initialized');
       return;
     }
 
-    // Cancel existing timer if any
-    stopPolling();
+    print('🚀 Initializing WeddingNotificationService | platform=${_platformName()}');
 
-    print('🔄 Starting notification polling (every ${interval.inSeconds}s)');
-    
-    // Check immediately
-    _checkForNewNotifications();
-
-    // Then check periodically
-    _pollingTimer = Timer.periodic(interval, (timer) {
-      _checkForNewNotifications();
-    });
-  }
-
-  // Stop polling for notifications
-  void stopPolling() {
-    if (_pollingTimer != null) {
-      _pollingTimer?.cancel();
-      _pollingTimer = null;
-      print('⏸️ Notification polling stopped');
+    if (kIsWeb) {
+      // Web: plugin not available — polling handled by Timer in main app
+      _isInitialized = true;
+      print('✅ Web: notification plugin skipped (Timer polling active)');
+      return;
     }
+
+    // ── Plugin settings ──
+    const android = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const ios     = DarwinInitializationSettings(
+      requestAlertPermission: true,
+      requestBadgePermission: true,
+      requestSoundPermission: true,
+    );
+    const windows = WindowsInitializationSettings(
+      appName: 'نظام حجز الأعراس',
+      appUserModelId: 'com.wedding.reservation',
+      guid: 'b3f1a2c4-5d6e-7f8a-9b0c-1d2e3f4a5b6c',
+    );
+
+    await _notifications.initialize(
+      const InitializationSettings(android: android, iOS: ios, windows: windows),
+      onDidReceiveNotificationResponse: (r) =>
+          print('📱 Notification tapped: ${r.id}'),
+    );
+
+    print('✅ Notification plugin initialized');
+
+    // ── Android: channel + WorkManager ──
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      const channel = AndroidNotificationChannel(
+        _channelId,
+        _channelName,
+        description: 'Reservation approvals, rejections, and reminders',
+        importance: Importance.max,
+        enableVibration: true,
+        playSound: true,
+        showBadge: true,
+      );
+      await _notifications
+          .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>()
+          ?.createNotificationChannel(channel);
+
+      try {
+        await Workmanager().initialize(callbackDispatcher, isInDebugMode: kDebugMode);
+        _workManagerInitialized = true;
+        print('✅ WorkManager initialized');
+
+        await Workmanager().registerPeriodicTask(
+          'wedding_notification_check',
+          'weddingNotificationCheckTask',
+          frequency: const Duration(minutes: 15),
+          constraints: Constraints(networkType: NetworkType.connected),
+          existingWorkPolicy: ExistingPeriodicWorkPolicy.replace,
+          initialDelay: const Duration(seconds: 10),
+        );
+        print('✅ WorkManager periodic task registered (15-min)');
+      } catch (e, stack) {
+        print('⚠️ WorkManager init failed: $e');
+        if (kDebugMode) print(stack);
+        _workManagerInitialized = false;
+      }
+    }
+
+    _isInitialized = true;
+    print('✅ WeddingNotificationService initialized');
+
+    // Initial check
+    await forceImmediateCheck();
   }
 
-  // Check for new notifications
-  Future<void> _checkForNewNotifications() async {
+  // ── Core check — called by Timer, foreground service & WorkManager ──
+  Future<void> checkAndShowNewNotifications() async {
     try {
-      // Get unread notifications from API
-      final unreadNotifications = await ApiService.getUnreadNotifications(limit: 50);
-      
-      if (unreadNotifications.isEmpty) {
+      print('🔍 [${_platformName()}] Checking notifications...');
+
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+
+      if (token == null || token.isEmpty) {
+        print('⚠️ No auth token — skipping');
         return;
       }
 
-      // Find new notifications that haven't been shown yet
-      for (var notification in unreadNotifications) {
-        final notificationId = notification['id'] as int;
-        
-        // Skip if already shown
-        if (_shownNotificationIds.contains(notificationId)) {
+      print('✅ Token found: ${token.substring(0, token.length.clamp(0, 20))}...');
+
+      await ApiService.initializeToken();
+
+      final List<dynamic> notifications =
+          await ApiService.getNotifications(unreadOnly: true, limit: 50);
+
+      print('📦 ${notifications.length} unread notification(s)');
+
+      if (kIsWeb) return; // Web: fetched for badge count only, no OS popup
+
+      final shownIds = await _getShownIds();
+      int shown = 0;
+
+      for (final notif in notifications) {
+        final id = notif['id'] as int?;
+        if (id == null) continue;
+        if (shownIds.contains(id)) {
+          print('⏭️ Skipping #$id (already shown)');
           continue;
         }
-
-        // Show notification
-        await _showNotification(
-          id: notificationId,
-          title: notification['title'] ?? 'إشعار جديد',
-          body: notification['message'] ?? '',
-          type: notification['notification_type'] ?? 'general',
-          payload: jsonEncode(notification),
-        );
-
-        // Mark as shown
-        _shownNotificationIds.add(notificationId);
-        
-        // Keep only last 100 notification IDs in memory
-        if (_shownNotificationIds.length > 100) {
-          _shownNotificationIds.removeAt(0);
-        }
+        print('🔔 Showing notification #$id');
+        await _showNotification(notif);
+        await _addShownId(id);
+        shown++;
+        print('✅ Notification #$id shown');
       }
 
-      // Update last unread count
-      _lastUnreadCount = unreadNotifications.length;
-
-      print('✅ Checked for notifications: ${unreadNotifications.length} unread');
-    } catch (e) {
-      print('❌ Error checking for new notifications: $e');
+      print('✅ Showed $shown new notification(s)');
+    } catch (e, stack) {
+      print('❌ checkAndShowNewNotifications: $e');
+      if (kDebugMode) print(stack);
     }
   }
 
-  // Show a local notification
-  Future<void> _showNotification({
-    required int id,
-    required String title,
-    required String body,
-    required String type,
-    String? payload,
-  }) async {
+  // ── Show a single OS notification ────────────────────────
+  Future<void> _showNotification(Map<String, dynamic> notif) async {
+    if (kIsWeb) return;
+
+    // Safely extract type
+    final rawType = notif['notification_type'];
+    final String typeStr = rawType is String ? rawType : 'general_announcement';
+
+    // Safely extract message
+    final rawMsg = notif['message'];
+    final String messageStr = rawMsg is String
+        ? rawMsg
+        : (rawMsg is List && rawMsg.isNotEmpty)
+            ? rawMsg.join(', ')
+            : '';
+
+    final int    id    = notif['id'] as int? ?? 0;
+    final String title = (notif['title'] as String?)?.isNotEmpty == true
+        ? notif['title'] as String
+        : _titleForType(typeStr);
+
+    print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    print('📤 SHOWING NOTIFICATION');
+    print('   Platform : ${_platformName()}');
+    print('   ID       : $id');
+    print('   Type     : $typeStr');
+    print('   Title    : $title');
+    print('   Message  : $messageStr');
+    print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
     try {
-      // Get notification icon and color based on type
-      final notificationStyle = _getNotificationStyle(type);
+      switch (defaultTargetPlatform) {
+        case TargetPlatform.android:
+          print('📱 Creating Android notification...');
+          await _notifications.show(
+            id, title, messageStr,
+            NotificationDetails(
+              android: AndroidNotificationDetails(
+                _channelId, _channelName,
+                channelDescription: 'Reservation approvals, rejections, and reminders',
+                importance: Importance.max,
+                priority: Priority.high,
+                enableVibration: true,
+                playSound: true,
+                showWhen: true,
+                when: DateTime.now().millisecondsSinceEpoch,
+                visibility: NotificationVisibility.public,
+                ticker: 'نظام حجز الأعراس',
+                autoCancel: true,
+                ongoing: false,
+                styleInformation: BigTextStyleInformation(
+                  messageStr,
+                  contentTitle: title,
+                  summaryText: 'نظام حجز الأعراس',
+                ),
+                icon: '@mipmap/ic_launcher',
+                largeIcon: const DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
+                color: _colorForType(typeStr),
+              ),
+            ),
+          );
+          print('✅ Android notification $id shown');
+          break;
 
-      // Android notification details
-      final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-        'wedding_reservations',
-        'Wedding Reservations',
-        channelDescription: 'Notifications for wedding reservation updates',
-        importance: Importance.high,
-        priority: Priority.high,
-        showWhen: true,
-        icon: '@mipmap/ic_launcher',
-        color: notificationStyle['color'],
-        playSound: true,
-        enableVibration: true,
-        enableLights: true,
-        styleInformation: BigTextStyleInformation(
-          body,
-          contentTitle: title,
-          htmlFormatContentTitle: true,
-          htmlFormatBigText: true,
-        ),
-      );
+        case TargetPlatform.iOS:
+          print('🍎 Creating iOS notification...');
+          await _notifications.show(
+            id, title, messageStr,
+            const NotificationDetails(
+              iOS: DarwinNotificationDetails(
+                presentAlert: true,
+                presentBadge: true,
+                presentSound: true,
+                sound: 'default',
+              ),
+            ),
+          );
+          print('✅ iOS notification $id shown');
+          break;
 
-      // iOS notification details
-      const DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
-        presentAlert: true,
-        presentBadge: true,
-        presentSound: true,
-      );
+        case TargetPlatform.windows:
+          print('🪟 Creating Windows notification...');
+          await _notifications.show(
+            id, title, messageStr,
+            NotificationDetails(
+              windows: WindowsNotificationDetails(
+                subtitle: 'نظام حجز الأعراس',
+                duration: WindowsNotificationDuration.long,
+                timestamp: DateTime.now(),
+              ),
+            ),
+          );
+          print('✅ Windows notification $id shown');
+          break;
 
-      // Combined notification details
-      final NotificationDetails notificationDetails = NotificationDetails(
-        android: androidDetails,
-        iOS: iosDetails,
-      );
-
-      // Show the notification
-      await _notifications.show(
-        id,
-        title,
-        body,
-        notificationDetails,
-        payload: payload,
-      );
-
-      print('📬 Notification shown: $title');
-    } catch (e) {
-      print('❌ Error showing notification: $e');
+        default:
+          print('🔧 Creating generic notification...');
+          await _notifications.show(id, title, messageStr, const NotificationDetails());
+          print('✅ Generic notification $id shown');
+      }
+    } catch (e, stack) {
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      print('❌ ERROR SHOWING NOTIFICATION');
+      print('   Error: $e');
+      if (kDebugMode) print(stack);
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     }
   }
 
-  // Get notification style based on type
-  Map<String, dynamic> _getNotificationStyle(String type) {
+  // ── Helpers ───────────────────────────────────────────────
+
+  String _titleForType(String type) {
     switch (type) {
-      case 'reservation_approved':
-        return {
-          'color': const Color(0xFF4CAF50), // Green
-          'icon': '@drawable/ic_check',
-        };
+      case 'reservation_approved':  return '✅ تمت الموافقة على الحجز';
+      case 'reservation_rejected':  return '❌ تم رفض الحجز';
+      case 'reservation_cancelled': return '🚫 تم إلغاء الحجز';
+      case 'reservation_reminder':  return '🔔 تذكير بالحجز';
+      case 'payment_reminder':      return '💰 تذكير بالدفع';
+      case 'general_announcement':  return '📢 إعلان عام';
+      case 'system_update':         return '⚙️ تحديث النظام';
+      case 'new_reservation':       return '📋 حجز جديد';
+      default:                      return '🔔 إشعار';
+    }
+  }
+
+  Color _colorForType(String type) {
+    switch (type) {
+      case 'reservation_approved':                return const Color(0xFF4CAF50);
       case 'reservation_rejected':
-        return {
-          'color': const Color(0xFFF44336), // Red
-          'icon': '@drawable/ic_cancel',
-        };
-      case 'reservation_cancelled':
-        return {
-          'color': const Color(0xFFFF9800), // Orange
-          'icon': '@drawable/ic_event_busy',
-        };
-      case 'payment_reminder':
-        return {
-          'color': const Color(0xFF2196F3), // Blue
-          'icon': '@drawable/ic_payment',
-        };
-      case 'reservation_reminder':
-        return {
-          'color': const Color(0xFF9C27B0), // Purple
-          'icon': '@drawable/ic_event',
-        };
-      case 'general_announcement':
-        return {
-          'color': const Color(0xFF4A90E2), // Primary blue
-          'icon': '@drawable/ic_announcement',
-        };
-      default:
-        return {
-          'color': const Color(0xFF757575), // Gray
-          'icon': '@drawable/ic_notification',
-        };
+      case 'reservation_cancelled':              return const Color(0xFFF44336);
+      case 'payment_reminder':                   return const Color(0xFFFF9800);
+      case 'new_reservation':                    return const Color(0xFF2196F3);
+      default:                                   return const Color(0xFF6200EE);
     }
   }
 
-  // Handle notification tap (foreground)
-  void _onNotificationTap(NotificationResponse response) {
-    _handleNotificationTap(response.payload);
+  String _platformName() {
+    if (kIsWeb) return 'web';
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.android: return 'android';
+      case TargetPlatform.iOS:     return 'ios';
+      case TargetPlatform.windows: return 'windows';
+      case TargetPlatform.macOS:   return 'macos';
+      case TargetPlatform.linux:   return 'linux';
+      default:                     return 'unknown';
+    }
   }
 
-  // Handle notification tap (background)
-  @pragma('vm:entry-point')
-  static void _onBackgroundNotificationTap(NotificationResponse response) {
-    _instance._handleNotificationTap(response.payload);
-  }
+  // ── Persisted shown-IDs ───────────────────────────────────
 
-  // Common notification tap handler
-  void _handleNotificationTap(String? payload) {
-    if (payload == null) return;
-
+  Future<Set<int>> _getShownIds() async {
     try {
-      final data = jsonDecode(payload) as Map<String, dynamic>;
-      final notificationId = data['id'] as int?;
-      
-      if (notificationId != null) {
-        // Mark notification as read when user taps it
-        ApiService.markNotificationAsRead(notificationId).catchError((e) {
-          print('Error marking notification as read: $e');
-        });
+      final prefs = await SharedPreferences.getInstance();
+      final value = prefs.get(_shownIdsKey);
+      if (value == null) return {};
+      if (value is String) {
+        return (jsonDecode(value) as List<dynamic>).map((e) => e as int).toSet();
+      } else if (value is List) {
+        return value.map((e) => e as int).toSet();
       }
-
-      // TODO: Navigate to relevant screen based on notification type
-      // You can implement navigation logic here using a navigator key
-      print('📱 Notification tapped: ${data['title']}');
+      return {};
     } catch (e) {
-      print('❌ Error handling notification tap: $e');
+      print('⚠️ Error reading shown IDs, resetting: $e');
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_shownIdsKey);
+      return {};
     }
   }
 
-  // Cancel a specific notification
+  Future<void> _addShownId(int id) async {
+    final prefs = await SharedPreferences.getInstance();
+    final ids   = await _getShownIds();
+    ids.add(id);
+    await prefs.setString(_shownIdsKey, jsonEncode(ids.toList()));
+    print('💾 Saved notification #$id to shown IDs');
+  }
+
+  // ── Public API ────────────────────────────────────────────
+
+  /// Force immediate check — call after login or on app resume
+  Future<void> forceImmediateCheck() async {
+    print('⚡ forceImmediateCheck() | ${_platformName()}');
+    await checkAndShowNewNotifications();
+  }
+
+  /// Clear on logout
+  Future<void> clearOnLogout() async {
+    if (!kIsWeb) await _notifications.cancelAll();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_shownIdsKey);
+    print('🗑️ Notification tracking cleared on logout');
+  }
+
+  /// Cancel one notification
   Future<void> cancelNotification(int id) async {
-    await _notifications.cancel(id);
+    if (!kIsWeb) await _notifications.cancel(id);
+    final prefs = await SharedPreferences.getInstance();
+    final ids   = await _getShownIds();
+    ids.remove(id);
+    await prefs.setString(_shownIdsKey, jsonEncode(ids.toList()));
+    print('🗑️ Removed notification #$id from tracking');
   }
 
-  // Cancel all notifications
-  Future<void> cancelAllNotifications() async {
-    await _notifications.cancelAll();
-    _shownNotificationIds.clear();
-  }
-
-  // Get pending notifications
-  Future<List<PendingNotificationRequest>> getPendingNotifications() async {
-    return await _notifications.pendingNotificationRequests();
-  }
-
-  // Check if notifications are enabled
-  Future<bool> areNotificationsEnabled() async {
-    if (defaultTargetPlatform == TargetPlatform.android) {
-      return await Permission.notification.isGranted;
-    } else if (defaultTargetPlatform == TargetPlatform.iOS) {
-      final granted = await _notifications
-          .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>()
-          ?.requestPermissions(alert: true, badge: true, sound: true);
-      return granted ?? false;
-    }
-    return true;
-  }
-
-  // Reset shown notifications (useful for testing)
-  void resetShownNotifications() {
-    _shownNotificationIds.clear();
-    _lastUnreadCount = 0;
-  }
-
-  // Force check for new notifications (manual refresh)
-  Future<void> forceCheck() async {
-    await _checkForNewNotifications();
-  }
-
-  // Dispose resources
-  void dispose() {
-    stopPolling();
-  }
+  bool get isBackgroundTasksAvailable => _workManagerInitialized;
 }

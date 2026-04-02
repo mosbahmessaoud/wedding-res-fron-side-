@@ -2,7 +2,11 @@
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-
+import 'package:wedding_reservation_app/services/notification_manager.dart';
+import 'package:wedding_reservation_app/services/token_manager.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:wedding_reservation_app/services/notification_service.dart';
+import 'package:wedding_reservation_app/services/foreground_notification_service.dart';
 import '../../../services/api_service.dart';
 import '../../../utils/colors.dart';
 
@@ -126,7 +130,39 @@ class HomeTabState extends State<HomeTab> with TickerProviderStateMixin {
     }
   }
 
-  Future<void> _loadData() async {
+//   Future<void> _loadData() async {
+//   try {
+//     await Future.wait([
+//       _loadUserProfile(),
+//       _loadPendingReservation(),
+//       _loadReservationStats(),
+//       _loadChartStatistics(),
+//     ]);
+    
+//     if (mounted) {
+//       setState(() {
+//         _connectionStatus = 'loaded';
+//       });
+//       _animationController.forward();
+//     }
+//   } catch (e) {
+//     if (mounted) {
+//       setState(() {
+//         _connectionStatus = 'offline';
+//       });
+//       ScaffoldMessenger.of(context).showSnackBar(
+//         SnackBar(
+//           content: Text('خطأ في تحميل البيانات: ${e.toString()}'),
+//           backgroundColor: Colors.red,
+//           behavior: SnackBarBehavior.floating,
+//           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+//         ),
+//       );
+//     }
+//   }
+// }
+
+Future<void> _loadData() async {
   try {
     await Future.wait([
       _loadUserProfile(),
@@ -134,7 +170,7 @@ class HomeTabState extends State<HomeTab> with TickerProviderStateMixin {
       _loadReservationStats(),
       _loadChartStatistics(),
     ]);
-    
+
     if (mounted) {
       setState(() {
         _connectionStatus = 'loaded';
@@ -155,9 +191,15 @@ class HomeTabState extends State<HomeTab> with TickerProviderStateMixin {
         ),
       );
     }
+  } finally {
+    // Ensure loading state is always cleared
+    if (mounted) {
+      setState(() {
+        _isInitialLoading = false;
+      });
+    }
   }
 }
-
 
   Future<void> _loadUserProfile() async {
     try {
@@ -184,16 +226,65 @@ class HomeTabState extends State<HomeTab> with TickerProviderStateMixin {
       }
     }
   }
+
+
+// Future<void> _checkConnectivityAndLoad() async {
+//   if (mounted) {
+//     setState(() {
+//       _connectionStatus = 'checking';
+//     });
+//   }
+  
+//   final connectivityResult = await Connectivity().checkConnectivity();
+  
+//   if (connectivityResult.contains(ConnectivityResult.none)) {
+//     if (mounted) {
+//       setState(() {
+//         _connectionStatus = 'offline';
+//         _isInitialLoading = false;
+//       });
+//       _showNoInternetDialog();
+//     }
+//     return;
+//   }
+  
+//   if (mounted) {
+//     setState(() {
+//       _connectionStatus = 'loading';
+//     });
+//   }
+  
+//   await _loadData();
+  
+//   if (mounted) {
+//     setState(() {
+//       _connectionStatus = 'loaded';
+//       _isInitialLoading = false;
+//     });
+//   }
+// }
+
 Future<void> _checkConnectivityAndLoad() async {
   if (mounted) {
     setState(() {
       _connectionStatus = 'checking';
     });
   }
-  
-  final connectivityResult = await Connectivity().checkConnectivity();
-  
-  if (connectivityResult.contains(ConnectivityResult.none)) {
+
+  // On web, connectivity_plus is unreliable — skip the check and just try loading
+  bool isOffline = false;
+
+  try {
+    final connectivityResult = await Connectivity()
+        .checkConnectivity()
+        .timeout(const Duration(seconds: 3));
+    isOffline = connectivityResult.contains(ConnectivityResult.none);
+  } catch (_) {
+    // If the check itself times out or fails (common on web), assume online
+    isOffline = false;
+  }
+
+  if (isOffline) {
     if (mounted) {
       setState(() {
         _connectionStatus = 'offline';
@@ -203,22 +294,32 @@ Future<void> _checkConnectivityAndLoad() async {
     }
     return;
   }
-  
+
   if (mounted) {
     setState(() {
       _connectionStatus = 'loading';
     });
   }
-  
-  await _loadData();
-  
-  if (mounted) {
-    setState(() {
-      _connectionStatus = 'loaded';
-      _isInitialLoading = false;
-    });
+
+  try {
+    await _loadData().timeout(const Duration(seconds: 15));
+  } catch (_) {
+    if (mounted) {
+      setState(() {
+        _connectionStatus = 'offline';
+      });
+    }
+  } finally {
+    // ALWAYS unblock the UI regardless of what happened
+    if (mounted) {
+      setState(() {
+        _isInitialLoading = false;
+      });
+    }
   }
 }
+
+
   // void _showNoInternetDialog() {
   //   if (!mounted) return;
     
@@ -494,10 +595,32 @@ void _showNoInternetDialog() {
             ),
           ),
           ElevatedButton(
-            onPressed: () {
-              ApiService.clearToken();
-              Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
-            },
+            // onPressed: () async {
+            //   await TokenManager.clearToken(); // ← ADD THIS
+            //   ApiService.clearToken();         // keep this too
+            //   // await NotificationManager().stopMonitoring(); // ✅ now awaited
+            //   await NotificationManager().cancelAllNotifications();
+            //   if (!context.mounted) return;
+            //   Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+            // },
+            onPressed: () async {
+            // ── 1. Clear auth token ──
+            await TokenManager.clearToken();
+            await ApiService.clearToken();
+ 
+            // ── 2. Clear stored credentials from SharedPreferences ──
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.remove('auth_token');
+            await prefs.remove('user_role');
+ 
+            // ── 3. Stop notification services & clear tracking ──
+            await WeddingNotificationService().clearOnLogout();
+            await WeddingForegroundNotificationService().stopService();
+ 
+            if (!context.mounted) return;
+            Navigator.of(context)
+                .pushNamedAndRemoveUntil('/login', (route) => false);
+          },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),

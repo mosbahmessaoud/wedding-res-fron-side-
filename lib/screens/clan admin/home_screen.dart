@@ -3,22 +3,22 @@ import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wedding_reservation_app/screens/clan%20admin/HallsTab.dart';
 import 'package:wedding_reservation_app/screens/clan%20admin/clan_admin_statistics_page.dart';
 import 'package:wedding_reservation_app/screens/clan%20admin/clan_rules_management_page.dart';
 import 'package:wedding_reservation_app/screens/clan%20admin/clan_settings_tab.dart';
 import 'package:wedding_reservation_app/screens/clan%20admin/food_menu_tab.dart';
-import 'package:wedding_reservation_app/screens/clan%20admin/groom_access_password_page.dart';
 import 'package:wedding_reservation_app/screens/clan%20admin/grooms_tab.dart';
 import 'package:wedding_reservation_app/screens/clan%20admin/home_tab.dart';
 import 'package:wedding_reservation_app/screens/clan%20admin/notifications_tab.dart'; // Added
 import 'package:wedding_reservation_app/screens/clan%20admin/reservations_tab.dart';
 import 'package:wedding_reservation_app/screens/clan%20admin/special_reservations_tab.dart';
-import 'package:wedding_reservation_app/services/notification_manager.dart';
-import 'package:wedding_reservation_app/services/token_manager.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:wedding_reservation_app/services/notification_service.dart';
+import 'package:wedding_reservation_app/services/connectivity_service.dart';
 import 'package:wedding_reservation_app/services/foreground_notification_service.dart';
+import 'package:wedding_reservation_app/services/notification_service.dart';
+import 'package:wedding_reservation_app/services/token_manager.dart';
+
 import '../../services/api_service.dart';
 import '../../utils/colors.dart';
 import '../../utils/constants.dart';
@@ -56,7 +56,7 @@ class _ClanAdminHomeScreenState extends State<ClanAdminHomeScreen>
   late Animation<Offset> _navSlideAnimation;
 
   // List of protected tab indices
-  final List<int> _protectedTabs = [1, 5, 6, 7, 8, 10,11]; // Halls, Grooms, Settings, Notif, Rules, Special Reserv, Password Management
+  final List<int> _protectedTabs = [1, 5, 6, 7, 8,11]; // Halls, Grooms, Settings, Notif, Rules, Special Reserv, Password Management
   
   // Tab keys for refreshing specific tabs
   final GlobalKey<FoodTabState> _foodTabKey = GlobalKey<FoodTabState>();
@@ -68,95 +68,122 @@ class _ClanAdminHomeScreenState extends State<ClanAdminHomeScreen>
   final GlobalKey<ClanRulesPageState> _rulesTabKey = GlobalKey<ClanRulesPageState>();
   final GlobalKey<SpecialReservationsTabState> _reserv_special = GlobalKey<SpecialReservationsTabState>();
   final GlobalKey<NotificationsTabState> _notificationsTabKey = GlobalKey<NotificationsTabState>(); // Added
-  final GlobalKey<GroomAccessPasswordPageState> _groomPasswordTabKey = GlobalKey<GroomAccessPasswordPageState>();
+  // final GlobalKey<GroomAccessPasswordPageState> _groomPasswordTabKey = GlobalKey<GroomAccessPasswordPageState>();
   final GlobalKey<ReservationsTabState> _reservationsTabKey = GlobalKey<ReservationsTabState>();
   final GlobalKey<ClanAdminStatisticsPageState> _statisticsTabKey = GlobalKey<ClanAdminStatisticsPageState>();
+
   @override
-  void initState() {
-    super.initState();
-    _animationController = AnimationController(
-      duration: Duration(milliseconds: 1200),
-      vsync: this,
-    );
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
-    );
+void initState() {
+  super.initState();
+  _animationController = AnimationController(
+    duration: Duration(milliseconds: 1200),
+    vsync: this,
+  );
+  _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+    CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+  );
 
-    _refreshAnimationController = AnimationController(
-      duration: Duration(milliseconds: 600),
-      vsync: this,
-    );
-    _refreshAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _refreshAnimationController, curve: Curves.elasticOut),
-    );
+  _refreshAnimationController = AnimationController(
+    duration: Duration(milliseconds: 600),
+    vsync: this,
+  );
+  _refreshAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+    CurvedAnimation(parent: _refreshAnimationController, curve: Curves.elasticOut),
+  );
 
-    _animationController.forward();
-    _loadClanInfo();
-    _checkAccessPassword(); // ADD THIS LINE
+  _animationController.forward();
 
+  // Listen for connectivity changes to re-load when back online
+  ConnectivityService().addListener(_onConnectivityChanged);
 
+  // Only load online data if we have internet
+  _initializeWithConnectivityCheck();
 
-    // ADD THIS INITIALIZATION FOR NAV ANIMATION:
-    _navAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 400),
-      vsync: this,
-    );
-    
-    _navSlideAnimation = Tween<Offset>(
-      begin: const Offset(0, 1), // Hidden below screen
-      end: Offset.zero, // Visible
-    ).animate(CurvedAnimation(
-      parent: _navAnimationController,
-      curve: Curves.easeInOut,
-    ));
-    
-    // Show nav initially
-    _navAnimationController.forward();
-    _startHideTimer();
-  
+  _navAnimationController = AnimationController(
+    duration: const Duration(milliseconds: 400),
+    vsync: this,
+  );
+  _navSlideAnimation = Tween<Offset>(
+    begin: const Offset(0, 1),
+    end: Offset.zero,
+  ).animate(CurvedAnimation(
+    parent: _navAnimationController,
+    curve: Curves.easeInOut,
+  ));
+  _navAnimationController.forward();
+  _startHideTimer();
+}
+void _onConnectivityChanged(bool isOnline) {
+  if (isOnline && (_clanId == null || _clanId == 0)) {
+    // Came back online and we have no data yet — retry silently
+    _initializeWithConnectivityCheck();
+  }
+}
 
+Future<void> _initializeWithConnectivityCheck() async {
+  final isOnline = ConnectivityService().isOnline ||
+      await ConnectivityService().checkRealInternet();
+
+  if (!isOnline) {
+    // Set safe defaults — no dialogs, just empty state
+    if (mounted) {
+      setState(() {
+        _clanId = 0;
+        _clanName = 'العشيرة';
+        _hasAccessPassword = false;
+      });
+    }
+    return;
   }
 
-// ADD THIS NEW METHOD:
+  // Run both calls concurrently but independently
+  await Future.wait([
+    _loadClanInfo(),
+    _checkAccessPassword(),
+  ]);
+}
 Future<void> _checkAccessPassword() async {
   try {
     final hasPassword = await ApiService.hasAccessPassword();
-    setState(() {
-      _hasAccessPassword = hasPassword;
-    });
+    if (mounted) {
+      setState(() => _hasAccessPassword = hasPassword);
+    }
   } catch (e) {
-    print('Error checking access password: $e');
-    setState(() {
-      _hasAccessPassword = false;
-    });
+    // Silent fail — default to false, no popup
+    if (mounted) {
+      setState(() => _hasAccessPassword = false);
+    }
   }
 }
-  Future<void> _loadClanInfo() async {
-    try {
-      final clanInfo = await ApiService.getClanInfoByCurrentUser();
+Future<void> _loadClanInfo() async {
+  try {
+    final clanInfo = await ApiService.getClanInfoByCurrentUser();
+    if (mounted) {
       setState(() {
         _clanId = clanInfo['id'];
         _clanName = clanInfo['name'] ?? 'العشيرة';
       });
-    } catch (e) {
-      print('Error loading clan info: $e');
-      // Set default values if loading fails
+    }
+  } catch (e) {
+    // Silent fail — use defaults, no popup
+    if (mounted) {
       setState(() {
         _clanId = 0;
         _clanName = 'العشيرة';
       });
     }
   }
+} 
 
-  @override
-  void dispose() {
-    _animationController.dispose();
-    _refreshAnimationController.dispose();
-    _hideNavTimer?.cancel();
-    _navAnimationController.dispose();
-    super.dispose();
-    
-      }
+@override
+void dispose() {
+  ConnectivityService().removeListener(_onConnectivityChanged);
+  _animationController.dispose();
+  _refreshAnimationController.dispose();
+  _hideNavTimer?.cancel();
+  _navAnimationController.dispose();
+  super.dispose();
+}
 
   @override
   void didUpdateWidget(ClanAdminHomeScreen oldWidget) {
@@ -469,86 +496,143 @@ Future<bool> _showAccessPasswordDialog() async {
   return result ?? false;
 }
 
-// UPDATED METHOD - Cleaner verification flow
-void _navigateToTab(int index) async {
-  // Prevent action if already verifying
-  if (_isVerifyingPassword) {
-    return;
-  }
+// // UPDATED METHOD - Cleaner verification flow
+// void _navigateToTab(int index) async {
+//   // Prevent action if already verifying
+//   if (_isVerifyingPassword) {
+//     return;
+//   }
   
-  // // Verify access for protected tabs
-  // bool hasAccess = await _verifyAccessForTab(index);
+//   // // Verify access for protected tabs
+//   // bool hasAccess = await _verifyAccessForTab(index);
   
-  // if (!hasAccess) {
-  //   return;
-  // }
+//   // if (!hasAccess) {
+//   //   return;
+//   // }
   
+//   final screenSize = MediaQuery.of(context).size;
+//   final isLargeScreen = screenSize.width > 1024;
+  
+//   if (_lastTabIndex != index) {
+//     setState(() {
+//       _currentIndex = index;
+//     });
+    
+//     _refreshCurrentTab(index);
+//     _lastTabIndex = index;
+//   } else {
+//     setState(() {
+//       _currentIndex = index;
+//     });
+//   }
+  
+//   // Reset hide timer when navigating
+//   if (!isLargeScreen) {
+//     _startHideTimer();
+//   }
+// }
+
+
+void _navigateToTab(int index) {
+  if (_isVerifyingPassword) return;
+
   final screenSize = MediaQuery.of(context).size;
   final isLargeScreen = screenSize.width > 1024;
-  
+
+  setState(() => _currentIndex = index);
+
+  // Only refresh if this is a NEW tab switch (not re-tapping same tab)
   if (_lastTabIndex != index) {
-    setState(() {
-      _currentIndex = index;
-    });
-    
     _refreshCurrentTab(index);
     _lastTabIndex = index;
-  } else {
-    setState(() {
-      _currentIndex = index;
-    });
   }
-  
-  // Reset hide timer when navigating
-  if (!isLargeScreen) {
-    _startHideTimer();
-  }
+
+  if (!isLargeScreen) _startHideTimer();
 }
 
 
-  // Method for refreshing specific tabs
-  void _refreshCurrentTab(int index) {
-    switch (index) {
-      case 0:
-        _homeTabKey.currentState?.refreshData();
-        break;
-      case 1:
-        _hallsTabKey.currentState?.refreshData();
-        break;
-      case 2:
-        _groomsTabKey.currentState?.refreshData();
-        break;
-      case 3:
-        _reservationsTabKey.currentState?.refreshData();
-        break;
-      case 4:
-        _foodTabKey.currentState?.refreshData();
-        break;
-      case 5:
-        _settingsTabKey.currentState?.refreshData();
-        break;
-      case 6:
-        _notifTabKey.currentState?.refreshData();
-        break;
-      case 7:
-        _rulesTabKey.currentState?.refreshData();
-        break;
-      case 8:
-        _reserv_special.currentState?.refreshData();
-        break;
-      case 9:
-        _notificationsTabKey.currentState?.refreshData(); // Added
-        break;
-      case 10:
-        _groomPasswordTabKey.currentState?.refreshData();
-        break;
-      case 11:
-        _statisticsTabKey.currentState?.refreshData(); // ← NEW LINE
-        break;
-      case 12: // ← Update from 11 to 12 for profile
-        break;
-    }
+  // // Method for refreshing specific tabs
+  // void _refreshCurrentTab(int index) {
+  //   switch (index) {
+  //     case 0:
+  //       _homeTabKey.currentState?.refreshData();
+  //       break;
+  //     case 1:
+  //       _hallsTabKey.currentState?.refreshData();
+  //       break;
+  //     case 2:
+  //       _groomsTabKey.currentState?.refreshData();
+  //       break;
+  //     case 3:
+  //       _reservationsTabKey.currentState?.refreshData();
+  //       break;
+  //     case 4:
+  //       _foodTabKey.currentState?.refreshData();
+  //       break;
+  //     case 5:
+  //       _settingsTabKey.currentState?.refreshData();
+  //       break;
+  //     case 6:
+  //       _notifTabKey.currentState?.refreshData();
+  //       break;
+  //     case 7:
+  //       _rulesTabKey.currentState?.refreshData();
+  //       break;
+  //     case 8:
+  //       _reserv_special.currentState?.refreshData();
+  //       break;
+  //     case 9:
+  //       _notificationsTabKey.currentState?.refreshData(); // Added
+  //       break;
+  //     // case 10:
+  //     //   _groomPasswordTabKey.currentState?.refreshData();
+  //     //   break;
+  //     case 10:
+  //       _statisticsTabKey.currentState?.refreshData(); // ← NEW LINE
+  //       break;
+  //     case 11: // ← Update from 11 to 12 for profile
+  //       break;
+  //   }
+  // }
+void _refreshCurrentTab(int index) {
+  switch (index) {
+    case 0:
+      _homeTabKey.currentState?.refreshData();
+      break;
+    case 1:
+      _hallsTabKey.currentState?.activateTab();
+      break;
+    case 2:
+      _groomsTabKey.currentState?.activateTab();
+      break;
+    case 3:
+      _reservationsTabKey.currentState?.activateTab();
+      break;
+    case 4:
+      _foodTabKey.currentState?.activateTab();
+      break;
+    case 5:
+      _settingsTabKey.currentState?.activateTab();
+      break;
+    case 6:
+      _notifTabKey.currentState?.activateTab();
+      break;
+    case 7:
+      _rulesTabKey.currentState?.activateTab();
+      break;
+    case 8:
+      _reserv_special.currentState?.activateTab();
+      break;
+    case 9:
+      _notificationsTabKey.currentState?.activateTab();
+      break;
+    case 10:
+      _statisticsTabKey.currentState?.refreshData();
+      break;
+    case 11:
+      break;
   }
+}
 
   void _notifyTabRefresh(int tabIndex) {
     _refreshCurrentTab(tabIndex);
@@ -671,7 +755,7 @@ void _navigateToTab(int index) async {
                           Center(child: CircularProgressIndicator(color: AppColors.primary)),
                         SpecialReservationsTab(key: _reserv_special),
                         NotificationsTab(key: _notificationsTabKey), // Added
-                        GroomAccessPasswordPage(key: _groomPasswordTabKey), // ← NEW LINE
+                        // GroomAccessPasswordPage(key: _groomPasswordTabKey), // ← NEW LINE
                         ClanAdminStatisticsPage(key: _statisticsTabKey), // ← NEW LINE
 
                         _buildProfileTab(isDark),
@@ -1343,11 +1427,11 @@ String _getAppBarTitle() {
       return 'الحجوزات الخاصة';
     case 9:
       return 'الإشعارات'; // Added
+    // case 10:
+    //   return 'كلمة مرور الوصول';
     case 10:
-      return 'كلمة مرور الوصول';
-    case 11:
       return 'الإحصائيات'; // ← NEW LINE
-    case 12: // ← Changed from 11 to 12
+    case 11: 
       return 'الملف الشخصي';
     default:
       return AppConstants.appName;

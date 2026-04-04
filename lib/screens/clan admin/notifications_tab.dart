@@ -1,5 +1,6 @@
 // lib/screens/clan admin/notifications_tab.dart
 import 'package:flutter/material.dart';
+import 'package:wedding_reservation_app/services/connectivity_service.dart';
 
 import '../../services/api_service.dart';
 import '../../utils/colors.dart';
@@ -21,14 +22,69 @@ class NotificationsTabState extends State<NotificationsTab> with SingleTickerPro
   late TabController _tabController;
   List<dynamic> _notifications = [];
   bool _isLoadingNotifications = false;
+
+//   @override
+// void initState() {
+//   super.initState();
+//   _tabController = TabController(length: 2, vsync: this);
+//   _checkConnectivityAndLoad();
+// }
+
+bool _hasLoadedOnce = false;
+
 @override
 void initState() {
   super.initState();
   _tabController = TabController(length: 2, vsync: this);
-  _loadNotifications();
-  
-  // Mark all notifications as read when the page opens
-  _markAllAsReadOnOpen();
+  // Do NOT load here — wait until tab is activated
+}
+
+void activateTab() {
+  if (!_hasLoadedOnce) {
+    _hasLoadedOnce = true;
+    _checkConnectivityAndLoad();
+  }
+}
+
+void refreshData() {
+  _checkConnectivityAndLoad();
+}
+Future<void> _checkConnectivityAndLoad() async {
+  final isOnline = ConnectivityService().isOnline ||
+      await ConnectivityService().checkRealInternet();
+
+  if (!isOnline) {
+    if (mounted) {
+      setState(() => _isLoadingNotifications = false);
+      _showOfflineSnackbar();
+    }
+    return;
+  }
+
+  await Future.wait([
+    _loadNotifications(),
+    _loadSendedNotifications(),
+    _markAllAsReadOnOpen(),
+  ]);
+}
+
+void _showOfflineSnackbar() {
+  if (!mounted) return;
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Row(
+        children: const [
+          Icon(Icons.wifi_off, color: Colors.white, size: 18),
+          SizedBox(width: 8),
+          Text('لا يوجد اتصال بالإنترنت'),
+        ],
+      ),
+      backgroundColor: Colors.red.shade700,
+      duration: const Duration(seconds: 3),
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+    ),
+  );
 }
 
 /// Mark all notifications as read when opening the page
@@ -55,71 +111,35 @@ Future<void> _markAllAsReadOnOpen() async {
     super.dispose();
   }
 
-  void refreshData() {
-    _loadNotifications();
-    _loadSendedNotifications();
-  }
+// void refreshData() {
+//   _checkConnectivityAndLoad();
+// }
 
-// Update _loadSendedNotifications to fetch with user details
-Future<void> _loadSendedNotifications() async {
+
+Future<void> _loadNotifications() async {
+  if (!mounted) return;
   setState(() => _isLoadingNotifications = true);
-  
   try {
-    final notifications = await ApiService.getSendedNotifications(limit: 100);
-    
-    // Enrich notifications with user data if not already included
-    for (var notification in notifications) {
-      if (notification['user_id'] != null && 
-          !notification.containsKey('user_first_name')) {
-        try {
-          // If your backend doesn't return user info, you might need to fetch it
-          // For now, we'll assume the backend returns it or you can add a method
-          // to fetch user details by ID
-        } catch (e) {
-          print('Could not fetch user details: $e');
-        }
-      }
-    }
-    
-    setState(() {
-      _notifications = notifications;
-    });
+    final notifications = await ApiService.getNotifications(limit: 100);
+    if (mounted) setState(() => _notifications = notifications);
   } catch (e) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('خطأ في تحميل الإشعارات: ${e.toString()}'),
-        backgroundColor: Colors.red,
-      ),
-    );
+    // Silent — error already surfaced by the offline banner or is a transient API error
+    print('Error loading notifications: $e');
   } finally {
-    setState(() => _isLoadingNotifications = false);
+    if (mounted) setState(() => _isLoadingNotifications = false);
   }
 }
 
-Future<void> _loadNotifications() async {
+Future<void> _loadSendedNotifications() async {
+  if (!mounted) return;
   setState(() => _isLoadingNotifications = true);
-  
   try {
-    final notifications = await ApiService.getNotifications(limit: 100);
-    
-    if (mounted) {
-      setState(() {
-        _notifications = notifications;
-      });
-    }
+    final notifications = await ApiService.getSendedNotifications(limit: 100);
+    if (mounted) setState(() => _notifications = notifications);
   } catch (e) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('خطأ في تحميل الإشعارات: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
+    print('Error loading sent notifications: $e');
   } finally {
-    if (mounted) {
-      setState(() => _isLoadingNotifications = false);
-    }
+    if (mounted) setState(() => _isLoadingNotifications = false);
   }
 }
 

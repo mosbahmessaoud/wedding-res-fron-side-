@@ -1,7 +1,7 @@
 // lib/screens/clan admin/settings_tab.dart
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:wedding_reservation_app/services/connectivity_service.dart';
 
 import '../../services/api_service.dart';
 import '../../utils/colors.dart';
@@ -79,72 +79,74 @@ class SettingsTabState extends State<SettingsTab>
 
   // double _payment = 0;
 
+// @override
+// void initState() {
+//   super.initState();
+//   _initAnimations();
+//   _checkConnectivityAndLoad();
+// }
+//   void refreshData() {
+//     _initAnimations();
+//     _checkConnectivityAndLoad();
+//     setState(() {
+      
+//     });
+//   }
+
+bool _hasLoadedOnce = false;
+
 @override
 void initState() {
   super.initState();
   _initAnimations();
-  _checkConnectivityAndLoad();
+  // Do NOT load here — wait until tab is activated
 }
-  void refreshData() {
-    _initAnimations();
-    _checkConnectivityAndLoad();
-    setState(() {
-      
-    });
-  }
 
+void activateTab() {
+  if (!_hasLoadedOnce) {
+    _hasLoadedOnce = true;
+    _checkConnectivityAndLoad();
+  }
+}
+
+void refreshData() {
+  _initAnimations();
+  _checkConnectivityAndLoad();
+  setState(() {});
+}
 
 Future<void> _checkConnectivityAndLoad() async {
-    setState(() {
-    _isLoading = true;
-  });
-  
-  // Show loading for 2 seconds
-  await Future.delayed(Duration(seconds: 2));
-  final connectivityResult = await Connectivity().checkConnectivity();
-  
-  if (connectivityResult.contains(ConnectivityResult.none)) {
-    _showNoInternetDialog();
-    setState(() {
-      _isLoading = false;
-    });
+  setState(() => _isLoading = true);
+
+  final isOnline = ConnectivityService().isOnline ||
+      await ConnectivityService().checkRealInternet();
+
+  if (!isOnline) {
+    if (mounted) {
+      setState(() => _isLoading = false);
+      _showOfflineBanner();
+    }
     return;
   }
-  
+
   await _loadInitialData();
 }
 
-void _showNoInternetDialog() {
-  showDialog(
-    context: context,
-    barrierDismissible: false,
-    builder: (context) => AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: Row(
-        children: [
-          Icon(Icons.wifi_off, color: Colors.orange),
-          SizedBox(width: 10),
-          Text('لا يوجد اتصال'),
+void _showOfflineBanner() {
+  if (!mounted) return;
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Row(
+        children: const [
+          Icon(Icons.wifi_off, color: Colors.white, size: 18),
+          SizedBox(width: 8),
+          Text('لا يوجد اتصال بالإنترنت'),
         ],
       ),
-      content: Text('يرجى التحقق من اتصالك بالإنترنت'),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text('إلغاء'),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            Navigator.pop(context);
-            _checkConnectivityAndLoad();
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-          child: Text('إعادة المحاولة', style: TextStyle(color: Colors.white)),
-        ),
-      ],
+      backgroundColor: Colors.red.shade700,
+      duration: const Duration(seconds: 3),
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
     ),
   );
 }

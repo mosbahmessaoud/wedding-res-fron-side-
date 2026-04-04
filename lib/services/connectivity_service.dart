@@ -1,7 +1,10 @@
 // lib/services/connectivity_service.dart
 import 'dart:async';
+import 'dart:io';
+
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
+
 
 class ConnectivityService {
   static final ConnectivityService _instance = ConnectivityService._internal();
@@ -17,39 +20,69 @@ class ConnectivityService {
   // Callbacks for connectivity changes
   final List<Function(bool)> _listeners = [];
   
-  // Initialize connectivity listener
-  void initialize() {
-    // Check initial connectivity
-    _checkConnectivity();
-    
-    // Listen to connectivity changes
-    _subscription = _connectivity.onConnectivityChanged.listen((result) {
-      _handleConnectivityChange(result);
-    });
+  // In ConnectivityService class
+
+Future<bool> checkRealInternet() async {
+  try {
+    final result = await InternetAddress.lookup('google.com')
+        .timeout(const Duration(seconds: 5));
+    return result.isNotEmpty && result[0].rawAddress.isNotEmpty;
+  } on SocketException catch (_) {
+    return false;
+  } on TimeoutException catch (_) {
+    return false;
   }
-  
-  Future<void> _checkConnectivity() async {
-    try {
-      final result = await _connectivity.checkConnectivity();
-      _handleConnectivityChange(result);
-    } catch (e) {
-      print('Error checking connectivity: $e');
+}
+
+void initialize() {
+  _checkConnectivity();
+  _subscription = _connectivity.onConnectivityChanged.listen((result) {
+    _handleConnectivityChange(result);
+  });
+}
+
+Future<void> _checkConnectivity() async {
+  try {
+    final result = await _connectivity.checkConnectivity();
+    // First check adapter
+    final hasAdapter = !result.contains(ConnectivityResult.none);
+    if (!hasAdapter) {
+      _updateOnlineStatus(false);
+      return;
+    }
+    // Then verify real internet
+    final hasInternet = await checkRealInternet();
+    _updateOnlineStatus(hasInternet);
+  } catch (e) {
+    print('Error checking connectivity: $e');
+    _updateOnlineStatus(false);
+  }
+}
+
+void _updateOnlineStatus(bool isOnline) {
+  final wasOnline = _isOnline;
+  _isOnline = isOnline;
+  if (wasOnline != _isOnline) {
+    print('Connectivity changed: ${_isOnline ? "Online" : "Offline"}');
+    for (var listener in _listeners) {
+      listener(_isOnline);
     }
   }
-  
-  void _handleConnectivityChange(List<ConnectivityResult> result) {
-    final wasOnline = _isOnline;
-    _isOnline = !result.contains(ConnectivityResult.none);
-    
-    // Notify listeners only if status changed
-    if (wasOnline != _isOnline) {
-      print('Connectivity changed: ${_isOnline ? "Online" : "Offline"}');
-      for (var listener in _listeners) {
-        listener(_isOnline);
-      }
-    }
+}
+
+void _handleConnectivityChange(List<ConnectivityResult> result) async {
+  final hasAdapter = !result.contains(ConnectivityResult.none);
+  if (!hasAdapter) {
+    _updateOnlineStatus(false);
+    return;
   }
-  
+  // Debounce: wait a moment for the connection to stabilize
+  await Future.delayed(const Duration(milliseconds: 500));
+  final hasInternet = await checkRealInternet();
+  _updateOnlineStatus(hasInternet);
+}
+
+
   // Add listener for connectivity changes
   void addListener(Function(bool isOnline) callback) {
     _listeners.add(callback);

@@ -1,10 +1,10 @@
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:wedding_reservation_app/providers/theme_provider.dart';
 import 'package:wedding_reservation_app/screens/auth/sing_up_screen.dart';
 import 'package:wedding_reservation_app/screens/super%20admin/otp_verification_screen.dart';
 import 'package:wedding_reservation_app/services/api_service.dart';
+import 'package:wedding_reservation_app/services/connectivity_service.dart';
 import 'package:wedding_reservation_app/utils/colors.dart';
 
 class GroomManagementScreen extends StatefulWidget {
@@ -39,13 +39,13 @@ int _getCrossAxisCount(BuildContext context) {
 }
 
 
-  @override
-  void initState() {
-    super.initState();
-    _checkConnectivityAndLoad();
-    _checkAccessPassword();
-    _searchController.addListener(_onSearchChanged);
-  }
+  // @override
+  // void initState() {
+  //   super.initState();
+  //   _checkConnectivityAndLoad();
+  //   _checkAccessPassword();
+  //   _searchController.addListener(_onSearchChanged);
+  // }
 
   @override
   void dispose() {
@@ -53,10 +53,32 @@ int _getCrossAxisCount(BuildContext context) {
     super.dispose();
   }
 
-  void refreshData() {
+  // void refreshData() {
+  //   _checkConnectivityAndLoad();
+  //   _checkAccessPassword();
+  // }
+
+  bool _hasLoadedOnce = false;
+
+@override
+void initState() {
+  super.initState();
+  // Do NOT load here — wait until tab is activated
+  _searchController.addListener(_onSearchChanged);
+}
+
+void activateTab() {
+  if (!_hasLoadedOnce) {
+    _hasLoadedOnce = true;
     _checkConnectivityAndLoad();
     _checkAccessPassword();
   }
+}
+
+void refreshData() {
+  _checkConnectivityAndLoad();
+  _checkAccessPassword();
+}
 
   void _onSearchChanged() {
     setState(() {
@@ -353,52 +375,42 @@ int _getCrossAxisCount(BuildContext context) {
     passwordController.dispose();
     return result ?? false;
   }
+Future<void> _checkConnectivityAndLoad() async {
+  setState(() => isLoading = true);
 
-  Future<void> _checkConnectivityAndLoad() async {
-    setState(() => isLoading = true);
-    await Future.delayed(Duration(seconds: 2));
-    final connectivityResult = await Connectivity().checkConnectivity();
-    
-    if (connectivityResult.contains(ConnectivityResult.none)) {
-      _showNoInternetDialog();
+  final isOnline = ConnectivityService().isOnline ||
+      await ConnectivityService().checkRealInternet();
+
+  if (!isOnline) {
+    if (mounted) {
       setState(() => isLoading = false);
-      return;
+      _showOfflineBanner();
     }
-    
-    await _loadGrooms();
+    return;
   }
 
-  void _showNoInternetDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            Icon(Icons.wifi_off, color: Colors.orange),
-            SizedBox(width: 10),
-            Text('لا يوجد اتصال'),
-          ],
-        ),
-        content: Text('يرجى التحقق من اتصالك بالإنترنت'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: Text('إلغاء')),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _checkConnectivityAndLoad();
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            child: Text('إعادة المحاولة', style: TextStyle(color: Colors.white)),
-          ),
+  await _loadGrooms();
+}
+
+
+void _showOfflineBanner() {
+  if (!mounted) return;
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Row(
+        children: const [
+          Icon(Icons.wifi_off, color: Colors.white, size: 18),
+          SizedBox(width: 8),
+          Text('لا يوجد اتصال بالإنترنت'),
         ],
       ),
-    );
-  }
+      backgroundColor: Colors.red.shade700,
+      duration: const Duration(seconds: 3),
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+    ),
+  );
+}
 
   static Future<Map<String, dynamic>?> _getGroomReservationStatus(int groomId) async {
     try {

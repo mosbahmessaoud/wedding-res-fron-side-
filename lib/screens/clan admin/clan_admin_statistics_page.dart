@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:wedding_reservation_app/screens/clan admin/home_screen.dart';
 import 'package:wedding_reservation_app/services/api_service.dart';
+import 'package:wedding_reservation_app/services/connectivity_service.dart';
 import 'package:wedding_reservation_app/utils/colors.dart';
 
 // ─── Design tokens ───────────────────────────────────────────────────────────
@@ -121,8 +122,31 @@ class ClanAdminStatisticsPageState extends State<ClanAdminStatisticsPage> {
     )).toList();
   }
 
+void _showOfflineBanner() {
+  if (!mounted) return;
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Row(children: const [
+        Icon(Icons.wifi_off, color: Colors.white, size: 18),
+        SizedBox(width: 8),
+        Text('لا يوجد اتصال بالإنترنت - لا يمكن تصدير البيانات'),
+      ]),
+      backgroundColor: Colors.red.shade700,
+      duration: const Duration(seconds: 4),
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+    ),
+  );
+}
   // ─── Fetch data (unchanged logic) ─────────────────────────────────────────
-  Future<Map<String, List<Map<String, dynamic>>>> _fetchData() async {
+Future<Map<String, List<Map<String, dynamic>>>> _fetchData() async {
+  final isOnline = ConnectivityService().isOnline ||
+      await ConnectivityService().checkRealInternet();
+
+  if (!isOnline) {
+    _showOfflineBanner();
+    return {'belongs': [], 'not_belongs': [], 'all': []};
+  }
     if (_exportType == 'grooms') {
       final response = await ApiService.listGroomsForClanAdmin();
       final data = response.map((g) {

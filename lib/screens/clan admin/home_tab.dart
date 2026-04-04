@@ -5,19 +5,20 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wedding_reservation_app/models/reservation_special.dart';
 import 'package:wedding_reservation_app/providers/theme_provider.dart';
 import 'package:wedding_reservation_app/screens/clan%20admin/bulk_upload_grooms_screen.dart';
 import 'package:wedding_reservation_app/screens/clan%20admin/custom_calendar_picker_view.dart';
 import 'package:wedding_reservation_app/screens/clan%20admin/expiring_reservations_page.dart';
 import 'package:wedding_reservation_app/screens/clan%20admin/manual_register_groom_screen.dart';
-import 'package:wedding_reservation_app/services/notification_manager.dart';
+import 'package:wedding_reservation_app/services/connectivity_service.dart';
+import 'package:wedding_reservation_app/services/foreground_notification_service.dart';
+import 'package:wedding_reservation_app/services/notification_service.dart';
 import 'package:wedding_reservation_app/services/token_manager.dart';
 import 'package:wedding_reservation_app/utils/constants.dart';
 import 'package:wedding_reservation_app/widgets/notification_panel.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:wedding_reservation_app/services/notification_service.dart';
-import 'package:wedding_reservation_app/services/foreground_notification_service.dart';
+
 import '../../services/api_service.dart';
 import '../../utils/colors.dart';
 
@@ -85,6 +86,10 @@ int _clanId = 0;
 // Add after _displayMonth = DateTime.now();
 bool _showYearPicker = false;
 
+
+bool _offlineBannerShown = false;
+
+
   @override
   void initState() {
     super.initState();
@@ -130,99 +135,101 @@ Future<Map<String, dynamic>?> _getClanInfo(int clanId) async {
     return null;
   }
 }
+
 Future<void> _loadCalendarData() async {
   setState(() => _calendarLoading = true);
+
+  final isOnline = ConnectivityService().isOnline ||
+      await ConnectivityService().checkRealInternet();
+
+  if (!isOnline) {
+  if (mounted) setState(() => _calendarLoading = false);
+  return; // silent
+}
 
   try {
     final userInfo = await ApiService.getCurrentUserInfo();
     final clanId = userInfo['clan_id'];
-    
+
     if (clanId == null) {
-      print('Error: No clan_id found for user');
       setState(() => _calendarLoading = false);
       return;
     }
 
     setState(() => _clanId = clanId);
 
-    // Fetch reservations (existing + not-belong)
-    final validatedReservations = await ApiService.getGroomsWithValidatedReservations(clanId);
-    final pendingReservations = await ApiService.getGroomsWithPendingReservations(clanId);
-    final specialReservations = await ApiService.getSpecialReservations(clanId);
-    final validatedNotBelong = await ApiService.getGroomsWithValidatedReservationsNotBelong(clanId);
-    final pendingNotBelong = await ApiService.getGroomsWithPendingReservationsNotBelong(clanId);
+    final results = await Future.wait([
+      ApiService.getGroomsWithValidatedReservations(clanId).catchError((_) => <dynamic>[]),
+      ApiService.getGroomsWithPendingReservations(clanId).catchError((_) => <dynamic>[]),
+      ApiService.getSpecialReservations(clanId).catchError((_) => <ReservationSpecial>[]),
+      ApiService.getGroomsWithValidatedReservationsNotBelong(clanId).catchError((_) => <dynamic>[]),
+      ApiService.getGroomsWithPendingReservationsNotBelong(clanId).catchError((_) => <dynamic>[]),
+    ]);
 
-    // Helper to enrich reservation
+    final validatedReservations   = results[0] as List<dynamic>;
+    final pendingReservations     = results[1] as List<dynamic>;
+    final specialReservations     = results[2] as List<ReservationSpecial>;
+    final validatedNotBelong      = results[3] as List<dynamic>;
+    final pendingNotBelong        = results[4] as List<dynamic>;
+
     Map<String, dynamic> enrichReservation(dynamic reservation, bool notBelong) {
       final enriched = Map<String, dynamic>.from(reservation);
       enriched['reservation_clan_id'] = reservation['clan_id'];
-      enriched['not_belong_to_clan'] = notBelong; // Mark as not belonging
+      enriched['not_belong_to_clan'] = notBelong;
       if (reservation['groom'] != null) {
-        enriched['first_name'] = reservation['groom']['first_name'];
-        enriched['last_name'] = reservation['groom']['last_name'];
-        enriched['father_name'] = reservation['groom']['father_name'];
-        enriched['phone_number'] = reservation['groom']['phone_number'];
-        enriched['guardian_name'] = reservation['groom']['guardian_name'];
+        enriched['first_name']     = reservation['groom']['first_name'];
+        enriched['last_name']      = reservation['groom']['last_name'];
+        enriched['father_name']    = reservation['groom']['father_name'];
+        enriched['phone_number']   = reservation['groom']['phone_number'];
+        enriched['guardian_name']  = reservation['groom']['guardian_name'];
         enriched['guardian_phone'] = reservation['groom']['guardian_phone'];
       }
       return enriched;
     }
 
-    // Group validated reservations by date
     Map<String, List<Map<String, dynamic>>> validatedByDate = {};
-    for (var reservation in validatedReservations) {
-      final enriched = enrichReservation(reservation, false);
-      for (var dateKey in ['date1', 'date2']) {
-        final date = reservation[dateKey];
-        if (date != null) validatedByDate.putIfAbsent(date, () => []).add(enriched);
+    Map<String, List<Map<String, dynamic>>> pendingByDate   = {};
+
+    for (var r in validatedReservations) {
+      final e = enrichReservation(r, false);
+      for (var key in ['date1', 'date2']) {
+        final d = r[key]; if (d != null) validatedByDate.putIfAbsent(d, () => []).add(e);
       }
     }
-    for (var reservation in validatedNotBelong) {
-      final enriched = enrichReservation(reservation, true);
-      for (var dateKey in ['date1', 'date2']) {
-        final date = reservation[dateKey];
-        if (date != null) validatedByDate.putIfAbsent(date, () => []).add(enriched);
+    for (var r in validatedNotBelong) {
+      final e = enrichReservation(r, true);
+      for (var key in ['date1', 'date2']) {
+        final d = r[key]; if (d != null) validatedByDate.putIfAbsent(d, () => []).add(e);
+      }
+    }
+    for (var r in pendingReservations) {
+      final e = enrichReservation(r, false);
+      for (var key in ['date1', 'date2']) {
+        final d = r[key]; if (d != null) pendingByDate.putIfAbsent(d, () => []).add(e);
+      }
+    }
+    for (var r in pendingNotBelong) {
+      final e = enrichReservation(r, true);
+      for (var key in ['date1', 'date2']) {
+        final d = r[key]; if (d != null) pendingByDate.putIfAbsent(d, () => []).add(e);
       }
     }
 
-    // Group pending reservations by date
-    Map<String, List<Map<String, dynamic>>> pendingByDate = {};
-    for (var reservation in pendingReservations) {
-      final enriched = enrichReservation(reservation, false);
-      for (var dateKey in ['date1', 'date2']) {
-        final date = reservation[dateKey];
-        if (date != null) pendingByDate.putIfAbsent(date, () => []).add(enriched);
-      }
-    }
-    for (var reservation in pendingNotBelong) {
-      final enriched = enrichReservation(reservation, true);
-      for (var dateKey in ['date1', 'date2']) {
-        final date = reservation[dateKey];
-        if (date != null) pendingByDate.putIfAbsent(date, () => []).add(enriched);
-      }
-    }
-
-    // Process special reservations
     Set<String> specialDates = {};
     Map<String, ReservationSpecial> specialMap = {};
-    for (var reservation in specialReservations) {
-      specialDates.add(reservation.date);
-      specialMap[reservation.date] = reservation;
+    for (var r in specialReservations) {
+      specialDates.add(r.date);
+      specialMap[r.date] = r;
     }
 
-    // Create DateAvailability map
     Map<String, DateAvailability> newAvailabilities = {};
     Set<String> allDates = {...validatedByDate.keys, ...pendingByDate.keys, ...specialDates};
 
     for (String dateStr in allDates) {
-      final date = DateTime.parse(dateStr);
+      final date      = DateTime.parse(dateStr);
       final validated = validatedByDate[dateStr] ?? [];
-      final pending = pendingByDate[dateStr] ?? [];
-      final allRes = [...validated, ...pending];
-
-      final validatedCount = validated.length;
-      final pendingCount = pending.length;
-      final totalCount = validatedCount + pendingCount;
+      final pending   = pendingByDate[dateStr]   ?? [];
+      final allRes    = [...validated, ...pending];
 
       DateStatus status;
       String note;
@@ -230,15 +237,15 @@ Future<void> _loadCalendarData() async {
       if (specialDates.contains(dateStr)) {
         status = DateStatus.specialReservation;
         note = 'حجز خاص من العشيرة';
-      } else if (validatedCount > 0 && pendingCount > 0) {
+      } else if (validated.isNotEmpty && pending.isNotEmpty) {
         status = DateStatus.mixed;
-        note = '$validatedCount مؤكد + $pendingCount في الانتظار';
-      } else if (validatedCount > 0) {
+        note = '${validated.length} مؤكد + ${pending.length} في الانتظار';
+      } else if (validated.isNotEmpty) {
         status = DateStatus.reserved;
-        note = '$validatedCount حجز مؤكد';
-      } else if (pendingCount > 0) {
+        note = '${validated.length} حجز مؤكد';
+      } else if (pending.isNotEmpty) {
         status = DateStatus.pending;
-        note = '$pendingCount في الانتظار';
+        note = '${pending.length} في الانتظار';
       } else {
         status = DateStatus.available;
         note = 'متاح';
@@ -247,9 +254,9 @@ Future<void> _loadCalendarData() async {
       newAvailabilities[dateStr] = DateAvailability(
         date: date,
         status: status,
-        currentCount: totalCount,
-        validatedCount: validatedCount,
-        pendingCount: pendingCount,
+        currentCount: allRes.length,
+        validatedCount: validated.length,
+        pendingCount: pending.length,
         maxCapacity: 3,
         reservations: allRes,
         validatedReservations: validated,
@@ -263,10 +270,9 @@ Future<void> _loadCalendarData() async {
       _calendarDateAvailabilities = newAvailabilities;
       _calendarLoading = false;
     });
-
   } catch (e) {
     print('Error loading calendar data: $e');
-    setState(() => _calendarLoading = false);
+    if (mounted) setState(() => _calendarLoading = false);
   }
 }
 
@@ -302,31 +308,48 @@ void _debugStatisticsData() {
   print('\n═════════════════════════════════════════\n');
 }
 
-
-  void _startNotificationPolling() {
-    _notificationTimer = Timer.periodic(
-      const Duration(seconds: 30), // Check every 30 seconds
-      (timer) async {
-        try {
-          final newCount = await ApiService.getUnreadNotificationCount();
-          if (newCount > _lastUnreadCount && mounted) {
-            setState(() {
-              _lastUnreadCount = newCount;
-            });
-            // Optional: Show a snackbar
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('لديك إشعارات جديدة'),
-                duration: Duration(seconds: 2),
-              ),
-            );
-          }
-        } catch (e) {
-          print('Error polling notifications: $e');
+void _startNotificationPolling() {
+  _notificationTimer = Timer.periodic(
+    const Duration(seconds: 30),
+    (timer) async {
+      // Skip silently when offline
+      if (!ConnectivityService().isOnline) return;
+      try {
+        final newCount = await ApiService.getUnreadNotificationCount();
+        if (newCount > _lastUnreadCount && mounted) {
+          setState(() => _lastUnreadCount = newCount);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('لديك إشعارات جديدة'),
+              duration: Duration(seconds: 2),
+            ),
+          );
         }
-      },
-    );
-  }
+      } catch (e) {
+        // Silent — no error popup during polling
+      }
+    },
+  );
+}
+
+void _showOfflineSnackbar() {
+  if (!mounted) return;
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Row(
+        children: const [
+          Icon(Icons.wifi_off, color: Colors.white, size: 18),
+          SizedBox(width: 8),
+          Text('لا يوجد اتصال بالإنترنت'),
+        ],
+      ),
+      backgroundColor: Colors.red.shade700,
+      duration: const Duration(seconds: 3),
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+    ),
+  );
+}
 
 
   @override
@@ -389,109 +412,144 @@ void _showLogoutDialog() {
   );
 }
 
-  Future<void> _loadDashboardData() async {
-    if (!mounted) return;
-    
-    setState(() => _isLoading = true);
+// Future<void> _loadDashboardData() async {
+//   if (!mounted) return;
 
-    try {
-      // Load data concurrently for better performance
-      final futures = await Future.wait([
-        ApiService.listHalls().catchError((_) => <dynamic>[]),
-        ApiService.listGrooms().catchError((_) => <dynamic>[]),
-        ApiService.getClanMenus().catchError((_) => <dynamic>[]),
-        ApiService.getAllReservations().catchError((_) => <dynamic>[]),
-        ApiService.getPendingReservations().catchError((_) => <dynamic>[]),
-        ApiService.getValidatedReservations().catchError((_) => <dynamic>[]),
-        ApiService.getCancelledReservations().catchError((_) => <dynamic>[]),
-        ApiService.getCurrentUserInfo().catchError((_) => <String, dynamic>{}),
-      ]);
+//   // Check connectivity before making any API calls
+//   final isOnline = ConnectivityService().isOnline ||
+//       await ConnectivityService().checkRealInternet();
 
-      if (!mounted) return;
+//   if (!isOnline) {
+//     if (mounted) setState(() => _isLoading = false);
+//     _showOfflineSnackbar();
+//     return;
+//   }
 
-      final halls = futures[0] as List<dynamic>;
-      final grooms = futures[1] as List<dynamic>;
-      final menus = futures[2] as List<dynamic>;
-      final allReservations = futures[3] as List<dynamic>;
-      final pendingReservations = futures[4] as List<dynamic>;
-      final validatedReservations = futures[5] as List<dynamic>;
-      final cancelledReservations = futures[6] as List<dynamic>;
-      final userInfo = futures[7] as Map<String, dynamic>;
+//   setState(() => _isLoading = true);
+Future<void> _loadDashboardData() async {
+  if (!mounted) return;
 
-      // Create recent activities from the latest data
-      _recentActivities = _generateRecentActivities(
-        halls, grooms, menus, allReservations
-      );
-      await _loadStatisticsData();
+  final isOnline = ConnectivityService().isOnline ||
+      await ConnectivityService().checkRealInternet();
 
-      setState(() {
-        _dashboardData = {
-          'halls_count': halls.length,
-          'reservations_count': allReservations.length,
-          'grooms_count': grooms.length,
-          'menus_count': menus.length,
-          'pending_reservations': pendingReservations.length,
-          'validated_reservations': validatedReservations.length,
-          'cancelled_reservations': cancelledReservations.length,
-        };
-        
-        _adminName = _extractAdminName(userInfo);
-        _ClanName = userInfo['clan_name'] ?? '';
-        _isLoading = false;
-      });
-
-      _refreshAnimationController.forward().then((_) {
-        _refreshAnimationController.reverse();
-      });
-    } catch (e) {
-      if (!mounted) return;
+  if (!isOnline) {
+    if (mounted) {
       setState(() => _isLoading = false);
-      print('Error loading dashboard data: $e');
+      if (!_offlineBannerShown) {
+        _offlineBannerShown = true;
+        _showOfflineSnackbar();
+      }
     }
+    return;
   }
+
+  _offlineBannerShown = false; // reset when online
+  setState(() => _isLoading = true);
+
+  try {
+    final futures = await Future.wait([
+      ApiService.listHalls().catchError((_) => <dynamic>[]),
+      ApiService.listGrooms().catchError((_) => <dynamic>[]),
+      ApiService.getClanMenus().catchError((_) => <dynamic>[]),
+      ApiService.getAllReservations().catchError((_) => <dynamic>[]),
+      ApiService.getPendingReservations().catchError((_) => <dynamic>[]),
+      ApiService.getValidatedReservations().catchError((_) => <dynamic>[]),
+      ApiService.getCancelledReservations().catchError((_) => <dynamic>[]),
+      ApiService.getCurrentUserInfo().catchError((_) => <String, dynamic>{}),
+    ]);
+
+    if (!mounted) return;
+
+    final halls = futures[0] as List<dynamic>;
+    final grooms = futures[1] as List<dynamic>;
+    final menus = futures[2] as List<dynamic>;
+    final allReservations = futures[3] as List<dynamic>;
+    final pendingReservations = futures[4] as List<dynamic>;
+    final validatedReservations = futures[5] as List<dynamic>;
+    final cancelledReservations = futures[6] as List<dynamic>;
+    final userInfo = futures[7] as Map<String, dynamic>;
+
+    _recentActivities = _generateRecentActivities(
+        halls, grooms, menus, allReservations);
+    await _loadStatisticsData();
+
+    setState(() {
+      _dashboardData = {
+        'halls_count': halls.length,
+        'reservations_count': allReservations.length,
+        'grooms_count': grooms.length,
+        'menus_count': menus.length,
+        'pending_reservations': pendingReservations.length,
+        'validated_reservations': validatedReservations.length,
+        'cancelled_reservations': cancelledReservations.length,
+      };
+      _adminName = _extractAdminName(userInfo);
+      _ClanName = userInfo['clan_name'] ?? '';
+      _isLoading = false;
+    });
+
+    _refreshAnimationController.forward().then((_) {
+      _refreshAnimationController.reverse();
+    });
+  } catch (e) {
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+    print('Error loading dashboard data: $e');
+  }
+}
 
 Future<void> _loadStatisticsData() async {
   if (!mounted) return;
-  
+
+  final isOnline = ConnectivityService().isOnline ||
+      await ConnectivityService().checkRealInternet();
+
+  if (!isOnline) {
+  if (mounted) setState(() => _statsLoading = false);
+  return; // silent — home already showed banner
+}
+
   setState(() => _statsLoading = true);
 
   try {
-    // Load clan statistics with data arrays
-    final clanToday = await ApiService.getValidatedReservationsToday();
-    final clanMonth = await ApiService.getValidatedReservationsMonth();
-    final clanYear = await ApiService.getValidatedReservationsYear();
-    
-    // Load county statistics with data arrays
-    final countyToday = await ApiService.getValidatedReservationsTodayCounty();
-    final countyMonth = await ApiService.getValidatedReservationsMonthCounty();
-    final countyYear = await ApiService.getValidatedReservationsYearCounty();
+    final results = await Future.wait([
+      ApiService.getValidatedReservationsToday().catchError((_) => <String, dynamic>{}),
+      ApiService.getValidatedReservationsMonth().catchError((_) => <String, dynamic>{}),
+      ApiService.getValidatedReservationsYear().catchError((_) => <String, dynamic>{}),
+      ApiService.getValidatedReservationsTodayCounty().catchError((_) => <String, dynamic>{}),
+      ApiService.getValidatedReservationsMonthCounty().catchError((_) => <String, dynamic>{}),
+      ApiService.getValidatedReservationsYearCounty().catchError((_) => <String, dynamic>{}),
+    ]);
 
     if (!mounted) return;
+
+    final clanToday    = results[0] as Map<String, dynamic>;
+    final clanMonth    = results[1] as Map<String, dynamic>;
+    final clanYear     = results[2] as Map<String, dynamic>;
+    final countyToday  = results[3] as Map<String, dynamic>;
+    final countyMonth  = results[4] as Map<String, dynamic>;
+    final countyYear   = results[5] as Map<String, dynamic>;
 
     setState(() {
       _clanStats = {
         'today': clanToday['count'] ?? 0,
         'month': clanMonth['count'] ?? 0,
-        'year': clanYear['count'] ?? 0,
+        'year':  clanYear['count']  ?? 0,
         'today_data': clanToday['reservations'] ?? [],
         'month_data': clanMonth['reservations'] ?? [],
-        'year_data': clanYear['reservations'] ?? [],
+        'year_data':  clanYear['reservations']  ?? [],
       };
-      
       _countyStats = {
         'today': countyToday['count'] ?? 0,
         'month': countyMonth['count'] ?? 0,
-        'year': countyYear['count'] ?? 0,
+        'year':  countyYear['count']  ?? 0,
         'today_data': countyToday['reservations'] ?? [],
         'month_data': countyMonth['reservations'] ?? [],
-        'year_data': countyYear['reservations'] ?? [],
+        'year_data':  countyYear['reservations']  ?? [],
       };
       _statsLoading = false;
     });
-    
-    // 🔍 DEBUG: Call debug method after loading data
     _debugStatisticsData();
-    
   } catch (e) {
     if (!mounted) return;
     setState(() => _statsLoading = false);

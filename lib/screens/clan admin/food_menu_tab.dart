@@ -1,8 +1,8 @@
 // lib/screens/clan_admin/food_tab.dart
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:wedding_reservation_app/services/api_service.dart';
+import 'package:wedding_reservation_app/services/connectivity_service.dart';
 import 'package:wedding_reservation_app/utils/colors.dart';
 
 class FoodTab extends StatefulWidget {
@@ -21,67 +21,72 @@ class FoodTabState extends State<FoodTab> {
   List<String> _foodTypes = [];
   List<int> _visitorOptions = [];
 
-  @override
-  void initState() {
-    super.initState();
+  // @override
+  // void initState() {
+  //   super.initState();
+  //   _checkConnectivityAndLoad();
+  // }
+
+  // void refreshData() {
+  //   _checkConnectivityAndLoad();
+  //   setState(() {});
+  // }
+  bool _hasLoadedOnce = false;
+
+@override
+void initState() {
+  super.initState();
+  // Do NOT load here — wait until tab is activated
+}
+
+void activateTab() {
+  if (!_hasLoadedOnce) {
+    _hasLoadedOnce = true;
     _checkConnectivityAndLoad();
   }
+}
 
-  void refreshData() {
-    _checkConnectivityAndLoad();
-    setState(() {});
-  }
+void refreshData() {
+  _checkConnectivityAndLoad();
+  setState(() {});
+}
+// In FoodTabState:
+Future<void> _checkConnectivityAndLoad() async {
+  setState(() => _isLoading = true);
 
-  Future<void> _checkConnectivityAndLoad() async {
-    setState(() => _isLoading = true);
-    await Future.delayed(Duration(seconds: 2));
-    final connectivityResult = await Connectivity().checkConnectivity();
-    
-    if (connectivityResult.contains(ConnectivityResult.none)) {
-      _showNoInternetDialog();
+  final isOnline = ConnectivityService().isOnline ||
+      await ConnectivityService().checkRealInternet();
+
+  if (!isOnline) {
+    if (mounted) {
       setState(() => _isLoading = false);
-      return;
+      _showOfflineBanner();
     }
-    
-    await _loadInitialData();
+    return;
   }
 
-  void _showNoInternetDialog() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        backgroundColor: isDark ? Colors.grey[900] : Colors.white,
-        title: Row(
-          children: [
-            Icon(Icons.wifi_off, color: Colors.orange),
-            SizedBox(width: 10),
-            Text('لا يوجد اتصال', style: TextStyle(color: isDark ? Colors.white : Colors.black)),
-          ],
-        ),
-        content: Text('يرجى التحقق من اتصالك بالإنترنت', style: TextStyle(color: isDark ? Colors.white70 : Colors.black87)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('إلغاء'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _checkConnectivityAndLoad();
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue.shade700,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            child: Text('إعادة المحاولة', style: TextStyle(color: Colors.white)),
-          ),
+  await _loadInitialData();
+}
+
+
+void _showOfflineBanner() {
+  if (!mounted) return;
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Row(
+        children: const [
+          Icon(Icons.wifi_off, color: Colors.white, size: 18),
+          SizedBox(width: 8),
+          Text('لا يوجد اتصال بالإنترنت'),
         ],
       ),
-    );
-  }
+      backgroundColor: Colors.red.shade700,
+      duration: const Duration(seconds: 3),
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+    ),
+  );
+}
 
   List<String> get _uniqueFoodTypes {
     final Set<String> foodTypes = {'الكل'};

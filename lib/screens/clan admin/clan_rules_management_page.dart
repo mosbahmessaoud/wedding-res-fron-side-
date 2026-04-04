@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -9,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:wedding_reservation_app/services/connectivity_service.dart';
 
 import '../../providers/theme_provider.dart';
 import '../../services/api_service.dart';
@@ -39,68 +39,69 @@ class ClanRulesPageState extends State<ClanRulesPage> {
   File? _pendingPdfFile;
   String? _pendingPdfFileName;
   
-  @override
-  void initState() {
-    super.initState();
+  // @override
+  // void initState() {
+  //   super.initState();
+  //   _checkConnectivityAndLoad();
+  // }
+  
+  // void refreshData() {
+  //   _checkConnectivityAndLoad();
+  //   setState(() {});
+  // }
+  bool _hasLoadedOnce = false;
+
+@override
+void initState() {
+  super.initState();
+  // Do NOT load here — wait until tab is activated
+}
+
+void activateTab() {
+  if (!_hasLoadedOnce) {
+    _hasLoadedOnce = true;
     _checkConnectivityAndLoad();
   }
-  
-  void refreshData() {
-    _checkConnectivityAndLoad();
-    setState(() {});
-  }
-Future<void> _checkConnectivityAndLoad() async {
-    setState(() {
-    _isLoading = true;
-  });
-  
-  // Show loading for 2 seconds
-  await Future.delayed(Duration(seconds: 2));
-  
-  final connectivityResult = await Connectivity().checkConnectivity();
-  
-  if (connectivityResult.contains(ConnectivityResult.none)) {
-    _showNoInternetDialog();
-    setState(() {
-      _isLoading = false;
-    });
+}
+
+void refreshData() {
+  _checkConnectivityAndLoad();
+  setState(() {});
+}
+
+  Future<void> _checkConnectivityAndLoad() async {
+  setState(() => _isLoading = true);
+
+  final isOnline = ConnectivityService().isOnline ||
+      await ConnectivityService().checkRealInternet();
+
+  if (!isOnline) {
+    if (mounted) {
+      setState(() => _isLoading = false);
+      _showOfflineBanner();
+    }
     return;
   }
-  
+
   await _loadData();
 }
 
-void _showNoInternetDialog() {
-  showDialog(
-    context: context,
-    barrierDismissible: false,
-    builder: (context) => AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: Row(
-        children: [
-          Icon(Icons.wifi_off, color: Colors.orange),
-          SizedBox(width: 10),
-          Text('لا يوجد اتصال'),
+
+void _showOfflineBanner() {
+  if (!mounted) return;
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Row(
+        children: const [
+          Icon(Icons.wifi_off, color: Colors.white, size: 18),
+          SizedBox(width: 8),
+          Text('لا يوجد اتصال بالإنترنت'),
         ],
       ),
-      content: Text('يرجى التحقق من اتصالك بالإنترنت'),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text('إلغاء'),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            Navigator.pop(context);
-            _checkConnectivityAndLoad();
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-          child: Text('إعادة المحاولة', style: TextStyle(color: Colors.white)),
-        ),
-      ],
+      backgroundColor: Colors.red.shade700,
+      duration: const Duration(seconds: 3),
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
     ),
   );
 }

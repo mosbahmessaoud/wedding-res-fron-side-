@@ -1,9 +1,9 @@
 // lib/screens/home/tabs/halls_tab.dart
 import 'dart:convert';
 
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:wedding_reservation_app/services/connectivity_service.dart';
 
 import '../../../services/api_service.dart';
 import '../../../utils/colors.dart';
@@ -24,73 +24,70 @@ class HallsTabState extends State<HallsTab> {
   String errorMessage = '';
   String searchQuery = '';
 
+  // @override
+  // void initState() {
+  //   super.initState();
+  //   _checkConnectivityAndLoad();
+  // }
+  bool _hasLoadedOnce = false;
+
   @override
   void initState() {
     super.initState();
-    _checkConnectivityAndLoad();
+    // Do NOT load here — wait until tab is activated
   }
- void refreshData() {
 
+
+void activateTab() {
+  if (!_hasLoadedOnce) {
+    _hasLoadedOnce = true;
     _checkConnectivityAndLoad();
-    setState(() {
-      
-    });
   }
+}
+
+// Keep refreshData for manual refresh (pull-to-refresh, etc.)
+void refreshData() {
+  _checkConnectivityAndLoad();
+}
+
 // Add this method in HallsTabState class
-
 Future<void> _checkConnectivityAndLoad() async {
-  setState(() {
-    isLoading = true;
-  });
-  
-  // Show loading for 2 seconds
-  await Future.delayed(Duration(seconds: 2));
-  final connectivityResult = await Connectivity().checkConnectivity();
-  
-  if (connectivityResult.contains(ConnectivityResult.none)) {
-    _showNoInternetDialog();
-    setState(() {
-      isLoading = false;
-    });
+  setState(() => isLoading = true);
+
+  final isOnline = ConnectivityService().isOnline ||
+      await ConnectivityService().checkRealInternet();
+
+  if (!isOnline) {
+    if (mounted) {
+      setState(() => isLoading = false);
+      _showOfflineBanner();
+    }
     return;
   }
-  
+
   try {
     await _loadInitialData();
   } catch (e) {
-    setState(() {
-      errorMessage = e.toString();
-      isLoading = false;
-    });
+    if (mounted) setState(() { errorMessage = e.toString(); isLoading = false; });
   }
 }
-void _showNoInternetDialog() {
-  showDialog(
-    context: context,
-    barrierDismissible: false,
-    builder: (context) => AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: Row(
-        children: [
-          Icon(Icons.wifi_off, color: Colors.orange),
-          SizedBox(width: 10),
-          Text('لا يوجد اتصال'),
+
+
+void _showOfflineBanner() {
+  if (!mounted) return;
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Row(
+        children: const [
+          Icon(Icons.wifi_off, color: Colors.white, size: 18),
+          SizedBox(width: 8),
+          Text('لا يوجد اتصال بالإنترنت'),
         ],
       ),
-      content: Text('يرجى التحقق من اتصالك بالإنترنت'),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text('إلغاء'),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            Navigator.pop(context);
-            _checkConnectivityAndLoad();
-          },
-          child: Text('إعادة المحاولة'),
-        ),
-      ],
+      backgroundColor: Colors.red.shade700,
+      duration: const Duration(seconds: 3),
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
     ),
   );
 }
@@ -212,6 +209,7 @@ Future<void> _loadInitialData() async {
                 borderRadius: BorderRadius.circular(10),
               ),
             ),
+
             child: Text(
               'حذف',
               style: TextStyle(color: Colors.white),

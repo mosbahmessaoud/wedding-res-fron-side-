@@ -24,7 +24,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workmanager/workmanager.dart';
 
 import 'api_service.dart';
-import 'token_manager.dart';
 
 // ──────────────────────────────────────────────────────────────
 // WorkManager background entry-point — Android only, top-level

@@ -18,8 +18,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'notification_service.dart';
 import 'api_service.dart';
+import 'notification_service.dart';
 
 // ──────────────────────────────────────────────────────────────
 // Top-level callback — required by flutter_foreground_task
@@ -189,8 +189,8 @@ class WeddingForegroundNotificationService {
     try {
       final ServiceRequestResult result = await FlutterForegroundTask.startService(
         serviceId: 512,
-        notificationTitle: 'نظام حجز الأعراس',
-        notificationText: 'جاري مراقبة الإشعارات...',
+        notificationTitle: 'أسُولي - ASULI',
+        notificationText: 'نظام حجز الأعراس...',
         callback: startCallback,
       );
 

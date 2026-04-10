@@ -8,11 +8,9 @@ import 'package:wedding_reservation_app/screens/auth/welcome_screen.dart';
 import 'package:wedding_reservation_app/screens/clan%20admin/home_screen.dart';
 import 'package:wedding_reservation_app/screens/groom/groom_home_screen.dart';
 import 'package:wedding_reservation_app/screens/super%20admin/home_screen.dart';
-import 'package:wedding_reservation_app/services/notification_manager.dart';
-import 'package:wedding_reservation_app/services/token_manager.dart';
-
-import 'package:wedding_reservation_app/services/notification_service.dart';
 import 'package:wedding_reservation_app/services/foreground_notification_service.dart';
+import 'package:wedding_reservation_app/services/notification_service.dart';
+import 'package:wedding_reservation_app/services/token_manager.dart';
 
 import '../../services/api_service.dart';
 import '../../widgets/common/custom_text_field.dart';
@@ -299,7 +297,7 @@ Future<void> _login() async {
   } catch (e) {
     if (!mounted) return;
     setState(() => _isLoading = false);
-    _showSnack('خطأ في تسجيل الدخول، تحقق من الإنترنت.', true);
+    _showSnack('خطأ في تسجيل الدخول، تحقق من المعلومات و الإنترنت.', true);
   }
 }
 

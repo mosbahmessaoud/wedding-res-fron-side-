@@ -798,38 +798,42 @@ Future<void> _submitReservation() async {
     // NEW: Check if clan admin exists and is active
     if (_userProfile!['clan_id'] != null) {
       try {
-        final clanAdminStatus = await ApiService.checkClanAdminStatus();
+        final clanAdminStatus = await ApiService.checkClanAdminStatus(_selectedClan!['id']);
         
-//  && !_isOriginClan
+        // if his origin clan not the clan id == 01 , check if hi reserv on the clan id 01
+
         
         if (clanAdminStatus['has_admin']==false || clanAdminStatus['is_active']==false ) {
-            if (clanAdminStatus['has_admin']==false) {
-            if (mounted) {
-                _showMessageDialog(
-                  title: 'عشيرتك ليست في النضام حالياً',
-                  // message:  'يرجى التواصل مع إدارة عشيرتك.',
-                  message: 'عذراً،  ${clanAdminStatus['clan_name']} ليست في النضام حالياً.\n\n'
-                          'يرجى التواصل مع إدارة عشيرتك لمزيد من التفاصيل.',
-                  // message: 'عذراً،  ${clanAdminStatus['clan_name']} غير مشتركة حالياً في التطبيق.\n\n'
-                  //         'يرجى التواصل مع إدارة عشيرتك للانضمام إلى النظام.',
-                  icon: Icons.business_center_outlined,
-                  titleColor: Colors.orange,
-                  isError: true,
-                );
-              }
-          } else if (clanAdminStatus['is_active']==false) {
-            if (mounted) {
-                _showMessageDialog(
-                  title: 'التسجيلات متوقفة مؤقتا ',
-                  message: 'التسجيلات متوقفة مؤقتا في ${clanAdminStatus['clan_name']} سيتم فتحها في أقرب وقت.',
 
-                  icon: Icons.business_center_outlined,
-                  titleColor: Colors.orange,
-                  isError: true,
-                );
-              }
-          } 
-          
+            if(clanAdminStatus['allowed'] == false){
+
+              if (clanAdminStatus['has_admin']==false) {
+              if (mounted) {
+                  _showMessageDialog(
+                    title: 'عشيرتك ليست في النضام حالياً',
+                    // message:  'يرجى التواصل مع إدارة عشيرتك.',
+                    message: 'عذراً،  ${clanAdminStatus['clan_name']} ليست في النضام حالياً.\n\n'
+                            'يرجى التواصل مع إدارة عشيرتك لمزيد من التفاصيل.',
+                    // message: 'عذراً،  ${clanAdminStatus['clan_name']} غير مشتركة حالياً في التطبيق.\n\n'
+                    //         'يرجى التواصل مع إدارة عشيرتك للانضمام إلى النظام.',
+                    icon: Icons.business_center_outlined,
+                    titleColor: Colors.orange,
+                    isError: true,
+                  );
+                }
+            } else if (clanAdminStatus['is_active']==false) {
+              if (mounted) {
+                  _showMessageDialog(
+                    title: 'التسجيلات متوقفة مؤقتا ',
+                    message: 'التسجيلات متوقفة مؤقتا في ${clanAdminStatus['clan_name']} سيتم فتحها في أقرب وقت.',
+
+                    icon: Icons.business_center_outlined,
+                    titleColor: Colors.orange,
+                    isError: true,
+                  );
+                }
+            } 
+          }
           return;
 
         }
@@ -2116,7 +2120,7 @@ Widget _buildIsNormal() {
       return const SizedBox.shrink();
     }
   return FutureBuilder<Map<String, dynamic>>(
-    future: ApiService.checkClanAdminStatusById(_selectedClan!['id']),
+    future: ApiService.checkClanAdminStatus(_selectedClan!['id']),
     builder: (context, snapshot) {
       if (snapshot.connectionState == ConnectionState.waiting) {
         return const Center(

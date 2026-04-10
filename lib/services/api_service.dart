@@ -760,7 +760,7 @@ static Future<Map<String, dynamic>> checkClanAdminStatusById(int clan_id) async 
   try {
     
     final response = await _client.get(
-      Uri.parse('$baseUrl/clan-admin/admin-status/$clan_id'),
+      Uri.parse('$baseUrl/clan-admin/admin-status-by-id/$clan_id'),
       headers: await _headers,
     ).timeout(_timeout);
 
@@ -786,12 +786,13 @@ static Future<Map<String, dynamic>> checkClanAdminStatusById(int clan_id) async 
   }
 }
 
+
   // Check clan admin status
-static Future<Map<String, dynamic>> checkClanAdminStatus() async {
+static Future<Map<String, dynamic>> checkClanAdminStatus(int selected_clan) async {
   try {
     
     final response = await _client.get(
-      Uri.parse('$baseUrl/clan-admin/admin-status'),
+      Uri.parse('$baseUrl/clan-admin/admin-status/$selected_clan'),
       headers: await _headers,
     ).timeout(_timeout);
 
@@ -801,6 +802,7 @@ static Future<Map<String, dynamic>> checkClanAdminStatus() async {
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
       return {
+        'allowed' : data['allowed'],
         'has_admin': data['has_admin'] ,
         'is_active': data['is_active'] ,
         'admin_name': data['admin_name'],
@@ -816,25 +818,25 @@ static Future<Map<String, dynamic>> checkClanAdminStatus() async {
     throw Exception('خطأ في التحقق من حالة مدير العشيرة: $e');
   }
 }
-static Future<bool> clanHasActiveAdmin() async {
-  try {
-    final status = await checkClanAdminStatus();
-    return status['has_admin'] == true && status['is_active'] == true;
-  } catch (e) {
-    print('Error checking if clan has active admin: $e');
-    return false;
-  }
-}
+// static Future<bool> clanHasActiveAdmin() async {
+//   try {
+//     final status = await checkClanAdminStatus();
+//     return status['has_admin'] == true && status['is_active'] == true;
+//   } catch (e) {
+//     print('Error checking if clan has active admin: $e');
+//     return false;
+//   }
+// }
 
-/// Get clan admin status with fallback (returns null on error)
-static Future<Map<String, dynamic>?> getClanAdminStatusSafe() async {
-  try {
-    return await checkClanAdminStatus();
-  } catch (e) {
-    print('Error getting clan admin status (safe): $e');
-    return null;
-  }
-}
+// /// Get clan admin status with fallback (returns null on error)
+// static Future<Map<String, dynamic>?> getClanAdminStatusSafe() async {
+//   try {
+//     return await checkClanAdminStatus();
+//   } catch (e) {
+//     print('Error getting clan admin status (safe): $e');
+//     return null;
+//   }
+// }
 
 /// Get user-friendly error message based on clan admin status
 static String getClanAdminStatusMessage(Map<String, dynamic> status, String clanName) {

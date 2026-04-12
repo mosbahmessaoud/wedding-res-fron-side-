@@ -756,7 +756,7 @@ void _refreshCurrentTab(int index) {
                         SpecialReservationsTab(key: _reserv_special),
                         NotificationsTab(key: _notificationsTabKey), // Added
                         // GroomAccessPasswordPage(key: _groomPasswordTabKey), // ← NEW LINE
-                        ClanAdminStatisticsPage(key: _statisticsTabKey), // ← NEW LINE
+                        ClanAdminStatisticsPage(key: _statisticsTabKey),
 
                         _buildProfileTab(isDark),
                       ],
@@ -936,8 +936,8 @@ void _refreshCurrentTab(int index) {
                       _buildRightNavItem(Icons.rule_outlined, 'اللوازم ', 7, isDark),
                       _buildRightNavItem(Icons.star_border_outlined, 'الحجوزات الخاصة', 8, isDark),
                       _buildRightNavItem(Icons.notifications_outlined, 'الإشعارات', 9, isDark), // Added
-                      _buildRightNavItem(Icons.lock_outline, 'كلمة مرور الوصول', 10, isDark),
-                      _buildRightNavItem(Icons.bar_chart_outlined, 'الإحصائيات', 11, isDark), // ← NEW LINE
+                      // _buildRightNavItem(Icons.lock_outline, 'كلمة مرور الوصول', 10, isDark),
+                      _buildRightNavItem(Icons.bar_chart_outlined, 'الإحصائيات', 10, isDark), // ← NEW LINE
                       // _buildRightNavItem(Icons.person_outline, 'الملف الشخصي', 10, isDark), // Changed from 9 to 10                  
                     ],
                   ),

@@ -216,14 +216,18 @@ Future<Map<String, List<Map<String, dynamic>>>> _fetchData() async {
           'القاعة': r['hall_name'] ?? '',
           'الهيئة': r['haia_committee_name'] ?? '',
           'لجنة المداح': r['madaeh_committee_name'] ?? '',
-          'الدفع': r['payment_valid'] == true ? 'مدفوع' : 'غير مدفوع',
+          'الدفع': r['payment_valid']  ?? '', // the payment_valid is one of these "paid" , "not_paid" , "partially_paid"
+          'المبلغ المدفوع': r['payment'] != null ? '${r['payment']} دج' : '—',
+
           'انتماء العريس': r['belongs_to_clan'] ?? '',
           'نوع الحجز': r['reserved_incide'] ?? '',
           'صلاحية الوثيقة': formatDaysRemain(r['days_remain']),
           if (_reservationStatusFilter == 'all') 'حالة الحجز': r['status'] ?? '',
+          '__raw_payment': r['payment_valid']?.toString() ?? '',
           '__raw_reserved_incide': r['reserved_incide'] ?? '',
           '__raw_status': r['status'] ?? '',
           '__raw_days_remain': r['days_remain']?.toString() ?? '',
+          '__raw_hall': r['hall_name']?.toString() ?? '',
         };
 
         final belongs    = filtered.where((r) => r['belongs_to_clan'] == 'ينتمي إلى عشيرتنا').map(mapReservation).toList();
@@ -316,6 +320,53 @@ Future<Map<String, List<Map<String, dynamic>>>> _fetchData() async {
           currentRow++;
         }
 
+        // void writeRows(List<Map<String, dynamic>> data) {
+        //   for (final row in data) {
+        //     final rawRI   = row['__raw_reserved_incide']?.toString() ?? '';
+        //     final rawSt   = row['__raw_status']?.toString() ?? '';
+        //     final rawDays = row['__raw_days_remain']?.toString() ?? '';
+        //     final daysInt = int.tryParse(rawDays);
+        //     for (var c = 0; c < headers.length; c++) {
+        //       final col  = headers[c];
+        //       final cell = sheet.cell(excel_lib.CellIndex.indexByColumnRow(columnIndex: c, rowIndex: currentRow));
+        //       if (col == 'نوع الحجز' && rawRI == 'الحجز في خارج العشيرة') {
+        //         cell.value = excel_lib.TextCellValue(row[col]?.toString() ?? '');
+        //         cell.cellStyle = excel_lib.CellStyle(backgroundColorHex: excel_lib.ExcelColor.fromHexString('#C62828'),
+        //             fontColorHex: excel_lib.ExcelColor.white, bold: true);
+        //       } else if (col == 'حالة الحجز') {
+        //         final ok = rawSt == 'validated' || rawSt == 'confirmed';
+        //         cell.value = excel_lib.TextCellValue(ok ? 'مؤكد ✅' : 'معلق ⏳');
+        //         cell.cellStyle = excel_lib.CellStyle(
+        //             backgroundColorHex: excel_lib.ExcelColor.fromHexString(ok ? '#388E3C' : '#F57C00'),
+        //             fontColorHex: excel_lib.ExcelColor.white, bold: true);
+        //       } else if (col == 'صلاحية الوثيقة') {
+        //         cell.value = excel_lib.TextCellValue(row[col]?.toString() ?? '—');
+        //         if (daysInt != null) {
+        //           final hex = daysInt < 0 ? '#B71C1C' : daysInt == 0 ? '#E65100' : daysInt <= 3 ? '#F9A825' : '#2E7D32';
+        //           cell.cellStyle = excel_lib.CellStyle(backgroundColorHex: excel_lib.ExcelColor.fromHexString(hex),
+        //               fontColorHex: excel_lib.ExcelColor.white, bold: daysInt <= 3);
+        //         }
+        //       } else if (col == 'الدفع') {
+        //         final raw = row['__raw_payment']?.toString() ?? '';
+        //         final (label, hex) = switch (raw) {
+        //           'paid'            => ('مدفوع ✅',        '#2E7D32'),
+        //           'not_paid'        => ('غير مدفوع ❌',    '#B71C1C'),
+        //           'partially_paid'  => ('مدفوع جزئياً ⚠️', '#E65100'),
+        //           _                 => (raw, '#607D8B'),
+        //         };
+        //         cell.value = excel_lib.TextCellValue(label);
+        //         cell.cellStyle = excel_lib.CellStyle(
+        //           backgroundColorHex: excel_lib.ExcelColor.fromHexString(hex),
+        //           fontColorHex: excel_lib.ExcelColor.white,
+        //           bold: true,
+        //         ); 
+        //         } else {
+        //         cell.value = excel_lib.TextCellValue(row[col]?.toString() ?? '');
+        //       }
+        //     }
+        //     currentRow++;
+        //   }
+        // }
         void writeRows(List<Map<String, dynamic>> data) {
           for (final row in data) {
             final rawRI   = row['__raw_reserved_incide']?.toString() ?? '';
@@ -325,24 +376,91 @@ Future<Map<String, List<Map<String, dynamic>>>> _fetchData() async {
             for (var c = 0; c < headers.length; c++) {
               final col  = headers[c];
               final cell = sheet.cell(excel_lib.CellIndex.indexByColumnRow(columnIndex: c, rowIndex: currentRow));
-              if (col == 'نوع الحجز' && rawRI == 'الحجز في خارج العشيرة') {
-                cell.value = excel_lib.TextCellValue(row[col]?.toString() ?? '');
-                cell.cellStyle = excel_lib.CellStyle(backgroundColorHex: excel_lib.ExcelColor.fromHexString('#C62828'),
-                    fontColorHex: excel_lib.ExcelColor.white, bold: true);
-              } else if (col == 'حالة الحجز') {
+
+              if (col == 'نوع الحجز') {
+  final (label, hex) = switch (rawRI) {
+    'الحجز في داخل العشيرة' => ('الحجز في داخل العشيرة', ''),
+    'الحجز في خارج العشيرة' => ('الحجز في خارج العشيرة', '#C62828'),
+    _                       => (rawRI.isEmpty ? '—' : rawRI, '#455A64'),
+  };
+  cell.value = excel_lib.TextCellValue(label);
+  if (hex.isNotEmpty) {
+    cell.cellStyle = excel_lib.CellStyle(
+      backgroundColorHex: excel_lib.ExcelColor.fromHexString(hex),
+      fontColorHex: excel_lib.ExcelColor.white,
+      bold: true,
+    );
+  }
+
+} else if (col == 'القاعة') {
+  final raw = row['__raw_hall']?.toString() ?? '';
+  final rawReserved = row['__raw_reserved_incide']?.toString() ?? '';
+  final (label, hex) = raw.isEmpty
+      ? ('—', '#455A64')
+      : rawReserved == 'الحجز في خارج العشيرة'
+          ? (raw, '#C62828')
+          : (raw, '');
+  cell.value = excel_lib.TextCellValue(label);
+  if (hex.isNotEmpty) {
+    cell.cellStyle = excel_lib.CellStyle(
+      backgroundColorHex: excel_lib.ExcelColor.fromHexString(hex),
+      fontColorHex: excel_lib.ExcelColor.white,
+      bold: true,
+    );
+  }} else if (col == 'حالة الحجز') {
                 final ok = rawSt == 'validated' || rawSt == 'confirmed';
-                cell.value = excel_lib.TextCellValue(ok ? 'مؤكد ✅' : 'معلق ⏳');
+                cell.value = excel_lib.TextCellValue(ok ? 'مؤكد ✅' : 'معلق ');
                 cell.cellStyle = excel_lib.CellStyle(
-                    backgroundColorHex: excel_lib.ExcelColor.fromHexString(ok ? '#388E3C' : '#F57C00'),
-                    fontColorHex: excel_lib.ExcelColor.white, bold: true);
+                  backgroundColorHex: excel_lib.ExcelColor.fromHexString(ok ? '#388E3C' : '#F57C00'),
+                  fontColorHex: excel_lib.ExcelColor.white,
+                  bold: true,
+                );
+
               } else if (col == 'صلاحية الوثيقة') {
                 cell.value = excel_lib.TextCellValue(row[col]?.toString() ?? '—');
                 if (daysInt != null) {
                   final hex = daysInt < 0 ? '#B71C1C' : daysInt == 0 ? '#E65100' : daysInt <= 3 ? '#F9A825' : '#2E7D32';
-                  cell.cellStyle = excel_lib.CellStyle(backgroundColorHex: excel_lib.ExcelColor.fromHexString(hex),
-                      fontColorHex: excel_lib.ExcelColor.white, bold: daysInt <= 3);
+                  cell.cellStyle = excel_lib.CellStyle(
+                    backgroundColorHex: excel_lib.ExcelColor.fromHexString(hex),
+                    fontColorHex: excel_lib.ExcelColor.white,
+                    bold: daysInt <= 3,
+                  );
                 }
-              } else {
+
+              } else if (col == 'الدفع') {
+                final raw = row['__raw_payment']?.toString() ?? '';
+                final (label, hex) = switch (raw) {
+                  'paid'           => ('مدفوع ✅',         '#2E7D32'),
+                  'not_paid'       => ('غير مدفوع ',     ''),
+                  'partially_paid' => ('مدفوع جزئياً ',  '#E65100'),
+                  _                => (raw.isEmpty ? '—' : raw, ''),
+                };
+                cell.value = excel_lib.TextCellValue(label);
+                if (hex.isNotEmpty) {
+                  cell.cellStyle = excel_lib.CellStyle(
+                    backgroundColorHex: excel_lib.ExcelColor.fromHexString(hex),
+                    fontColorHex: excel_lib.ExcelColor.white,
+                    bold: true,
+                  );
+                }
+                
+
+              } else if (col == 'المبلغ المدفوع') {
+                final rawPayment = row['__raw_payment']?.toString() ?? '';
+                final amount = row[col]?.toString() ?? '—';
+                final hex = switch (rawPayment) {
+                  'paid'           => '#2E7D32',
+                  'not_paid'       => '#B71C1C',
+                  'partially_paid' => '#E65100',
+                  _                => '#607D8B',
+                };
+                cell.value = excel_lib.TextCellValue(amount);
+                cell.cellStyle = excel_lib.CellStyle(
+                  backgroundColorHex: excel_lib.ExcelColor.fromHexString(hex),
+                  fontColorHex: excel_lib.ExcelColor.white,
+                  bold: true,
+                );
+                } else {
                 cell.value = excel_lib.TextCellValue(row[col]?.toString() ?? '');
               }
             }

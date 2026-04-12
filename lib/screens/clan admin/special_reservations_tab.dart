@@ -1425,6 +1425,7 @@ void _showOfflineBanner() {
     );
   }
 
+
   void _showErrorDialog(String message) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final screenSize = MediaQuery.of(context).size;

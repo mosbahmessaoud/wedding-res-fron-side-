@@ -818,6 +818,50 @@ static Future<Map<String, dynamic>> checkClanAdminStatus(int selected_clan) asyn
     throw Exception('خطأ في التحقق من حالة مدير العشيرة: $e');
   }
 }
+
+// get conected clans 
+Future<List<String>> getConnectedClans() async {
+  
+  final response = await http.get(
+    Uri.parse('$baseUrl/clan-admin/connected-clans'),
+    headers: await _headers,
+
+  );
+
+  if (response.statusCode == 200) {
+    final List<dynamic> data = jsonDecode(response.body);
+    return data.cast<String>();
+  } else {
+    throw Exception('Failed to load connected clans: ${response.statusCode}');
+  }
+}
+
+
+
+static Future<Map<String, dynamic>> revertToPending(int reservationId) async {
+  try {
+    final response = await _client.post(
+      Uri.parse('$baseUrl/clan-admin/valid-to-pending/$reservationId'),
+      headers: await _headers,
+    ).timeout(_timeout);
+
+    print('Revert to pending response: ${response.statusCode}');
+    print('Revert to pending body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['detail'] ?? 'فشل في تحديث حالة الحجز');
+    }
+  } catch (e) {
+    print('Error reverting reservation to pending: $e');
+    throw Exception('خطأ في تحديث حالة الحجز: $e');
+  }
+}
+
+
+
 // static Future<bool> clanHasActiveAdmin() async {
 //   try {
 //     final status = await checkClanAdminStatus();
@@ -2234,7 +2278,7 @@ static Future<Map<String, dynamic>> updateReservationDate(int reservationId, Dat
   static Future<void> deleteReservation(int reservationId) async {
     try {
       final response = await _client.delete(
-        Uri.parse('$baseUrl/delete_res/$reservationId'),
+        Uri.parse('$baseUrl/reservations/delete_res/$reservationId'),
         headers: await _headers,
       );
 

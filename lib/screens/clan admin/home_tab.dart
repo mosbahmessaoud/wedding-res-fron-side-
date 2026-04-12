@@ -171,21 +171,24 @@ Future<void> _loadCalendarData() async {
     final specialReservations     = results[2] as List<ReservationSpecial>;
     final validatedNotBelong      = results[3] as List<dynamic>;
     final pendingNotBelong        = results[4] as List<dynamic>;
-
-    Map<String, dynamic> enrichReservation(dynamic reservation, bool notBelong) {
-      final enriched = Map<String, dynamic>.from(reservation);
-      enriched['reservation_clan_id'] = reservation['clan_id'];
-      enriched['not_belong_to_clan'] = notBelong;
-      if (reservation['groom'] != null) {
-        enriched['first_name']     = reservation['groom']['first_name'];
-        enriched['last_name']      = reservation['groom']['last_name'];
-        enriched['father_name']    = reservation['groom']['father_name'];
-        enriched['phone_number']   = reservation['groom']['phone_number'];
-        enriched['guardian_name']  = reservation['groom']['guardian_name'];
-        enriched['guardian_phone'] = reservation['groom']['guardian_phone'];
-      }
-      return enriched;
-    }
+// In _loadCalendarData, replace enrichReservation:
+Map<String, dynamic> enrichReservation(dynamic reservation, bool notBelong) {
+  final enriched = Map<String, dynamic>.from(reservation);
+  enriched['reservation_clan_id'] = reservation['clan_id'];
+  enriched['not_belong_to_clan'] = notBelong;
+  if (reservation['groom'] != null) {
+    final groom = reservation['groom'];
+    enriched['first_name']      = groom['first_name'];
+    enriched['last_name']       = groom['last_name'];
+    enriched['father_name']     = groom['father_name'];
+    enriched['phone_number']    = groom['phone_number'];
+    enriched['guardian_name']   = groom['guardian_name'];
+    enriched['guardian_phone']  = groom['guardian_phone'];
+    enriched['groom_clan_id']   = groom['clan_id'];
+    enriched['groom_clan_name'] = groom['clan_name']; // NEW - direct from backend
+  }
+  return enriched;
+}
 
     Map<String, List<Map<String, dynamic>>> validatedByDate = {};
     Map<String, List<Map<String, dynamic>>> pendingByDate   = {};
@@ -1293,11 +1296,11 @@ Widget _buildQuickActions(BuildContext context) {
     (Icons.rule_outlined, 'اللوازم ', ' لوازم العريس ', Color(0xFF00BCD4), 7),
     (Icons.star_border_outlined, 'الحجوزات الخاصة', ' حجز أيام خاصة بالعشيرة', Color(0xFFF57C00), 8),
     // (Icons.lock_outline, '  كلمة المرور للوصول ', ' انشاء كلمة المرور للوصول الى الصفحات الخاصة', Color.fromARGB(255, 0, 245, 53), 10),
-    (Icons.stacked_bar_chart, '  الإحصائيات ', ' تنزيل الإحصائيات على الجهاز', Color.fromARGB(255, 0, 159, 245), 11),
+    (Icons.stacked_bar_chart, '  الإحصائيات ', ' تنزيل الإحصائيات على الجهاز', Color.fromARGB(255, 0, 159, 245), 10),
     (Icons.warning_amber_rounded, 'حجوزات قريبة الانتهاء', 'عرض الحجوزات قريبة الانتهاء', Color(0xFFD32F2F), -3),
     // NEW ACTIONS - Add these two new items
     (Icons.person_add_alt_outlined, 'تسجيل عريس يدوي', ' إضافة عريس جديد ي  دوياً', Color(0xFF00897B), -1), // -1 for manual navigation
-    (Icons.upload_file_outlined, 'تحميل عرسان جماعي', ' رفع ملف Excel للعرسان', Color(0xFF7B1FA2), -2), // -2 for manual navigation
+    // (Icons.upload_file_outlined, 'تحميل عرسان جماعي', ' رفع ملف Excel للعرسان', Color(0xFF7B1FA2), -2), // -2 for manual navigation
   ];
 
   return Column(
@@ -3276,21 +3279,19 @@ Widget _buildReservationCard(Map<String, dynamic> res, DateAvailability availabi
   final guardianName = res['guardian_name'] ?? '';
   final groomPhone = res['phone_number'] ?? '';
   final guardianPhone = res['guardian_phone'] ?? '';
-  final reservationClanId = res['reservation_clan_id'];
   final bool notBelongToClan = res['not_belong_to_clan'] == true;
+  // Read clan name directly — no async call needed
+  final String groomClanName = res['groom_clan_name'] ?? 'غير محدد';
+  final bool hasClanInfo = res['groom_clan_id'] != null;
 
   return Container(
     margin: EdgeInsets.only(bottom: 12),
     padding: EdgeInsets.all(16),
     decoration: BoxDecoration(
-      color: notBelongToClan
-          ? Colors.purple.shade50
-          : Colors.grey.shade100,
+      color: notBelongToClan ? Colors.purple.shade50 : Colors.grey.shade100,
       borderRadius: BorderRadius.circular(12),
       border: Border.all(
-        color: notBelongToClan
-            ? Colors.purple.shade300
-            : Colors.grey.shade300,
+        color: notBelongToClan ? Colors.purple.shade300 : Colors.grey.shade300,
         width: notBelongToClan ? 1.5 : 1,
       ),
     ),
@@ -3381,65 +3382,53 @@ Widget _buildReservationCard(Map<String, dynamic> res, DateAvailability availabi
           ],
         ),
 
-        // Clan info
-        if (reservationClanId != null) ...[
+        // Clan info — always shown, reads directly from groom's User.clan
+        if (hasClanInfo) ...[
           Divider(height: 24, color: Colors.grey.shade300),
-          FutureBuilder<Map<String, dynamic>?>(
-            future: _getClanInfo(reservationClanId),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return Row(
+          Row(
+            children: [
+              Container(
+                padding: EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: (notBelongToClan ? Colors.purple : AppColors.primary).withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.groups,
+                  size: 20,
+                  color: notBelongToClan ? Colors.purple : AppColors.primary,
+                ),
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    SizedBox(
-                      width: 16, height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.purple),
+                    Text(
+                      notBelongToClan ? 'عشيرة العريس (خارجية)' : 'عشيرة العريس',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: notBelongToClan
+                            ? Colors.purple.shade600
+                            : Colors.grey.shade600,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
-                    SizedBox(width: 12),
-                    Text('جاري تحميل معلومات العشيرة...', style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+                    SizedBox(height: 2),
+                    Text(
+                      groomClanName,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: notBelongToClan
+                            ? Colors.purple.shade800
+                            : Colors.black87,
+                      ),
+                    ),
                   ],
-                );
-              }
-              if (snapshot.hasError || !snapshot.hasData) return SizedBox.shrink();
-
-              final clanInfo = snapshot.data!;
-              return Row(
-                children: [
-                  Container(
-                    padding: EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.purple.withOpacity(0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(Icons.groups, size: 20, color: Colors.purple),
-                  ),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          notBelongToClan ? 'عشيرة العريس (خارجية)' : 'العشيرة',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: notBelongToClan ? Colors.purple.shade600 : Colors.grey.shade600,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        SizedBox(height: 2),
-                        Text(
-                          clanInfo['clan_name'] ?? 'غير محدد',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            color: notBelongToClan ? Colors.purple.shade800 : Colors.black87,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              );
-            },
+                ),
+              ),
+            ],
           ),
         ],
 
@@ -3450,7 +3439,10 @@ Widget _buildReservationCard(Map<String, dynamic> res, DateAvailability availabi
             children: [
               Container(
                 padding: EdgeInsets.all(8),
-                decoration: BoxDecoration(color: Colors.blue.withOpacity(0.1), shape: BoxShape.circle),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
                 child: Icon(Icons.supervisor_account, size: 20, color: Colors.blue),
               ),
               SizedBox(width: 12),
@@ -3458,17 +3450,34 @@ Widget _buildReservationCard(Map<String, dynamic> res, DateAvailability availabi
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('ولي الأمر', style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontWeight: FontWeight.w500)),
+                    Text(
+                      'ولي الأمر',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey.shade600,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                     SizedBox(height: 2),
                     if (guardianName.isNotEmpty)
-                      Text(guardianName, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.black87)),
+                      Text(
+                        guardianName,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black87,
+                        ),
+                      ),
                     if (guardianPhone.isNotEmpty) ...[
                       SizedBox(height: 4),
                       Row(
                         children: [
                           Icon(Icons.phone, size: 12, color: Colors.grey.shade600),
                           SizedBox(width: 4),
-                          Text(guardianPhone, style: TextStyle(fontSize: 13, color: Colors.grey.shade700)),
+                          Text(
+                            guardianPhone,
+                            style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+                          ),
                         ],
                       ),
                     ],
@@ -3498,17 +3507,25 @@ Widget _buildReservationCard(Map<String, dynamic> res, DateAvailability availabi
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                availability.validatedReservations.contains(res) ? Icons.check_circle : Icons.schedule,
+                availability.validatedReservations.contains(res)
+                    ? Icons.check_circle
+                    : Icons.schedule,
                 size: 14,
-                color: availability.validatedReservations.contains(res) ? Colors.green : Colors.orange,
+                color: availability.validatedReservations.contains(res)
+                    ? Colors.green
+                    : Colors.orange,
               ),
               SizedBox(width: 4),
               Text(
-                availability.validatedReservations.contains(res) ? 'مؤكد' : 'في الانتظار',
+                availability.validatedReservations.contains(res)
+                    ? 'مؤكد'
+                    : 'في الانتظار',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: availability.validatedReservations.contains(res) ? Colors.green : Colors.orange,
+                  color: availability.validatedReservations.contains(res)
+                      ? Colors.green
+                      : Colors.orange,
                 ),
               ),
             ],
@@ -3518,7 +3535,6 @@ Widget _buildReservationCard(Map<String, dynamic> res, DateAvailability availabi
     ),
   );
 }
-
 // // Add this helper method for special reservation info rows
 // Widget _buildSpecialReservationInfoRow({
 //   required IconData icon,

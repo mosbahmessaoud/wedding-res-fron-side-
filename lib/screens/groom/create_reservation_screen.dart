@@ -118,14 +118,79 @@ bool get _isOriginClan {
   }
   return _userProfile!['clan_id'] == _selectedClan!['id'];
 }
+
+// void _showMessageDialog({
+//   required String title,
+//   required String message,
+//   Color? titleColor,
+//   Color? backgroundColor,
+//   IconData? icon,
+//   bool isError = false, 
+
+// }) {
+//   showDialog(
+//     context: context,
+//     builder: (BuildContext context) {
+//       return AlertDialog(
+//         shape: RoundedRectangleBorder(
+//           borderRadius: BorderRadius.circular(12),
+//         ),
+//         title: Row(
+//           children: [
+//             if (icon != null) ...[
+//               Icon(
+//                 icon,
+//                 color: titleColor ?? (isError ? Colors.red : Colors.green),
+//                 size: 24,
+//               ),
+//               const SizedBox(width: 8),
+//             ],
+//             Expanded(
+//               child: Text(
+//                 title,
+//                 style: TextStyle(
+//                   color: titleColor ?? (isError ? Colors.red : Colors.green),
+//                   fontWeight: FontWeight.bold,
+//                   fontSize: 18,
+//                 ),
+//               ),
+//             ),
+//           ],
+//         ),
+//         content: SingleChildScrollView(
+
+//           child: Text(
+//             message,
+//             style:  TextStyle(
+//               fontSize: 16,
+//               height: 1.4,
+//               color: const Color.fromARGB(255, 64, 73, 78),
+//             ),
+//             textAlign: TextAlign.right,
+//           ),
+//         ),
+//         backgroundColor: backgroundColor ?? Colors.white,
+//         actions: [
+//           TextButton(
+//             onPressed: () => Navigator.of(context).pop(),
+//             style: TextButton.styleFrom(
+//               foregroundColor: titleColor ?? (isError ? Colors.red : Colors.green),
+//             ),
+//             child: const Text('حسناً'),
+//           ),
+//         ],
+//       );
+//     },
+//   );
+// }
 void _showMessageDialog({
   required String title,
   required String message,
   Color? titleColor,
   Color? backgroundColor,
   IconData? icon,
-  bool isError = false, 
-
+  bool isError = false,
+  String? highlightText, // ← only this added
 }) {
   showDialog(
     context: context,
@@ -157,16 +222,37 @@ void _showMessageDialog({
           ],
         ),
         content: SingleChildScrollView(
-
-          child: Text(
-            message,
-            style:  TextStyle(
-              fontSize: 16,
-              height: 1.4,
-              color: const Color.fromARGB(255, 64, 73, 78),
-            ),
-            textAlign: TextAlign.right,
-          ),
+          child: highlightText != null && message.contains(highlightText)
+              ? RichText(
+                  textAlign: TextAlign.right,
+                  text: TextSpan(
+                    style: const TextStyle(
+                      fontSize: 16,
+                      height: 1.4,
+                      color: Color.fromARGB(255, 64, 73, 78),
+                    ),
+                    children: [
+                      TextSpan(text: message.split(highlightText).first),
+                      TextSpan(
+                        text: highlightText,
+                        style: const TextStyle(
+                          color: Colors.red,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      TextSpan(text: message.split(highlightText).last),
+                    ],
+                  ),
+                )
+              : Text( // ← all other existing calls work exactly as before
+                  message,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    height: 1.4,
+                    color: Color.fromARGB(255, 64, 73, 78),
+                  ),
+                  textAlign: TextAlign.right,
+                ),
         ),
         backgroundColor: backgroundColor ?? Colors.white,
         actions: [
@@ -799,45 +885,48 @@ Future<void> _submitReservation() async {
     if (_userProfile!['clan_id'] != null) {
       try {
         final clanAdminStatus = await ApiService.checkClanAdminStatus(_selectedClan!['id']);
+        final apiService = ApiService();
+        final clan_names = await apiService.getConnectedClans();
         
         // if his origin clan not the clan id == 01 , check if hi reserv on the clan id 01
 
-        
-        if (clanAdminStatus['has_admin']==false || clanAdminStatus['is_active']==false ) {
+        if(clanAdminStatus['allowed'] == false){
+        if (clanAdminStatus['has_admin']==false ) {
 
-            if(clanAdminStatus['allowed'] == false){
-
-              if (clanAdminStatus['has_admin']==false) {
               if (mounted) {
                   _showMessageDialog(
                     title: 'عشيرتك ليست في النضام حالياً',
-                    // message:  'يرجى التواصل مع إدارة عشيرتك.',
-                    message: 'عذراً،  ${clanAdminStatus['clan_name']} ليست في النضام حالياً.\n\n'
-                            'يرجى التواصل مع إدارة عشيرتك لمزيد من التفاصيل.',
-                    // message: 'عذراً،  ${clanAdminStatus['clan_name']} غير مشتركة حالياً في التطبيق.\n\n'
-                    //         'يرجى التواصل مع إدارة عشيرتك للانضمام إلى النظام.',
-                    icon: Icons.business_center_outlined,
-                    titleColor: Colors.orange,
-                    isError: true,
-                  );
-                }
-            } else if (clanAdminStatus['is_active']==false) {
-              if (mounted) {
-                  _showMessageDialog(
-                    title: 'التسجيلات متوقفة مؤقتا ',
-                    message: 'التسجيلات متوقفة مؤقتا في ${clanAdminStatus['clan_name']} سيتم فتحها في أقرب وقت.',
+                    message: 'عذراً، ${clanAdminStatus['clan_name']} ليست في النضام حالياً.\n\n'
+                            'حاليا يمكنك الحجز فقط في العشائر المتعاقدة مع التطبيق وهي التالي:\n\n'
+                            '${clan_names.map((name) => '• $name').join('\n')}',
 
                     icon: Icons.business_center_outlined,
                     titleColor: Colors.orange,
                     isError: true,
                   );
                 }
-            } 
-          }
-          return;
+                return;
 
+            
         }
-        
+        }
+        if(clanAdminStatus['allowed'] == true && clanAdminStatus['has_admin']==true  ){
+           if(clanAdminStatus['is_active']==false){
+                if (mounted) {
+                        _showMessageDialog(
+                          title: 'التسجيلات متوقفة مؤقتا ',
+                          message: 'التسجيلات متوقفة مؤقتا في ${clanAdminStatus['clan_name']} سيتم فتحها في أقرب وقت.',
+
+                          icon: Icons.business_center_outlined,
+                          titleColor: Colors.orange,
+                          isError: true,
+                        );
+                      }
+                      return;
+
+           }
+                
+          }
 
       } catch (e) {
         print('Error checking clan admin status: $e');
@@ -886,30 +975,53 @@ Future<void> _submitReservation() async {
     response = await ApiService.createReservation(reservationData);
     print('Reservation created successfully: ${response['reservation_id']}');
 
-    if (mounted) {
-      // Navigate to GroomHomeScreen with reservations tab selected
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (context) => const GroomHomeScreen(initialTabIndex: 2),
-        ),
-      );
+    // if (mounted) {
+    //   // Navigate to GroomHomeScreen with reservations tab selected
+    //   Navigator.of(context).pushReplacement(
+    //     MaterialPageRoute(
+    //       builder: (context) => const GroomHomeScreen(initialTabIndex: 2),
+    //     ),
+    //   );
       
-      String daysMax = _getValidationDeadlineDays();
-      String successMessage = 
-        'تم إنشاء حجز جديد بنجاح!\n\n'
-        'يجب طباعة الحجز وختمه وتوقيعه خلال $daysMax يوم كأقصى حد، '
-        'وإلا سيتم إلغاء الحجز تلقائيًا.\n\n'
-        'يمكنك الآن الذهاب إلى قائمة الحجوزات لطباعة الحجز.';
+    //   String daysMax = _getValidationDeadlineDays();
+    //   String successMessage = 
+    //     'تم إنشاء حجز جديد بنجاح!\n\n'
+    //     'يجب طباعة الحجز وختمه وتوقيعه خلال $daysMax يوم كأقصى حد، '
+    //     'وإلا سيتم إلغاء الحجز تلقائيًا.\n\n'
+    //     'يمكنك الآن الذهاب إلى قائمة الحجوزات لطباعة الحجز.';
 
-      _showMessageDialog(
-        title: 'تم إنشاء الحجز بنجاح',
-        message: successMessage,
-        icon: Icons.check_circle,
-        titleColor: Colors.green,
-        isError: false,
-      );
-    }
+    //   _showMessageDialog(
+    //     title: 'تم إنشاء الحجز بنجاح',
+    //     message: successMessage,
+    //     icon: Icons.check_circle,
+    //     titleColor: Colors.green,
+    //     isError: false,
+    //   );
+    // }
     
+    if (mounted) {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (context) => const GroomHomeScreen(initialTabIndex: 2),
+      ),
+    );
+    
+    String daysMax = _getValidationDeadlineDays();
+    String successMessage = 
+      'تم إنشاء حجز جديد بنجاح!\n\n'
+      'يجب طباعة الحجز وختمه وتوقيعه خلال $daysMax يوم كأقصى حد، '
+      'وإلا سيتم إلغاء الحجز تلقائيًا.\n\n'
+      'يمكنك الآن الذهاب إلى قائمة الحجوزات لطباعة الحجز.';
+
+    _showMessageDialog(
+      title: 'تم إنشاء الحجز بنجاح',
+      message: successMessage,
+      highlightText: '$daysMax يوم',  // ← only this added
+      icon: Icons.check_circle,
+      titleColor: Colors.green,
+      isError: false,
+    );
+  }
   } on FormatException catch (e) {
     print('Format error: $e');
     if (mounted) {
@@ -938,15 +1050,15 @@ Future<void> _submitReservation() async {
       return;
     }
 
-    if (response != null && response.containsKey('reservation_id')) {
-      try {
-        print('Deleting reservation due to error: ${response['reservation_id']}');
-        await ApiService.deleteReservation(response['reservation_id']);
-        print('Reservation deleted successfully');
-      } catch (deleteError) {
-        print('Failed to delete reservation: $deleteError');
-      }
-    }
+    // if (response != null && response.containsKey('reservation_id')) {
+    //   try {
+    //     print('Deleting reservation due to error: ${response['reservation_id']}');
+        // await ApiService.deleteReservation(response['reservation_id']);
+    //     print('Reservation deleted successfully');
+    //   } catch (deleteError) {
+    //     print('Failed to delete reservation: $deleteError');
+    //   }
+    // }
     
     if (mounted) {
       String errorTitle = 'خطأ في إرسال الطلب';

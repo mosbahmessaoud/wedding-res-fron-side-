@@ -555,7 +555,18 @@ Widget _buildOutsideActionButtons(Map<String, dynamic> reservation, String statu
       ),
     );
   }
-
+  // from validate to pending update
+  if (status == 'validated'){
+    buttons.add(
+          _buildActionButton(
+            onPressed: () => _revertToPending(reservationId, groomName),
+            icon: Icons.undo_rounded,
+            label: 'إعادة للمعلق',
+            color: Colors.orange.shade700,
+            isCompact: screenWidth < 600,
+          ),
+        );
+  }
   if (status == 'pending_validation') {
     buttons.add(
       _buildActionButton(
@@ -638,7 +649,7 @@ List<Widget> _buildDetailRows(Map<String, dynamic> reservation, bool isDark) {
     ['اسم الولي:', reservation['guardian_name'] ?? 'غير محدد'],
     ['اسم الأب:', reservation['father_name'] ?? 'غير محدد'],
     ['رقم الهاتف:', reservation['phone_number'] ?? 'غير محدد'],
-    ['اليوم الأول:', _formatDate(reservation['date1'])],
+    ['تاريخ العرس:', _formatDate(reservation['date1'])],
     if (reservation['date2_bool'] == true && reservation['date2'] != null)
       ['اليوم الثاني:', _formatDate(reservation['date2'])],
     ['حالة الدفع:', _getPaymentStatusText(reservation['payment_status'] ?? 'not_paid')],
@@ -1063,39 +1074,250 @@ void _showOfflineBanner() {
       return false;
     }
   }
+
+
+// Future<void> _loadAllReservations() async {
+//   setState(() => _isLoading = true);
+
+//   try {
+//     final userInfo = await ApiService.getCurrentUserInfo();
+//     final clanId = userInfo['clan_id'];
+
+//     List<dynamic> validatedRes = [];
+//     List<dynamic> cancelledRes = [];
+//     List<dynamic> pendingRes = [];
+//     List<dynamic> allRes = [];
+//     List<dynamic> archivedRes = [];
+
+//     try {
+//       validatedRes = await ApiService.getOriginValidatedReservations();
+//     } catch (e) {
+//       print('خطأ في الحجوزات المؤكدة');
+//     }
+
+//     try {
+//       cancelledRes = await ApiService.getOriginCancelledReservations();
+//     } catch (e) {
+//       print('خطأ في الحجوزات الملغاة: ');
+//     }
+
+//     try {
+//       pendingRes = await ApiService.getOriginPendingReservations();
+//     } catch (e) {
+//       print('⚠️ فشل في تحميل الحجوزات المعلقة');
+//       pendingRes = [];
+//     }
+
+//     // Sort pending: soonest expiry first, nulls last
+//     pendingRes.sort((a, b) {
+//       final aDate = a['expired_date_if_pending'];
+//       final bDate = b['expired_date_if_pending'];
+//       if (aDate == null && bDate == null) return 0;
+//       if (aDate == null) return 1;
+//       if (bDate == null) return -1;
+//       return DateTime.parse(aDate).compareTo(DateTime.parse(bDate));
+//     });
+
+//     // ── Main page: split active vs archived ─────────────────────────────
+//     List<dynamic> validatedActive = [];
+//     List<dynamic> validatedArchived = [];
+//     for (var res in validatedRes) {
+//       if (_isReservationArchived(res)) {
+//         validatedArchived.add(res);
+//       } else {
+//         validatedActive.add(res);
+//       }
+//     }
+
+//     List<dynamic> pendingActive = [];
+//     List<dynamic> pendingArchived = [];
+//     for (var res in pendingRes) {
+//       if (_isReservationArchived(res)) {
+//         pendingArchived.add(res);
+//       } else {
+//         pendingActive.add(res);
+//       }
+//     }
+
+//     List<dynamic> cancelledArchived = [];
+//     for (var res in cancelledRes) {
+//       if (_isReservationArchived(res)) {
+//         cancelledArchived.add(res);
+//       }
+//     }
+
+
+//     archivedRes = [...validatedArchived, ...pendingArchived, ...cancelledArchived];
+//     allRes = [...validatedActive, ...pendingActive];
+
+//     // ── Load outside/notBelong raw data ─────────────────────────────────
+//     List<dynamic> notBelongPendingRes = [];
+//     List<dynamic> notBelongValidatedRes = [];
+
+//     try {
+//       notBelongPendingRes = await ApiService.getGroomsWithPendingReservationsNotBelong(clanId);
+//     } catch (e) {
+//       print('خطأ في حجوزات العشائر الخارجية المعلقة');
+//     }
+
+//     try {
+//       notBelongValidatedRes = await ApiService.getGroomsWithValidatedReservationsNotBelong(clanId);
+//     } catch (e) {
+//       print('خطأ في حجوزات العشائر الخارجية المؤكدة');
+//     }
+
+//     List<dynamic> belongPendingOutsideRes = [];
+//     List<dynamic> belongValidatedOutsideRes = [];
+//     List<dynamic> belongCancelledOutsideRes = [];
+//     List<dynamic> notBelongCancelledRes = [];
+
+//     try {
+      
+
+//       belongCancelledOutsideRes = await ApiService.getGroomsBelongWithCancelledReservationsOutside(clanId);
+//       belongPendingOutsideRes = await ApiService.getGroomsBelongWithPendingReservationsOutside(clanId);
+//       print('✓ تم تحميل ${belongPendingOutsideRes.length} حجز معلق خارج العشيرة (أبناء العشيرة)');
+
+//       belongValidatedOutsideRes = await ApiService.getGroomsBelongWithValidatedReservationsOutside(clanId);
+//       print('✓ تم تحميل ${belongValidatedOutsideRes.length} حجز مؤكد خارج العشيرة (أبناء العشيرة)');
+
+//       notBelongCancelledRes = await ApiService.getGroomsNotBelongWithCancelledReservationsIntside(clanId);
+//       print('✓ تم تحميل ${notBelongCancelledRes.length} حجز ملغي من خارج العشيرة');
+//     } catch (e) {
+//       print('خطأ في حجوزات أبناء العشيرة خارجها: $e');
+//     }
+
+//     // ── BelongOutside: split active vs archived ──────────────────────────
+//     List<dynamic> belongPendingOutsideActive = [];
+//     List<dynamic> belongValidatedOutsideActive = [];
+//     List<dynamic> belongCancelledOutsideActive = [];
+//     List<dynamic> belongOutsideArchived = [];
+
+//     for (var r in belongPendingOutsideRes) {
+//       if (_isReservationArchived(r)) {
+//         belongOutsideArchived.add({...r as Map, '_nb_status': 'pending'});
+//       } else {
+//         belongPendingOutsideActive.add(r);
+//       }
+//     }
+//     for (var r in belongValidatedOutsideRes) {
+//       if (_isReservationArchived(r)) {
+//         belongOutsideArchived.add({...r as Map, '_nb_status': 'validated'});
+//       } else {
+//         belongValidatedOutsideActive.add(r);
+//       }
+//     }
+//     for (var r in belongCancelledOutsideRes) {
+//       if (_isReservationArchived(r)) {
+//         belongOutsideArchived.add({...r as Map, '_nb_status': 'cancelled'});
+//       } else {
+//         belongCancelledOutsideActive.add(r);
+//       }
+//     }
+
+//     // ── NotBelong: split active vs archived ──────────────────────────────
+//     List<dynamic> notBelongPendingActive = [];
+//     List<dynamic> notBelongValidatedActive = [];
+//     List<dynamic> notBelongCancelledActive = [];
+//     List<dynamic> notBelongArchived = [];
+
+//     for (var r in notBelongPendingRes) {
+//       if (_isReservationArchived(r)) {
+//         notBelongArchived.add({...r as Map, '_nb_status': 'pending'});
+//       } else {
+//         notBelongPendingActive.add(r);
+//       }
+//     }
+//     for (var r in notBelongValidatedRes) {
+//       if (_isReservationArchived(r)) {
+//         notBelongArchived.add({...r as Map, '_nb_status': 'validated'});
+//       } else {
+//         notBelongValidatedActive.add(r);
+//       }
+//     }
+//     for (var r in notBelongCancelledRes) {
+//       if (_isReservationArchived(r)) {
+//         notBelongArchived.add({...r as Map, '_nb_status': 'cancelled'});
+//       } else {
+//         notBelongCancelledActive.add(r);
+//       }
+//     }
+
+//     setState(() {
+//       _validatedReservations = validatedActive;
+//       _cancelledReservations = cancelledRes;
+//       _pendingReservations = pendingActive;
+//       _allReservations = allRes;
+//       _archivedReservations = archivedRes;
+
+//       _notBelongPendingReservations = notBelongPendingActive;
+//       _notBelongValidatedReservations = notBelongValidatedActive;
+//       _notBelongCancelledReservations = notBelongCancelledActive;
+//       _notBelongArchivedReservations = notBelongArchived;
+
+//       _belongPendingOutsideReservations = belongPendingOutsideActive;
+//       _belongValidatedOutsideReservations = belongValidatedOutsideActive;
+//       _belongCancelledOutsideReservations = belongCancelledOutsideActive;
+//       _belongArchivedOutsideReservations = belongOutsideArchived;
+//     });
+
+//     print('📊 إحصائيات الحجوزات:');
+//     print('  - الكل (نشط): ${allRes.length}');
+//     print('  - معلقة (نشطة): ${pendingActive.length}');
+//     print('  - مؤكدة (نشطة): ${validatedActive.length}');
+//     print('  - ملغاة: ${cancelledRes.length}');
+//     print('  - أرشيف: ${archivedRes.length}');
+//     print('  - حجزو خارج (نشط): ${belongPendingOutsideActive.length + belongValidatedOutsideActive.length}');
+//     print('  - حجزو خارج (أرشيف): ${belongOutsideArchived.length}');
+//     print('  - أتو من خارج (نشط): ${notBelongPendingActive.length + notBelongValidatedActive.length}');
+//     print('  - أتو من خارج (أرشيف): ${notBelongArchived.length}');
+
+//   } catch (e) {
+//     print('خطأ عام في تحميل الحجوزات: $e');
+
+//     setState(() {
+//       _allReservations = [];
+//       _pendingReservations = [];
+//       _validatedReservations = [];
+//       _cancelledReservations = [];
+//       _archivedReservations = [];
+//     });
+
+//     _showSnackBar('فشل في تحميل الحجوزات', Colors.red.shade400);
+//   } finally {
+//     setState(() => _isLoading = false);
+//   }
+// }
 Future<void> _loadAllReservations() async {
   setState(() => _isLoading = true);
 
   try {
+    final userInfo = await ApiService.getCurrentUserInfo();
+    final clanId = userInfo['clan_id'];
+
     List<dynamic> validatedRes = [];
     List<dynamic> cancelledRes = [];
     List<dynamic> pendingRes = [];
-    List<dynamic> allRes = [];
-    List<dynamic> archivedRes = [];
 
     try {
       validatedRes = await ApiService.getOriginValidatedReservations();
-      print('✓ تم تحميل ${validatedRes.length} حجز مؤكد');
     } catch (e) {
-      print('خطأ في الحجوزات المؤكدة: $e');
+      print('خطأ في الحجوزات المؤكدة');
     }
 
     try {
       cancelledRes = await ApiService.getOriginCancelledReservations();
-      print('✓ تم تحميل ${cancelledRes.length} حجز ملغي');
     } catch (e) {
-      print('خطأ في الحجوزات الملغاة: $e');
+      print('خطأ في الحجوزات الملغاة');
     }
 
     try {
       pendingRes = await ApiService.getOriginPendingReservations();
-      print('✓ تم تحميل ${pendingRes.length} حجز معلق');
     } catch (e) {
-      print('⚠️ فشل في تحميل الحجوزات المعلقة: $e');
+      print('فشل في تحميل الحجوزات المعلقة');
       pendingRes = [];
     }
 
-    // Sort pending: soonest expiry first, nulls last
     pendingRes.sort((a, b) {
       final aDate = a['expired_date_if_pending'];
       final bDate = b['expired_date_if_pending'];
@@ -1105,7 +1327,6 @@ Future<void> _loadAllReservations() async {
       return DateTime.parse(aDate).compareTo(DateTime.parse(bDate));
     });
 
-    // ── Main page: split active vs archived ─────────────────────────────
     List<dynamic> validatedActive = [];
     List<dynamic> validatedArchived = [];
     for (var res in validatedRes) {
@@ -1133,29 +1354,23 @@ Future<void> _loadAllReservations() async {
       }
     }
 
-    archivedRes = [...validatedArchived, ...pendingArchived, ...cancelledArchived];
-    allRes = [...validatedActive, ...pendingActive];
+    final archivedRes = [...validatedArchived, ...pendingArchived, ...cancelledArchived];
+    final allRes = [...validatedActive, ...pendingActive];
 
-    // ── Load outside/notBelong raw data ─────────────────────────────────
+    // ── outside/notBelong ────────────────────────────────────────────────
     List<dynamic> notBelongPendingRes = [];
     List<dynamic> notBelongValidatedRes = [];
 
     try {
-      notBelongPendingRes = await ApiService.getGroomsWithPendingReservationsNotBelong(
-        (await ApiService.getCurrentUserInfo())['clan_id'],
-      );
-      print('✓ تم تحميل ${notBelongPendingRes.length} حجز معلق خارج العشيرة');
+      notBelongPendingRes = await ApiService.getGroomsWithPendingReservationsNotBelong(clanId);
     } catch (e) {
-      print('خطأ في حجوزات العشائر الخارجية المعلقة: $e');
+      print('خطأ في حجوزات العشائر الخارجية المعلقة');
     }
 
     try {
-      notBelongValidatedRes = await ApiService.getGroomsWithValidatedReservationsNotBelong(
-        (await ApiService.getCurrentUserInfo())['clan_id'],
-      );
-      print('✓ تم تحميل ${notBelongValidatedRes.length} حجز مؤكد خارج العشيرة');
+      notBelongValidatedRes = await ApiService.getGroomsWithValidatedReservationsNotBelong(clanId);
     } catch (e) {
-      print('خطأ في حجوزات العشائر الخارجية المؤكدة: $e');
+      print('خطأ في حجوزات العشائر الخارجية المؤكدة');
     }
 
     List<dynamic> belongPendingOutsideRes = [];
@@ -1164,23 +1379,15 @@ Future<void> _loadAllReservations() async {
     List<dynamic> notBelongCancelledRes = [];
 
     try {
-      final userInfo = await ApiService.getCurrentUserInfo();
-      final clanId = userInfo['clan_id'];
-
       belongCancelledOutsideRes = await ApiService.getGroomsBelongWithCancelledReservationsOutside(clanId);
       belongPendingOutsideRes = await ApiService.getGroomsBelongWithPendingReservationsOutside(clanId);
-      print('✓ تم تحميل ${belongPendingOutsideRes.length} حجز معلق خارج العشيرة (أبناء العشيرة)');
-
       belongValidatedOutsideRes = await ApiService.getGroomsBelongWithValidatedReservationsOutside(clanId);
-      print('✓ تم تحميل ${belongValidatedOutsideRes.length} حجز مؤكد خارج العشيرة (أبناء العشيرة)');
-
       notBelongCancelledRes = await ApiService.getGroomsNotBelongWithCancelledReservationsIntside(clanId);
-      print('✓ تم تحميل ${notBelongCancelledRes.length} حجز ملغي من خارج العشيرة');
     } catch (e) {
       print('خطأ في حجوزات أبناء العشيرة خارجها: $e');
     }
 
-    // ── BelongOutside: split active vs archived ──────────────────────────
+    // ── BelongOutside split ──────────────────────────────────────────────
     List<dynamic> belongPendingOutsideActive = [];
     List<dynamic> belongValidatedOutsideActive = [];
     List<dynamic> belongCancelledOutsideActive = [];
@@ -1188,27 +1395,27 @@ Future<void> _loadAllReservations() async {
 
     for (var r in belongPendingOutsideRes) {
       if (_isReservationArchived(r)) {
-        belongOutsideArchived.add({...r as Map, '_nb_status': 'pending'});
+        belongOutsideArchived.add(r);
       } else {
         belongPendingOutsideActive.add(r);
       }
     }
     for (var r in belongValidatedOutsideRes) {
       if (_isReservationArchived(r)) {
-        belongOutsideArchived.add({...r as Map, '_nb_status': 'validated'});
+        belongOutsideArchived.add(r);
       } else {
         belongValidatedOutsideActive.add(r);
       }
     }
     for (var r in belongCancelledOutsideRes) {
       if (_isReservationArchived(r)) {
-        belongOutsideArchived.add({...r as Map, '_nb_status': 'cancelled'});
+        belongOutsideArchived.add(r);
       } else {
         belongCancelledOutsideActive.add(r);
       }
     }
 
-    // ── NotBelong: split active vs archived ──────────────────────────────
+    // ── NotBelong split ──────────────────────────────────────────────────
     List<dynamic> notBelongPendingActive = [];
     List<dynamic> notBelongValidatedActive = [];
     List<dynamic> notBelongCancelledActive = [];
@@ -1216,21 +1423,21 @@ Future<void> _loadAllReservations() async {
 
     for (var r in notBelongPendingRes) {
       if (_isReservationArchived(r)) {
-        notBelongArchived.add({...r as Map, '_nb_status': 'pending'});
+        notBelongArchived.add(r);
       } else {
         notBelongPendingActive.add(r);
       }
     }
     for (var r in notBelongValidatedRes) {
       if (_isReservationArchived(r)) {
-        notBelongArchived.add({...r as Map, '_nb_status': 'validated'});
+        notBelongArchived.add(r);
       } else {
         notBelongValidatedActive.add(r);
       }
     }
     for (var r in notBelongCancelledRes) {
       if (_isReservationArchived(r)) {
-        notBelongArchived.add({...r as Map, '_nb_status': 'cancelled'});
+        notBelongArchived.add(r);
       } else {
         notBelongCancelledActive.add(r);
       }
@@ -1254,20 +1461,8 @@ Future<void> _loadAllReservations() async {
       _belongArchivedOutsideReservations = belongOutsideArchived;
     });
 
-    print('📊 إحصائيات الحجوزات:');
-    print('  - الكل (نشط): ${allRes.length}');
-    print('  - معلقة (نشطة): ${pendingActive.length}');
-    print('  - مؤكدة (نشطة): ${validatedActive.length}');
-    print('  - ملغاة: ${cancelledRes.length}');
-    print('  - أرشيف: ${archivedRes.length}');
-    print('  - حجزو خارج (نشط): ${belongPendingOutsideActive.length + belongValidatedOutsideActive.length}');
-    print('  - حجزو خارج (أرشيف): ${belongOutsideArchived.length}');
-    print('  - أتو من خارج (نشط): ${notBelongPendingActive.length + notBelongValidatedActive.length}');
-    print('  - أتو من خارج (أرشيف): ${notBelongArchived.length}');
-
   } catch (e) {
     print('خطأ عام في تحميل الحجوزات: $e');
-
     setState(() {
       _allReservations = [];
       _pendingReservations = [];
@@ -1275,7 +1470,6 @@ Future<void> _loadAllReservations() async {
       _cancelledReservations = [];
       _archivedReservations = [];
     });
-
     _showSnackBar('فشل في تحميل الحجوزات', Colors.red.shade400);
   } finally {
     setState(() => _isLoading = false);
@@ -2026,39 +2220,82 @@ Future<void> _validateReservationFromCancelledTab(int reservationId, String groo
     }).toList();
   }
 
-  Future<bool> _showConfirmationDialog(String title, String content, Color color, IconData icon) async {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+  // Future<bool> _showConfirmationDialog(String title, String content, Color color, IconData icon) async {
+  //   final isDark = Theme.of(context).brightness == Brightness.dark;
     
-    return await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: isDark ? AppColors.darkCard : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            Icon(icon, color: color, size: 28),
-            const SizedBox(width: 12),
-            Text(title, style: TextStyle(color: color, fontWeight: FontWeight.w600)),
-          ],
-        ),
-        content: Text(content, style: TextStyle(color: isDark ? Colors.white70 : Colors.grey.shade700)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text('إلغاء', style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade600)),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: color,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+  //   return await showDialog<bool>(
+  //     context: context,
+  //     builder: (context) => AlertDialog(
+  //       backgroundColor: isDark ? AppColors.darkCard : Colors.white,
+  //       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+  //       title: Row(
+  //         children: [
+  //           Icon(icon, color: color, size: 28),
+  //           const SizedBox(width: 12),
+  //           Text(title, style: TextStyle(color: color, fontWeight: FontWeight.w600)),
+  //         ],
+  //       ),
+  //       content: Text(content, style: TextStyle(color: isDark ? Colors.white70 : Colors.grey.shade700)),
+  //       actions: [
+  //         TextButton(
+  //           onPressed: () => Navigator.of(context).pop(false),
+  //           child: Text('إلغاء', style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade600)),
+  //         ),
+  //         ElevatedButton(
+  //           onPressed: () => Navigator.of(context).pop(true),
+  //           style: ElevatedButton.styleFrom(
+  //             backgroundColor: color,
+  //             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+  //           ),
+  //           child: const Text('تأكيد', style: TextStyle(color: Colors.white)),
+  //         ),
+  //       ],
+  //     ),
+  //   ) ?? false;
+  // }
+  Future<bool> _showConfirmationDialog(String title, String content, Color color, IconData icon) async {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  
+  return await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      backgroundColor: isDark ? AppColors.darkCard : Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: Row(
+        children: [
+          Icon(icon, color: color, size: 28),
+          const SizedBox(width: 12),
+          Flexible(                                          // ← wrap with Flexible
+            child: Text(
+              title,
+              style: TextStyle(color: color, fontWeight: FontWeight.w600),
+              softWrap: true,                               // ← allow wrapping
             ),
-            child: const Text('تأكيد', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
-    ) ?? false;
-  }
+      content: Text(
+        content,
+        style: TextStyle(color: isDark ? Colors.white70 : Colors.grey.shade700),
+        softWrap: true,                                     // ← allow wrapping
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: Text('إلغاء', style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade600)),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.of(context).pop(true),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: color,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          child: const Text('تأكيد', style: TextStyle(color: Colors.white)),
+        ),
+      ],
+    ),
+  ) ?? false;
+}
 
   void _showSnackBar(String message, Color color) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -2261,28 +2498,28 @@ PreferredSizeWidget _buildModernAppBar() {
                   horizontal: MediaQuery.of(context).size.width < 600 ? 8 : 12
                 ),
                 tabs: [
-  Tab(text: 'الحجوزات الداخلية'),
-  Tab(
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(Icons.output, size: 14, color: Colors.teal),
-        SizedBox(width: 4),
-        Text('حجزو خارج '),
-      ],
-    ),
-  ),
-  Tab(
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(Icons.swap_horiz, size: 14, color: Colors.purple),
-        SizedBox(width: 4),
-        Text('أتو من خارج '),
-      ],
-    ),
-  ),
-],
+                Tab(text: 'الحجوزات الداخلية'),
+                Tab(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.output, size: 14, color: Colors.teal),
+                      SizedBox(width: 4),
+                      Text('حجزو خارج '),
+                    ],
+                  ),
+                ),
+                Tab(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.swap_horiz, size: 14, color: Colors.purple),
+                      SizedBox(width: 4),
+                      Text('أتو من خارج '),
+                    ],
+                  ),
+                ),
+              ],
               ),
             ),
           // Tab Views
@@ -2631,7 +2868,7 @@ Widget _buildModernStatistics(bool isDark) {
 //     ['اسم الولي:', reservation['guardian_name'] ?? 'غير محدد'],
 //     ['اسم الأب:', reservation['father_name'] ?? 'غير محدد'],
 //     ['رقم الهاتف:', reservation['phone_number'] ?? 'غير محدد'],
-//     ['اليوم الأول:', _formatDate(reservation['date1'])],
+//     ['تاريخ العرس:', _formatDate(reservation['date1'])],
 //     if (reservation['date2_bool'] == true && reservation['date2'] != null)
 //       ['اليوم الثاني:', _formatDate(reservation['date2'])],
 //     ['حالة الدفع:', _getPaymentStatusText(reservation['payment_status'] ?? 'not_paid')],
@@ -3158,6 +3395,16 @@ Widget _buildModernActionButtons(Map<String, dynamic> reservation, String status
         isCompact: isCompact,
       ),
     );
+    // ✅ NEW — revert to pending
+    buttons.add(
+      _buildActionButton(
+        onPressed: () => _revertToPending(reservationId, groomName),
+        icon: Icons.undo_rounded,
+        label: 'إعادة للمعلق',
+        color: Colors.orange.shade700,
+        isCompact: isCompact,
+      ),
+    );
     buttons.add(
       _buildActionButton(
         onPressed: () => _cancelReservation(reservationId, groomName),
@@ -3198,7 +3445,7 @@ Widget _buildModernActionButtons(Map<String, dynamic> reservation, String status
   }
 
   // Show delete for archived reservations regardless of status
-  if (isArchived) {
+  if (isArchived && status != 'cancelled' && status != 'validated') {
     buttons.add(
       _buildActionButton(
         onPressed: () => _deleteReservation(reservationId, groomName),
@@ -3216,6 +3463,28 @@ Widget _buildModernActionButtons(Map<String, dynamic> reservation, String status
     alignment: isCompact ? WrapAlignment.center : WrapAlignment.start,
     children: buttons,
   );
+}
+
+Future<void> _revertToPending(int reservationId, String groomName) async {
+  final confirmed = await _showConfirmationDialog(
+    'إعادة الحجز إلى المعلق',
+    'هل أنت متأكد من إعادة حجز $groomName إلى حالة المعلق؟',
+    Colors.orange.shade700,
+    Icons.undo_rounded,
+  );
+
+  if (!confirmed) return;
+
+  try {
+    setState(() => _isLoading = true);
+    await ApiService.revertToPending(reservationId);
+    await _loadAllReservations();
+    _showSnackBar('تم إعادة الحجز إلى حالة المعلق', Colors.orange.shade700);
+  } catch (e) {
+    _showSnackBar('خطأ في تحديث حالة الحجز: $e', Colors.red.shade400);
+  } finally {
+    setState(() => _isLoading = false);
+  }
 }
 Widget _buildActionButton({
   required VoidCallback onPressed,
@@ -3303,54 +3572,34 @@ Widget _buildActionButton({
       return dateTimeString;
     }
   }
-
 Widget _buildNotBelongReservationsPage(bool isDark) {
-  final allPending = _notBelongPendingReservations
-      .map((r) => Map<String, dynamic>.from({...r as Map, '_nb_status': 'pending'}))
-      .toList();
-  final allValidated = _notBelongValidatedReservations
-      .map((r) => Map<String, dynamic>.from({...r as Map, '_nb_status': 'validated'}))
-      .toList();
-  final allNotBelong = [...allValidated, ...allPending];
-final allCancelled = _notBelongCancelledReservations
-      .map((r) => Map<String, dynamic>.from({...r as Map, '_nb_status': 'cancelled'}))
-      .toList();
+  // _nb_status is now read from 'status' field directly in the card
+  final allActive = [
+    ..._notBelongValidatedReservations,
+    ..._notBelongPendingReservations,
+  ].where((r) => !_isReservationArchived(r)).toList();
 
-  final allArchived = _notBelongArchivedReservations
-      .map((r) => Map<String, dynamic>.from(r as Map))
-      .toList();
-  final allActive = [...allValidated, ...allPending]
-      .where((r) => !_isReservationArchived(r))
-      .toList();
-  final allActiveValidated = allValidated
-      .where((r) => !_isReservationArchived(r))
-      .toList();
-  final allActivePending = allPending
-      .where((r) => !_isReservationArchived(r))
-      .toList();
-
-  List<Map<String, dynamic>> applySearch(List<Map<String, dynamic>> list) {
-    if (_searchQuery.isEmpty) return list;
+  List<Map<String, dynamic>> applySearch(List<dynamic> list) {
+    if (_searchQuery.isEmpty) return list.cast<Map<String, dynamic>>();
     final q = _searchQuery.toLowerCase();
     return list.where((r) {
       return (r['first_name']?.toString().toLowerCase() ?? '').contains(q) ||
           (r['last_name']?.toString().toLowerCase() ?? '').contains(q) ||
           (r['guardian_name']?.toString().toLowerCase() ?? '').contains(q) ||
           (r['phone_number']?.toString() ?? '').contains(q);
-    }).toList();
+    }).cast<Map<String, dynamic>>().toList();
   }
 
   final filteredAll = applySearch(allActive);
-  final filteredValidated = applySearch(allActiveValidated);
-  final filteredPending = applySearch(allActivePending);
-  final filteredCancelled = applySearch(allCancelled);
-  final filteredArchived = applySearch(allArchived);
+  final filteredValidated = applySearch(_notBelongValidatedReservations.where((r) => !_isReservationArchived(r)).toList());
+  final filteredPending = applySearch(_notBelongPendingReservations.where((r) => !_isReservationArchived(r)).toList());
+  final filteredCancelled = applySearch(_notBelongCancelledReservations);
+  final filteredArchived = applySearch(_notBelongArchivedReservations);
 
   return DefaultTabController(
     length: 5,
     child: Column(
       children: [
-        // Header banner
         Container(
           margin: const EdgeInsets.fromLTRB(12, 12, 12, 0),
           padding: const EdgeInsets.all(14),
@@ -3375,26 +3624,16 @@ final allCancelled = _notBelongCancelledReservations
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'أتو من خارج العشيرة',
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold),
-                    ),
-                    Text(
-                      'عرسان من عشائر أخرى يحجزون في قاعات عشيرتنا',
-                      style: TextStyle(
-                          color: Colors.white.withOpacity(0.85), fontSize: 11),
-                    ),
+                    const Text('أتو من خارج العشيرة',
+                        style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+                    Text('عرسان من عشائر أخرى يحجزون في قاعات عشيرتنا',
+                        style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 11)),
                   ],
                 ),
               ),
             ],
           ),
         ),
-
-        // Inner tabs
         Container(
           color: isDark ? AppColors.darkCard : Colors.white,
           margin: const EdgeInsets.only(top: 8),
@@ -3403,12 +3642,9 @@ final allCancelled = _notBelongCancelledReservations
             tabAlignment: TabAlignment.start,
             indicatorColor: Colors.purple.shade400,
             labelColor: Colors.purple.shade400,
-            unselectedLabelColor:
-                isDark ? Colors.grey.shade400 : Colors.grey.shade600,
-            labelStyle: TextStyle(
-              fontWeight: FontWeight.w600,
-              fontSize: MediaQuery.of(context).size.width < 600 ? 11 : 13,
-            ),
+            unselectedLabelColor: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+            labelStyle: TextStyle(fontWeight: FontWeight.w600,
+                fontSize: MediaQuery.of(context).size.width < 600 ? 11 : 13),
             tabs: [
               Tab(text: 'الكل (${filteredAll.length})'),
               Tab(text: 'مؤكدة (${filteredValidated.length})'),
@@ -3418,7 +3654,6 @@ final allCancelled = _notBelongCancelledReservations
             ],
           ),
         ),
-
         Expanded(
           child: TabBarView(
             children: [
@@ -3427,6 +3662,105 @@ final allCancelled = _notBelongCancelledReservations
               _buildNotBelongList(filteredPending, isDark),
               _buildNotBelongList(filteredCancelled, isDark),
               _buildNotBelongList(filteredArchived, isDark),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+Widget _buildBelongOutsideReservationsPage(bool isDark) {
+  final allActive = [
+    ..._belongValidatedOutsideReservations,
+    ..._belongPendingOutsideReservations,
+  ].where((r) => !_isReservationArchived(r)).toList();
+
+  List<Map<String, dynamic>> applySearch(List<dynamic> list) {
+    if (_searchQuery.isEmpty) return list.cast<Map<String, dynamic>>();
+    final q = _searchQuery.toLowerCase();
+    return list.where((r) {
+      final groomData = r['groom'] ?? {};
+      return (groomData['first_name']?.toString().toLowerCase() ?? '').contains(q) ||
+          (groomData['last_name']?.toString().toLowerCase() ?? '').contains(q) ||
+          (r['first_name']?.toString().toLowerCase() ?? '').contains(q) ||
+          (r['last_name']?.toString().toLowerCase() ?? '').contains(q) ||
+          (groomData['phone_number']?.toString() ?? '').contains(q);
+    }).cast<Map<String, dynamic>>().toList();
+  }
+
+  final filteredAll = applySearch(allActive);
+  final filteredValidated = applySearch(_belongValidatedOutsideReservations.where((r) => !_isReservationArchived(r)).toList());
+  final filteredPending = applySearch(_belongPendingOutsideReservations.where((r) => !_isReservationArchived(r)).toList());
+  final filteredCancelled = applySearch(_belongCancelledOutsideReservations);
+  final filteredArchived = applySearch(_belongArchivedOutsideReservations);
+
+  return DefaultTabController(
+    length: 5,
+    child: Column(
+      children: [
+        Container(
+          margin: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Colors.teal.shade600, Colors.teal.shade800],
+            ),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.output, color: Colors.white, size: 22),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('حجزو في خارج العشيرة',
+                        style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+                    Text('عرسان من عشيرتنا يحجزون في قاعات عشائر أخرى',
+                        style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 11)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        Container(
+          color: isDark ? AppColors.darkCard : Colors.white,
+          margin: const EdgeInsets.only(top: 8),
+          child: TabBar(
+            isScrollable: true,
+            tabAlignment: TabAlignment.start,
+            indicatorColor: Colors.teal.shade400,
+            labelColor: Colors.teal.shade400,
+            unselectedLabelColor: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+            labelStyle: TextStyle(fontWeight: FontWeight.w600,
+                fontSize: MediaQuery.of(context).size.width < 600 ? 11 : 13),
+            tabs: [
+              Tab(text: 'الكل (${filteredAll.length})'),
+              Tab(text: 'مؤكدة (${filteredValidated.length})'),
+              Tab(text: 'معلقة (${filteredPending.length})'),
+              Tab(text: 'ملغاة (${filteredCancelled.length})'),
+              Tab(text: 'أرشيف (${filteredArchived.length})'),
+            ],
+          ),
+        ),
+        Expanded(
+          child: TabBarView(
+            children: [
+              _buildBelongOutsideList(filteredAll, isDark),
+              _buildBelongOutsideList(filteredValidated, isDark),
+              _buildBelongOutsideList(filteredPending, isDark),
+              _buildBelongOutsideList(filteredCancelled, isDark),
+              _buildBelongOutsideList(filteredArchived, isDark),
             ],
           ),
         ),
@@ -3570,23 +3904,21 @@ Widget _buildNotBelongStatCard(
     ),
   );
 }
-
 Widget _buildNotBelongReservationCard(Map<String, dynamic> reservation, bool isDark) {
-  final nbStatus = reservation['_nb_status'] ?? 'pending';
-  final isCancelled = nbStatus == 'cancelled';
-  final isValidated = nbStatus == 'validated';
-
+  // Read status directly from the reservation data
+  final status = reservation['status'] ?? 'pending_validation';
+  final isCancelled = status == 'cancelled';
+  final isValidated = status == 'validated';
+  // ... rest of the function stays exactly the same,
+  // just replace every reference to nbStatus/isCancelled/isValidated with the above
+  
   final statusColor = isCancelled
       ? Colors.red.shade400
-      : isValidated
-          ? Colors.green.shade400
-          : Colors.orange.shade400;
+      : isValidated ? Colors.green.shade400 : Colors.orange.shade400;
   final statusLabel = isCancelled ? 'ملغي' : isValidated ? 'مؤكد' : 'معلق';
   final statusIcon = isCancelled
       ? Icons.cancel_rounded
-      : isValidated
-          ? Icons.check_circle_rounded
-          : Icons.hourglass_empty_rounded;
+      : isValidated ? Icons.check_circle_rounded : Icons.hourglass_empty_rounded;
 
   final groomData = reservation['groom'] ?? {};
   final firstName = groomData['first_name'] ?? reservation['first_name'] ?? 'غير محدد';
@@ -3599,8 +3931,8 @@ Widget _buildNotBelongReservationCard(Map<String, dynamic> reservation, bool isD
   final date2 = reservation['date2'];
   final date2Bool = reservation['date2_bool'] ?? false;
   final reservationId = reservation['id'] ?? 0;
-  final groomId = reservation['groom_id'] ?? 0;
 
+  // ... rest of the widget body is identical to before
   return Container(
     margin: const EdgeInsets.only(bottom: 14),
     decoration: BoxDecoration(
@@ -3608,11 +3940,7 @@ Widget _buildNotBelongReservationCard(Map<String, dynamic> reservation, bool isD
       borderRadius: BorderRadius.circular(20),
       border: Border.all(color: Colors.purple.shade200, width: 1.5),
       boxShadow: [
-        BoxShadow(
-          color: Colors.purple.withOpacity(0.08),
-          blurRadius: 10,
-          offset: const Offset(0, 3),
-        ),
+        BoxShadow(color: Colors.purple.withOpacity(0.08), blurRadius: 10, offset: const Offset(0, 3)),
       ],
     ),
     child: Theme(
@@ -3628,196 +3956,316 @@ Widget _buildNotBelongReservationCard(Map<String, dynamic> reservation, bool isD
           backgroundColor: Colors.purple.shade100,
           child: Icon(Icons.swap_horiz, color: Colors.purple.shade700, size: 20),
         ),
-        title: Row(
-          children: [
-            Expanded(
-              child: Text(
-                '$firstName $lastName',
-                style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 16,
-                    color: isDark ? Colors.white : Colors.black87),
-              ),
-            ),
-          ],
-        ),
+        title: Text('$firstName $lastName',
+            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16,
+                color: isDark ? Colors.white : Colors.black87)),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 4),
             if (phone.isNotEmpty)
-              Row(
-                children: [
-                  Icon(Icons.phone_rounded, size: 14,
-                      color: isDark ? Colors.grey.shade400 : Colors.grey.shade500),
-                  const SizedBox(width: 4),
-                  Text(phone,
-                      style: TextStyle(
-                          color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
-                          fontSize: 13)),
-                ],
-              ),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                Icon(Icons.calendar_today_rounded, size: 14,
+              Row(children: [
+                Icon(Icons.phone_rounded, size: 14,
                     color: isDark ? Colors.grey.shade400 : Colors.grey.shade500),
                 const SizedBox(width: 4),
-                Text(
-                  '${_formatDate(date1)}${date2Bool && date2 != null ? ' - ${_formatDate(date2)}' : ''}',
-                  style: TextStyle(
-                      color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
-                      fontSize: 13),
-                ),
-              ],
-            ),
+                Text(phone, style: TextStyle(
+                    color: isDark ? Colors.grey.shade400 : Colors.grey.shade600, fontSize: 13)),
+              ]),
+            const SizedBox(height: 4),
+            Row(children: [
+              Icon(Icons.calendar_today_rounded, size: 14,
+                  color: isDark ? Colors.grey.shade400 : Colors.grey.shade500),
+              const SizedBox(width: 4),
+              Text(
+                '${_formatDate(date1)}${date2Bool && date2 != null ? ' - ${_formatDate(date2)}' : ''}',
+                style: TextStyle(
+                    color: isDark ? Colors.grey.shade400 : Colors.grey.shade600, fontSize: 13),
+              ),
+            ]),
             const SizedBox(height: 8),
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: Colors.purple.shade100,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.purple.shade300),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.swap_horiz, size: 12, color: Colors.purple.shade700),
-                      const SizedBox(width: 4),
-                      Text('عشيرة أخرى',
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
-                              color: Colors.purple.shade700)),
-                    ],
-                  ),
+            Row(children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: Colors.purple.shade100,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.purple.shade300),
                 ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: statusColor.withOpacity(0.4)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(statusIcon, size: 12, color: statusColor),
-                      const SizedBox(width: 4),
-                      Text(statusLabel,
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
-                              color: statusColor)),
-                    ],
-                  ),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.swap_horiz, size: 12, color: Colors.purple.shade700),
+                  const SizedBox(width: 4),
+                  Text('عشيرة أخرى',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
+                          color: Colors.purple.shade700)),
+                ]),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: statusColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: statusColor.withOpacity(0.4)),
                 ),
-              ],
-            ),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(statusIcon, size: 12, color: statusColor),
+                  const SizedBox(width: 4),
+                  Text(statusLabel,
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: statusColor)),
+                ]),
+              ),
+            ]),
           ],
         ),
-       children: [
-  Container(
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      color: isDark ? AppColors.darkInputBackground : Colors.grey.shade50,
-      borderRadius: BorderRadius.circular(12),
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.darkInputBackground : Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                FutureBuilder<Map<String, dynamic>?>(
+                  future: _getClanInfo(reservationId),
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) return const SizedBox.shrink();
+                    final clanInfo = snapshot.data!;
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.purple.shade50,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.purple.shade200),
+                      ),
+                      child: Row(children: [
+                        Icon(Icons.groups, color: Colors.purple.shade600, size: 20),
+                        const SizedBox(width: 10),
+                        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text('العشيرة الأصلية للعريس',
+                              style: TextStyle(fontSize: 11, color: Colors.purple.shade400,
+                                  fontWeight: FontWeight.w500)),
+                          Text(clanInfo['clan_name'] ?? 'غير محدد',
+                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold,
+                                  color: Colors.purple.shade800)),
+                        ]),
+                      ]),
+                    );
+                  },
+                ),
+                _buildDetailRow('الاسم الكامل:', '$firstName $lastName', isDark),
+                if (fatherName.isNotEmpty) _buildDetailRow('اسم الأب:', fatherName, isDark),
+                if (phone.isNotEmpty) _buildDetailRow('رقم الهاتف:', phone, isDark),
+                if (guardianName.isNotEmpty) _buildDetailRow('ولي الأمر:', guardianName, isDark),
+                if (guardianPhone.isNotEmpty) _buildDetailRow('هاتف الولي:', guardianPhone, isDark),
+                _buildDetailRow('تاريخ العرس:', _formatDate(date1), isDark),
+                if (date2Bool && date2 != null)
+                  _buildDetailRow('اليوم الثاني:', _formatDate(date2), isDark),
+                _buildDetailRow('حالة الحجز:', statusLabel, isDark, valueColor: statusColor),
+                _buildDetailRow(
+                  'حالة الدفع:',
+                  _getPaymentStatusText(reservation['payment_status'] ?? 'not_paid'),
+                  isDark,
+                  valueColor: _getPaymentStatusColor(reservation['payment_status'] ?? 'not_paid'),
+                ),
+                if (reservation['allow_others'] != null)
+                  _buildDetailRow('يسمح للآخرين:',
+                      reservation['allow_others'] == true ? 'نعم' : 'لا', isDark),
+                const SizedBox(height: 16),
+                _buildModernActionButtons(
+                  {...reservation, 'phone_number': phone, 'guardian_phone': guardianPhone},
+                  status,
+                  (reservation['groom']?['id'] ?? reservation['groom_id'] ?? 0) as int,
+                  reservationId as int,
+                  '$firstName $lastName',
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Clan info
-        if (reservationId != null)
-          FutureBuilder<Map<String, dynamic>?>(
-            future: _getClanInfo(reservationId),
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) return const SizedBox.shrink();
-              final clanInfo = snapshot.data!;
-              return Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.purple.shade50,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.purple.shade200),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.groups, color: Colors.purple.shade600, size: 20),
-                    const SizedBox(width: 10),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('العشيرة الأصلية للعريس',
-                            style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.purple.shade400,
-                                fontWeight: FontWeight.w500)),
-                        Text(
-                          clanInfo['clan_name'] ?? 'غير محدد',
-                          style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.purple.shade800),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
+  );
+}
 
-        // Details
-        _buildDetailRow('الاسم الكامل:', '$firstName $lastName', isDark),
-        if (fatherName.isNotEmpty)
-          _buildDetailRow('اسم الأب:', fatherName, isDark),
-        if (phone.isNotEmpty)
-          _buildDetailRow('رقم الهاتف:', phone, isDark),
-        if (guardianName.isNotEmpty)
-          _buildDetailRow('ولي الأمر:', guardianName, isDark),
-        if (guardianPhone.isNotEmpty)
-          _buildDetailRow('هاتف الولي:', guardianPhone, isDark),
-        _buildDetailRow('اليوم الأول:', _formatDate(date1), isDark),
-        if (date2Bool && date2 != null)
-          _buildDetailRow('اليوم الثاني:', _formatDate(date2), isDark),
-        _buildDetailRow('حالة الحجز:', statusLabel, isDark, valueColor: statusColor),
-        _buildDetailRow(
-          'حالة الدفع:',
-          _getPaymentStatusText(reservation['payment_status'] ?? 'not_paid'),
-          isDark,
-          valueColor: _getPaymentStatusColor(reservation['payment_status'] ?? 'not_paid'),
-        ),
-        if (reservation['allow_others'] != null)
-          _buildDetailRow(
-            'يسمح للآخرين:',
-            reservation['allow_others'] == true ? 'نعم' : 'لا',
-            isDark,
-          ),
-        // const SizedBox(height: 16),
-        // // ACTION BUTTONS
-        // _buildModernActionButtons(
-        //   reservation,
-        //   nbStatus == 'validated' ? 'validated' : 'pending_validation',
-        //   (reservation['groom']?['id'] ?? reservation['groom_id'] ?? 0) as int,
-        //   reservationId as int,
-        //   '$firstName $lastName',
-        // ),
-        const SizedBox(height: 16),
-        _buildModernActionButtons(
-          {
-            ...reservation,
-            'phone_number': phone,
-            'guardian_phone': guardianPhone,
-          },
-          isCancelled ? 'cancelled' : isValidated ? 'validated' : 'pending_validation',
-          (reservation['groom']?['id'] ?? reservation['groom_id'] ?? 0) as int,
-          reservationId as int,
-          '$firstName $lastName',
-        ),
+Widget _buildBelongOutsideReservationCard(Map<String, dynamic> reservation, bool isDark) {
+  final status = reservation['status'] ?? 'pending_validation';
+  final isCancelled = status == 'cancelled';
+  final isValidated = status == 'validated';
+
+  final statusColor = isCancelled
+      ? Colors.red.shade400
+      : isValidated ? Colors.green.shade400 : Colors.orange.shade400;
+  final statusLabel = isCancelled ? 'ملغي' : isValidated ? 'مؤكد' : 'معلق';
+  final statusIcon = isCancelled
+      ? Icons.cancel_rounded
+      : isValidated ? Icons.check_circle_rounded : Icons.hourglass_empty_rounded;
+
+  final groomData = reservation['groom'] ?? {};
+  final firstName = groomData['first_name'] ?? reservation['first_name'] ?? 'غير محدد';
+  final lastName = groomData['last_name'] ?? reservation['last_name'] ?? '';
+  final fatherName = groomData['father_name'] ?? reservation['father_name'] ?? '';
+  final phone = groomData['phone_number'] ?? reservation['phone_number'] ?? '';
+  final date1 = reservation['date1'] ?? '';
+  final date2 = reservation['date2'];
+  final date2Bool = reservation['date2_bool'] ?? false;
+  final reservationClanId = reservation['clan_id'];
+  final reservationId = reservation['id'] ?? 0;
+  final guardianName = groomData['guardian_name'] ?? reservation['guardian_name'] ?? '';
+
+  return Container(
+    margin: const EdgeInsets.only(bottom: 14),
+    decoration: BoxDecoration(
+      color: isDark ? AppColors.darkCard : Colors.white,
+      borderRadius: BorderRadius.circular(20),
+      border: Border.all(color: Colors.teal.shade200, width: 1.5),
+      boxShadow: [
+        BoxShadow(color: Colors.teal.withOpacity(0.08), blurRadius: 10, offset: const Offset(0, 3)),
       ],
     ),
-  ),
-],
+    child: Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        tilePadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        childrenPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+        backgroundColor: isDark ? AppColors.darkCard : Colors.white,
+        collapsedBackgroundColor: isDark ? AppColors.darkCard : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        collapsedShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        leading: CircleAvatar(
+          backgroundColor: Colors.teal.shade100,
+          child: Icon(Icons.output, color: Colors.teal.shade700, size: 20),
+        ),
+        title: Text('$firstName $lastName',
+            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16,
+                color: isDark ? Colors.white : Colors.black87)),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 4),
+            if (phone.isNotEmpty)
+              Row(children: [
+                Icon(Icons.phone_rounded, size: 14,
+                    color: isDark ? Colors.grey.shade400 : Colors.grey.shade500),
+                const SizedBox(width: 4),
+                Text(phone, style: TextStyle(
+                    color: isDark ? Colors.grey.shade400 : Colors.grey.shade600, fontSize: 13)),
+              ]),
+            const SizedBox(height: 4),
+            Row(children: [
+              Icon(Icons.calendar_today_rounded, size: 14,
+                  color: isDark ? Colors.grey.shade400 : Colors.grey.shade500),
+              const SizedBox(width: 4),
+              Text(
+                '${_formatDate(date1)}${date2Bool && date2 != null ? ' - ${_formatDate(date2)}' : ''}',
+                style: TextStyle(
+                    color: isDark ? Colors.grey.shade400 : Colors.grey.shade600, fontSize: 13),
+              ),
+            ]),
+            const SizedBox(height: 8),
+            Row(children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: Colors.teal.shade100,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.teal.shade300),
+                ),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.output, size: 12, color: Colors.teal.shade700),
+                  const SizedBox(width: 4),
+                  Text('حجز خارج العشيرة',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
+                          color: Colors.teal.shade700)),
+                ]),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: statusColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: statusColor.withOpacity(0.4)),
+                ),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(statusIcon, size: 12, color: statusColor),
+                  const SizedBox(width: 4),
+                  Text(statusLabel,
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: statusColor)),
+                ]),
+              ),
+            ]),
+          ],
+        ),
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.darkInputBackground : Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (reservationClanId != null)
+                  FutureBuilder<Map<String, dynamic>?>(
+                    future: _getDestinationClanInfo(reservationClanId),
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData) return const SizedBox.shrink();
+                      final clanInfo = snapshot.data!;
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.teal.shade50,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: Colors.teal.shade200),
+                        ),
+                        child: Row(children: [
+                          Icon(Icons.location_on, color: Colors.teal.shade600, size: 20),
+                          const SizedBox(width: 10),
+                          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Text('العشيرة التي حجز فيها',
+                                style: TextStyle(fontSize: 11, color: Colors.teal.shade400,
+                                    fontWeight: FontWeight.w500)),
+                            Text(clanInfo['clan_name'] ?? 'غير محدد',
+                                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold,
+                                    color: Colors.teal.shade800)),
+                          ]),
+                        ]),
+                      );
+                    },
+                  ),
+                _buildDetailRow('الاسم الكامل:', '$firstName $lastName', isDark),
+                if (fatherName.isNotEmpty) _buildDetailRow('اسم الأب:', fatherName, isDark),
+                if (phone.isNotEmpty) _buildDetailRow('رقم الهاتف:', phone, isDark),
+                _buildDetailRow('تاريخ العرس:', _formatDate(date1), isDark),
+                if (date2Bool && date2 != null)
+                  _buildDetailRow('اليوم الثاني:', _formatDate(date2), isDark),
+                _buildDetailRow('حالة الحجز:', statusLabel, isDark, valueColor: statusColor),
+                _buildDetailRow(
+                  'حالة الدفع:',
+                  _getPaymentStatusText(reservation['payment_status'] ?? 'not_paid'),
+                  isDark,
+                  valueColor: _getPaymentStatusColor(reservation['payment_status'] ?? 'not_paid'),
+                ),
+                if (reservation['allow_others'] != null)
+                  _buildDetailRow('يسمح للآخرين:',
+                      reservation['allow_others'] == true ? 'نعم' : 'لا', isDark),
+                const SizedBox(height: 16),
+                _buildModernActionButtons(
+                  {...reservation, 'phone_number': phone, 'guardian_phone': guardianName},
+                  status,
+                  (reservation['groom']?['id'] ?? reservation['groom_id'] ?? 0) as int,
+                  reservationId as int,
+                  '$firstName $lastName',
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     ),
   );
@@ -3876,144 +4324,144 @@ Future<Map<String, dynamic>?> _getClanInfo(int reservationId) async {
   }
 }
 
-Widget _buildBelongOutsideReservationsPage(bool isDark) {
-  final allPending = _belongPendingOutsideReservations
-      .map((r) => Map<String, dynamic>.from({...r as Map, '_nb_status': 'pending'}))
-      .toList();
-  final allValidated = _belongValidatedOutsideReservations
-      .map((r) => Map<String, dynamic>.from({...r as Map, '_nb_status': 'validated'}))
-      .toList();
-  final allBelongOutside = [...allValidated, ...allPending];
+// Widget _buildBelongOutsideReservationsPage(bool isDark) {
+//   final allPending = _belongPendingOutsideReservations
+//       .map((r) => Map<String, dynamic>.from({...r as Map, '_nb_status': 'pending'}))
+//       .toList();
+//   final allValidated = _belongValidatedOutsideReservations
+//       .map((r) => Map<String, dynamic>.from({...r as Map, '_nb_status': 'validated'}))
+//       .toList();
+//   final allBelongOutside = [...allValidated, ...allPending];
 
-  // REMOVE this line:
-  // final allCancelled = allBelongOutside
-  //     .where((r) => (r['status'] ?? '') == 'cancelled')
-  //     .toList();
+//   // REMOVE this line:
+//   // final allCancelled = allBelongOutside
+//   //     .where((r) => (r['status'] ?? '') == 'cancelled')
+//   //     .toList();
 
-  final allCancelled = _belongCancelledOutsideReservations
-      .map((r) => Map<String, dynamic>.from({...r as Map, '_nb_status': 'cancelled'}))
-      .toList();
+//   final allCancelled = _belongCancelledOutsideReservations
+//       .map((r) => Map<String, dynamic>.from({...r as Map, '_nb_status': 'cancelled'}))
+//       .toList();
 
-  final allArchived = _belongArchivedOutsideReservations
-      .map((r) => Map<String, dynamic>.from(r as Map))
-      .toList();  
-  final allActive = [...allValidated, ...allPending]
-      .where((r) => !_isReservationArchived(r))
-      .toList();
-  final allActiveValidated = allValidated
-      .where((r) => !_isReservationArchived(r))
-      .toList();
-  final allActivePending = allPending
-      .where((r) => !_isReservationArchived(r))
-      .toList();
+//   final allArchived = _belongArchivedOutsideReservations
+//       .map((r) => Map<String, dynamic>.from(r as Map))
+//       .toList();  
+//   final allActive = [...allValidated, ...allPending]
+//       .where((r) => !_isReservationArchived(r))
+//       .toList();
+//   final allActiveValidated = allValidated
+//       .where((r) => !_isReservationArchived(r))
+//       .toList();
+//   final allActivePending = allPending
+//       .where((r) => !_isReservationArchived(r))
+//       .toList();
 
-  List<Map<String, dynamic>> applySearch(List<Map<String, dynamic>> list) {
-    if (_searchQuery.isEmpty) return list;
-    final q = _searchQuery.toLowerCase();
-    return list.where((r) {
-      final groomData = r['groom'] ?? {};
-      return (groomData['first_name']?.toString().toLowerCase() ?? '').contains(q) ||
-          (groomData['last_name']?.toString().toLowerCase() ?? '').contains(q) ||
-          (r['first_name']?.toString().toLowerCase() ?? '').contains(q) ||
-          (r['last_name']?.toString().toLowerCase() ?? '').contains(q) ||
-          (groomData['phone_number']?.toString() ?? '').contains(q);
-    }).toList();
-  }
+//   List<Map<String, dynamic>> applySearch(List<Map<String, dynamic>> list) {
+//     if (_searchQuery.isEmpty) return list;
+//     final q = _searchQuery.toLowerCase();
+//     return list.where((r) {
+//       final groomData = r['groom'] ?? {};
+//       return (groomData['first_name']?.toString().toLowerCase() ?? '').contains(q) ||
+//           (groomData['last_name']?.toString().toLowerCase() ?? '').contains(q) ||
+//           (r['first_name']?.toString().toLowerCase() ?? '').contains(q) ||
+//           (r['last_name']?.toString().toLowerCase() ?? '').contains(q) ||
+//           (groomData['phone_number']?.toString() ?? '').contains(q);
+//     }).toList();
+//   }
 
-  final filteredAll = applySearch(allActive);
-  final filteredValidated = applySearch(allActiveValidated);
-  final filteredPending = applySearch(allActivePending);
-  final filteredCancelled = applySearch(allCancelled);
-  final filteredArchived = applySearch(allArchived);
+//   final filteredAll = applySearch(allActive);
+//   final filteredValidated = applySearch(allActiveValidated);
+//   final filteredPending = applySearch(allActivePending);
+//   final filteredCancelled = applySearch(allCancelled);
+//   final filteredArchived = applySearch(allArchived);
 
-  return DefaultTabController(
-    length: 5,
-    child: Column(
-      children: [
-        // Header banner
-        Container(
-          margin: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Colors.teal.shade600, Colors.teal.shade800],
-            ),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.output, color: Colors.white, size: 22),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'حجزو في خارج العشيرة',
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold),
-                    ),
-                    Text(
-                      'عرسان من عشيرتنا يحجزون في قاعات عشائر أخرى',
-                      style: TextStyle(
-                          color: Colors.white.withOpacity(0.85), fontSize: 11),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
+//   return DefaultTabController(
+//     length: 5,
+//     child: Column(
+//       children: [
+//         // Header banner
+//         Container(
+//           margin: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+//           padding: const EdgeInsets.all(14),
+//           decoration: BoxDecoration(
+//             gradient: LinearGradient(
+//               colors: [Colors.teal.shade600, Colors.teal.shade800],
+//             ),
+//             borderRadius: BorderRadius.circular(16),
+//           ),
+//           child: Row(
+//             children: [
+//               Container(
+//                 padding: const EdgeInsets.all(8),
+//                 decoration: BoxDecoration(
+//                   color: Colors.white.withOpacity(0.2),
+//                   shape: BoxShape.circle,
+//                 ),
+//                 child: const Icon(Icons.output, color: Colors.white, size: 22),
+//               ),
+//               const SizedBox(width: 10),
+//               Expanded(
+//                 child: Column(
+//                   crossAxisAlignment: CrossAxisAlignment.start,
+//                   children: [
+//                     const Text(
+//                       'حجزو في خارج العشيرة',
+//                       style: TextStyle(
+//                           color: Colors.white,
+//                           fontSize: 15,
+//                           fontWeight: FontWeight.bold),
+//                     ),
+//                     Text(
+//                       'عرسان من عشيرتنا يحجزون في قاعات عشائر أخرى',
+//                       style: TextStyle(
+//                           color: Colors.white.withOpacity(0.85), fontSize: 11),
+//                     ),
+//                   ],
+//                 ),
+//               ),
+//             ],
+//           ),
+//         ),
 
-        // Inner tabs
-        Container(
-          color: isDark ? AppColors.darkCard : Colors.white,
-          margin: const EdgeInsets.only(top: 8),
-          child: TabBar(
-            isScrollable: true,
-            tabAlignment: TabAlignment.start,
-            indicatorColor: Colors.teal.shade400,
-            labelColor: Colors.teal.shade400,
-            unselectedLabelColor:
-                isDark ? Colors.grey.shade400 : Colors.grey.shade600,
-            labelStyle: TextStyle(
-              fontWeight: FontWeight.w600,
-              fontSize: MediaQuery.of(context).size.width < 600 ? 11 : 13,
-            ),
-            tabs: [
-              Tab(text: 'الكل (${filteredAll.length})'),
-              Tab(text: 'مؤكدة (${filteredValidated.length})'),
-              Tab(text: 'معلقة (${filteredPending.length})'),
-              Tab(text: 'ملغاة (${filteredCancelled.length})'),
-              Tab(text: 'أرشيف (${filteredArchived.length})'),
-            ],
-          ),
-        ),
+//         // Inner tabs
+//         Container(
+//           color: isDark ? AppColors.darkCard : Colors.white,
+//           margin: const EdgeInsets.only(top: 8),
+//           child: TabBar(
+//             isScrollable: true,
+//             tabAlignment: TabAlignment.start,
+//             indicatorColor: Colors.teal.shade400,
+//             labelColor: Colors.teal.shade400,
+//             unselectedLabelColor:
+//                 isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+//             labelStyle: TextStyle(
+//               fontWeight: FontWeight.w600,
+//               fontSize: MediaQuery.of(context).size.width < 600 ? 11 : 13,
+//             ),
+//             tabs: [
+//               Tab(text: 'الكل (${filteredAll.length})'),
+//               Tab(text: 'مؤكدة (${filteredValidated.length})'),
+//               Tab(text: 'معلقة (${filteredPending.length})'),
+//               Tab(text: 'ملغاة (${filteredCancelled.length})'),
+//               Tab(text: 'أرشيف (${filteredArchived.length})'),
+//             ],
+//           ),
+//         ),
 
-        Expanded(
-          child: TabBarView(
-            children: [
-              _buildBelongOutsideList(filteredAll, isDark),
-              _buildBelongOutsideList(filteredValidated, isDark),
-              _buildBelongOutsideList(filteredPending, isDark),
-              _buildBelongOutsideList(filteredCancelled, isDark),
-              _buildBelongOutsideList(filteredArchived, isDark),
-            ],
-          ),
-        ),
-      ],
-    ),
-  );
-}
+//         Expanded(
+//           child: TabBarView(
+//             children: [
+//               _buildBelongOutsideList(filteredAll, isDark),
+//               _buildBelongOutsideList(filteredValidated, isDark),
+//               _buildBelongOutsideList(filteredPending, isDark),
+//               _buildBelongOutsideList(filteredCancelled, isDark),
+//               _buildBelongOutsideList(filteredArchived, isDark),
+//             ],
+//           ),
+//         ),
+//       ],
+//     ),
+//   );
+// }
 
 // Widget _buildBelongOutsideList(List<Map<String, dynamic>> items, bool isDark) {
 //   if (items.isEmpty) {
@@ -4116,236 +4564,6 @@ Widget _buildBelongOutsideList(List<Map<String, dynamic>> items, bool isDark) {
   );
 }
 
-Widget _buildBelongOutsideReservationCard(Map<String, dynamic> reservation, bool isDark) {
-  final nbStatus = reservation['_nb_status'] ?? 'pending';
-  final isCancelled = nbStatus == 'cancelled';
-  final isValidated = nbStatus == 'validated';
-  
-  final statusColor = isCancelled
-      ? Colors.red.shade400
-      : isValidated
-          ? Colors.green.shade400
-          : Colors.orange.shade400;
-  final statusLabel = isCancelled ? 'ملغي' : isValidated ? 'مؤكد' : 'معلق';
-  final statusIcon = isCancelled
-      ? Icons.cancel_rounded
-      : isValidated
-          ? Icons.check_circle_rounded
-          : Icons.hourglass_empty_rounded;
-
-  final groomData = reservation['groom'] ?? {};
-  final firstName = groomData['first_name'] ?? reservation['first_name'] ?? 'غير محدد';
-  final lastName = groomData['last_name'] ?? reservation['last_name'] ?? '';
-  final fatherName = groomData['father_name'] ?? reservation['father_name'] ?? '';
-  final phone = groomData['phone_number'] ?? reservation['phone_number'] ?? '';
-  final date1 = reservation['date1'] ?? '';
-  final date2 = reservation['date2'];
-  final date2Bool = reservation['date2_bool'] ?? false;
-  final reservationClanId = reservation['clan_id'];
-  final reservationId = reservation['id'] ?? 0;
-  final groomId = reservation['groom_id'] ?? 0;
-  final guardianName = groomData['guardian_name'] ?? reservation['guardian_name'] ?? '';
-
-  return Container(
-    margin: const EdgeInsets.only(bottom: 14),
-    decoration: BoxDecoration(
-      color: isDark ? AppColors.darkCard : Colors.white,
-      borderRadius: BorderRadius.circular(20),
-      border: Border.all(color: Colors.teal.shade200, width: 1.5),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.teal.withOpacity(0.08),
-          blurRadius: 10,
-          offset: const Offset(0, 3),
-        ),
-      ],
-    ),
-    child: Theme(
-      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-      child: ExpansionTile(
-        tilePadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-        childrenPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-        backgroundColor: isDark ? AppColors.darkCard : Colors.white,
-        collapsedBackgroundColor: isDark ? AppColors.darkCard : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        collapsedShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        leading: CircleAvatar(
-          backgroundColor: Colors.teal.shade100,
-          child: Icon(Icons.output, color: Colors.teal.shade700, size: 20),
-        ),
-        title: Text(
-          '$firstName $lastName',
-          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16,
-              color: isDark ? Colors.white : Colors.black87),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 4),
-            if (phone.isNotEmpty)
-              Row(
-                children: [
-                  Icon(Icons.phone_rounded, size: 14,
-                      color: isDark ? Colors.grey.shade400 : Colors.grey.shade500),
-                  const SizedBox(width: 4),
-                  Text(phone,
-                      style: TextStyle(
-                          color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
-                          fontSize: 13)),
-                ],
-              ),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                Icon(Icons.calendar_today_rounded, size: 14,
-                    color: isDark ? Colors.grey.shade400 : Colors.grey.shade500),
-                const SizedBox(width: 4),
-                Text(
-                  '${_formatDate(date1)}${date2Bool && date2 != null ? ' - ${_formatDate(date2)}' : ''}',
-                  style: TextStyle(
-                      color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
-                      fontSize: 13),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: Colors.teal.shade100,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.teal.shade300),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.output, size: 12, color: Colors.teal.shade700),
-                      const SizedBox(width: 4),
-                      Text('حجز خارج العشيرة',
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
-                              color: Colors.teal.shade700)),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: statusColor.withOpacity(0.4)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(statusIcon, size: 12, color: statusColor),
-                      const SizedBox(width: 4),
-                      Text(statusLabel,
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
-                              color: statusColor)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-        children: [
-  Container(
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      color: isDark ? AppColors.darkInputBackground : Colors.grey.shade50,
-      borderRadius: BorderRadius.circular(12),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Destination clan info (where they reserved)
-        if (reservationClanId != null)
-          FutureBuilder<Map<String, dynamic>?>(
-            future: _getDestinationClanInfo(reservationClanId),
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) return const SizedBox.shrink();
-              final clanInfo = snapshot.data!;
-              return Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.teal.shade50,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.teal.shade200),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.location_on, color: Colors.teal.shade600, size: 20),
-                    const SizedBox(width: 10),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('العشيرة التي حجز فيها',
-                            style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.teal.shade400,
-                                fontWeight: FontWeight.w500)),
-                        Text(
-                          clanInfo['clan_name'] ?? 'غير محدد',
-                          style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.teal.shade800),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-
-        _buildDetailRow('الاسم الكامل:', '$firstName $lastName', isDark),
-        if (fatherName.isNotEmpty)
-          _buildDetailRow('اسم الأب:', fatherName, isDark),
-        if (phone.isNotEmpty)
-          _buildDetailRow('رقم الهاتف:', phone, isDark),
-        _buildDetailRow('اليوم الأول:', _formatDate(date1), isDark),
-        if (date2Bool && date2 != null)
-          _buildDetailRow('اليوم الثاني:', _formatDate(date2), isDark),
-        _buildDetailRow('حالة الحجز:', statusLabel, isDark, valueColor: statusColor),
-        _buildDetailRow(
-          'حالة الدفع:',
-          _getPaymentStatusText(reservation['payment_status'] ?? 'not_paid'),
-          isDark,
-          valueColor: _getPaymentStatusColor(reservation['payment_status'] ?? 'not_paid'),
-        ),
-        if (reservation['allow_others'] != null)
-          _buildDetailRow(
-            'يسمح للآخرين:',
-            reservation['allow_others'] == true ? 'نعم' : 'لا',
-            isDark,
-          ),
-        const SizedBox(height: 16),
-        _buildModernActionButtons(
-          {
-            ...reservation,
-            'phone_number': phone,
-            'guardian_phone': guardianName,
-          },
-          isCancelled ? 'cancelled' : isValidated ? 'validated' : 'pending_validation',
-          (reservation['groom']?['id'] ?? reservation['groom_id'] ?? 0) as int,
-          reservationId as int,
-          '$firstName $lastName',
-        ),
-      ],
-    ),
-  ),
-],
-      ),
-    ),
-  );
-}
-
 // Gets the destination clan name directly by clan_id (no reservation lookup needed here)
 Future<Map<String, dynamic>?> _getDestinationClanInfo(int clanId) async {
   try {
@@ -4401,14 +4619,58 @@ Future<Map<String, dynamic>?> _getDestinationClanInfo(int clanId) async {
 //     ),
 //   );
 // }
+
+// Widget _buildBelongReservationsPage(bool isDark) {
+//   // Exclude archived items from the cancelled tab display
+//   final cancelledActive = _getFilteredReservations(
+//     _cancelledReservations.where((r) => !_isReservationArchived(r)).toList(),
+//   );
+
+//   return DefaultTabController(
+//     length: 4,
+//     child: Column(
+//       children: [
+//         Container(
+//           color: isDark ? AppColors.darkCard : Colors.white,
+//           child: TabBar(
+//             isScrollable: true,
+//             tabAlignment: TabAlignment.start,
+//             indicatorColor: Colors.blue.shade400,
+//             labelColor: Colors.blue.shade400,
+//             unselectedLabelColor: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+//             labelStyle: TextStyle(
+//               fontWeight: FontWeight.w600,
+//               fontSize: MediaQuery.of(context).size.width < 600 ? 11 : 13,
+//             ),
+//             tabs: [
+//               Tab(text: 'الكل (${_allReservations.length})'),
+//               Tab(text: 'معلقة (${_pendingReservations.length})'),
+//               Tab(text: 'ملغاة (${cancelledActive.length})'),
+//               Tab(text: 'أرشيف (${_archivedReservations.length})'),
+//             ],
+//           ),
+//         ),
+//         Expanded(
+//           child: TabBarView(
+//             children: [
+//               _buildReservationsList(_getFilteredReservations(_allReservations), 'all', isDark),
+//               _buildReservationsList(_getFilteredReservations(_pendingReservations), 'pending', isDark),
+//               _buildReservationsList(cancelledActive, 'cancelled', isDark),
+//               _buildReservationsList(_getFilteredReservations(_archivedReservations), 'archived', isDark),
+//             ],
+//           ),
+//         ),
+//       ],
+//     ),
+//   );
+// }
 Widget _buildBelongReservationsPage(bool isDark) {
-  // Exclude archived items from the cancelled tab display
   final cancelledActive = _getFilteredReservations(
     _cancelledReservations.where((r) => !_isReservationArchived(r)).toList(),
   );
 
   return DefaultTabController(
-    length: 4,
+    length: 5,
     child: Column(
       children: [
         Container(
@@ -4425,6 +4687,7 @@ Widget _buildBelongReservationsPage(bool isDark) {
             ),
             tabs: [
               Tab(text: 'الكل (${_allReservations.length})'),
+              Tab(text: 'مؤكدة (${_validatedReservations.length})'),
               Tab(text: 'معلقة (${_pendingReservations.length})'),
               Tab(text: 'ملغاة (${cancelledActive.length})'),
               Tab(text: 'أرشيف (${_archivedReservations.length})'),
@@ -4435,6 +4698,7 @@ Widget _buildBelongReservationsPage(bool isDark) {
           child: TabBarView(
             children: [
               _buildReservationsList(_getFilteredReservations(_allReservations), 'all', isDark),
+              _buildReservationsList(_getFilteredReservations(_validatedReservations), 'validated', isDark),
               _buildReservationsList(_getFilteredReservations(_pendingReservations), 'pending', isDark),
               _buildReservationsList(cancelledActive, 'cancelled', isDark),
               _buildReservationsList(_getFilteredReservations(_archivedReservations), 'archived', isDark),
